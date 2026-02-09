@@ -92,7 +92,13 @@ export class Renderer {
       this.drawGroundItem(item.pos, item.itemId);
     }
 
-    // Draw entities sorted by depth (y+x for isometric)
+    // Draw dead entities (corpses) — flat, faded, with loot indicator
+    const corpses = state.entities.filter((e) => e.dead && e.inventory.length > 0);
+    for (const corpse of corpses) {
+      this.drawCorpse(corpse);
+    }
+
+    // Draw living entities sorted by depth (y+x for isometric)
     const sorted = [...state.entities]
       .filter((e) => !e.dead)
       .sort((a, b) => (a.pos.y + a.pos.x) - (b.pos.y + b.pos.x));
@@ -263,6 +269,39 @@ export class Renderer {
       ctx.fillRect(bx, by, barW, barH);
       ctx.fillStyle = ratio > 0.5 ? "#40c040" : ratio > 0.25 ? "#c4703a" : "#b83030";
       ctx.fillRect(bx, by, barW * ratio, barH);
+    }
+  }
+
+  private drawCorpse(entity: Entity) {
+    const { ctx } = this;
+    const wx = (entity.pos.x - entity.pos.y) * TILE_HALF_W;
+    const wy = (entity.pos.x + entity.pos.y) * TILE_HALF_H;
+
+    // Flat body shape (knocked down, faded)
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = "#5C4A3A";
+    ctx.save();
+    ctx.translate(wx, wy - 2);
+    ctx.scale(1.4, 0.4); // flatten
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Blood stain under body
+    ctx.fillStyle = "rgba(100, 10, 10, 0.5)";
+    ctx.beginPath();
+    ctx.ellipse(wx, wy + 2, 14, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Loot indicator — pulsing bag icon
+    if (entity.inventory.length > 0) {
+      const pulse = Math.sin(Date.now() / 400) * 0.3 + 0.7;
+      ctx.fillStyle = `rgba(196, 112, 58, ${pulse})`;
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("[LOOT]", wx, wy - 14);
     }
   }
 

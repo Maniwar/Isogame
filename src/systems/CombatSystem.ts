@@ -22,8 +22,10 @@ export class CombatSystem {
     state.activeCombatIdx = 0;
     state.combatLog = [];
     state.targetBodyPart = null;
-    state.combatPending = null;
+    state.combatActionQueue = [];
+    state.combatExecuting = false;
     state.combatTurnDelay = 0;
+    state.bodyPartPanelOpen = false;
 
     // Reset AP for all combatants
     for (const e of combatants) {
@@ -64,8 +66,9 @@ export class CombatSystem {
       return;
     }
 
-    // Clear pending action on turn change
-    state.combatPending = null;
+    // Clear action queue on turn change
+    state.combatActionQueue = [];
+    state.combatExecuting = false;
 
     // Add delay between turns so player can see what's happening
     if (current && !current.isPlayer) {
