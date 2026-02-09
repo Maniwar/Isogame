@@ -70,6 +70,52 @@ export interface Stats {
   luck: number;
 }
 
+/** Body parts for targeted shots */
+export type BodyPart = "head" | "torso" | "left_arm" | "right_arm" | "left_leg" | "right_leg";
+
+/** Body part targeting modifiers */
+export interface BodyPartMod {
+  label: string;
+  hitMod: number;        // multiplier on hit chance (1.0 = normal)
+  damageMod: number;     // multiplier on damage
+  critBonus: number;     // added to crit chance
+  crippleChance: number; // chance to cripple on hit
+}
+
+export const BODY_PARTS: Record<BodyPart, BodyPartMod> = {
+  head:      { label: "Head",      hitMod: 0.4, damageMod: 1.6, critBonus: 0.15, crippleChance: 0.25 },
+  torso:     { label: "Torso",     hitMod: 1.0, damageMod: 1.0, critBonus: 0.0,  crippleChance: 0.0 },
+  left_arm:  { label: "Left Arm",  hitMod: 0.65, damageMod: 0.9, critBonus: 0.05, crippleChance: 0.2 },
+  right_arm: { label: "Right Arm", hitMod: 0.65, damageMod: 0.9, critBonus: 0.05, crippleChance: 0.2 },
+  left_leg:  { label: "Left Leg",  hitMod: 0.65, damageMod: 0.85, critBonus: 0.05, crippleChance: 0.2 },
+  right_leg: { label: "Right Leg", hitMod: 0.65, damageMod: 0.85, critBonus: 0.05, crippleChance: 0.2 },
+};
+
+/** Crippled body parts on an entity */
+export interface CrippleState {
+  head: boolean;       // blinded — reduced perception
+  left_arm: boolean;   // weakened grip — reduced damage
+  right_arm: boolean;  // weakened grip — reduced damage
+  left_leg: boolean;   // hobbled — costs 2 AP per step
+  right_leg: boolean;  // hobbled — costs 2 AP per step
+}
+
+/** Combat log entry */
+export interface CombatLogEntry {
+  text: string;
+  color: string;
+  turn: number;
+}
+
+/** Pending combat action awaiting confirmation */
+export interface CombatPendingAction {
+  type: "attack" | "move";
+  targetTile: { x: number; y: number };
+  targetEntity?: Entity;
+  apCost: number;
+  bodyPart?: BodyPart;
+}
+
 /** Animation state names */
 export type AnimationName = "idle" | "walk" | "attack";
 
@@ -98,6 +144,7 @@ export interface Entity {
   moveProgress: number;      // 0..1 interpolation between tiles
   dead: boolean;
   anim: AnimState;
+  crippled: CrippleState;
 }
 
 /** Item definition */
@@ -182,6 +229,11 @@ export interface GameState {
   notifications: Notification[];
   gameTime: number;          // in-game hours elapsed
   vfx: VFX[];
+  combatLog: CombatLogEntry[];
+  targetBodyPart: BodyPart | null;
+  combatPending: CombatPendingAction | null;
+  combatTurnDelay: number;   // ms remaining before next turn processes
+  lootTarget: Entity | null;  // dead entity being looted
 }
 
 export interface Notification {
