@@ -1,0 +1,11 @@
+# Generated assets — do not commit large binary output
+output/
+processed/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment
+.env

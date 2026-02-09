@@ -27,7 +27,12 @@ Isogame/
 │   ├── portraits/         # Dialogue character portraits
 │   ├── ui/                # UI elements (HUD frames, buttons)
 │   └── audio/             # Sound effects and music
-├── scripts/               # Build scripts, asset pipelines, tooling
+├── scripts/
+│   └── asset-gen/         # AI asset generation pipeline (Gemini API)
+│       ├── config.yaml    # Style, palette, dimensions, batch definitions
+│       ├── generate.py    # Main generation script
+│       ├── postprocess.py # Palette reduction, resizing, sprite sheets
+│       └── prompts/       # Prompt templates per asset category
 ├── tests/                 # Test files
 ├── docs/                  # Additional documentation
 └── config/                # Game configuration files
@@ -42,7 +47,7 @@ To be finalized. Likely candidates based on project goals:
 - **Build tool:** Vite, Webpack, or similar bundler
 - **Package manager:** npm or yarn
 - **Testing:** Jest, Vitest, or pytest depending on language choice
-- **Asset pipeline:** Custom scripts (Python) for batch processing and sprite sheet generation
+- **Asset pipeline:** Python scripts using Gemini API for AI-generated art, plus Pillow/NumPy for post-processing
 
 ## Development Workflow
 
@@ -127,14 +132,57 @@ When working in this repository:
 7. **Document new systems** — add brief inline comments for complex game logic
 8. **Preserve save compatibility** — be cautious with changes to serialized data structures
 
-## Useful Commands
+## Asset Generation Pipeline
 
-Commands will be added here as the build system is configured:
+The `scripts/asset-gen/` directory contains a complete AI-powered asset pipeline using Google's Gemini API.
+
+### Quick Start
 
 ```bash
-# Placeholder — update once tooling is set up
+cd scripts/asset-gen
+pip install -r requirements.txt
+export GEMINI_API_KEY="your-key"
+
+# Preview prompts (no API calls)
+python generate.py --dry-run
+
+# Generate a specific category
+python generate.py --category tiles
+
+# Post-process generated assets
+python postprocess.py
+```
+
+### Pipeline Overview
+
+1. **generate.py** — Calls Gemini API with crafted prompts to produce raw images
+2. **postprocess.py** — Enforces palette consistency, resizes to exact dimensions, cleans transparency, assembles sprite sheets
+3. **config.yaml** — Central config for palette colors, tile dimensions, batch definitions, and API settings
+4. **prompts/** — Modular prompt templates for tiles, characters, items, and portraits
+
+### Style Consistency
+
+- Feed reference images via `--reference-dir` (up to 14 images) for multi-reference style guidance
+- Post-processor maps all colors to the defined Fallout 2 palette
+- Character sprites are generated per-direction with consistent prompt phrasing
+
+See `scripts/asset-gen/README.md` for full documentation.
+
+## Useful Commands
+
+```bash
+# Asset generation
+cd scripts/asset-gen
+python generate.py --dry-run              # Preview all prompts
+python generate.py --category tiles       # Generate tile assets
+python generate.py --category characters  # Generate character sprites
+python generate.py --category items       # Generate item icons
+python generate.py --category portraits   # Generate NPC portraits
+python generate.py                        # Generate everything
+python postprocess.py                     # Post-process all output
+
+# Game (once configured)
 npm run dev          # Start development server
 npm run build        # Production build
 npm run test         # Run test suite
-npm run lint         # Lint source code
 ```

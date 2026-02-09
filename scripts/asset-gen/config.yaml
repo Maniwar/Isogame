@@ -1,0 +1,148 @@
+# Isogame Asset Generation Configuration
+# Style and pipeline settings for Gemini-based asset generation
+
+style:
+  name: "Post-Apocalyptic Isometric"
+  description: >
+    Fallout 2-inspired isometric pixel art. Muted, desaturated colors with
+    earthy browns, rust oranges, dusty yellows, and faded greens. Gritty,
+    weathered surfaces. Retro-futuristic 1950s Americana meets nuclear wasteland.
+  keywords:
+    - "isometric pixel art"
+    - "post-apocalyptic wasteland"
+    - "Fallout 2 style"
+    - "retro-futuristic"
+    - "top-down 3/4 view"
+    - "muted desaturated palette"
+
+# Target palette — Fallout 2 post-apocalyptic color scheme
+palette:
+  # Ground / earth tones
+  sand_light: "#D4C4A0"
+  sand_dark: "#B8A67C"
+  dirt: "#8B7355"
+  dirt_dark: "#6B5340"
+  mud: "#5C4A3A"
+
+  # Rust / metal
+  rust_light: "#C4703A"
+  rust: "#A0522D"
+  rust_dark: "#7A3B1E"
+  metal_light: "#9E9E8E"
+  metal_dark: "#6E6E5E"
+
+  # Vegetation (sparse, dying)
+  green_faded: "#7A8B5A"
+  green_dark: "#4A5B3A"
+  brown_green: "#6B7B4A"
+
+  # Sky / atmosphere
+  sky_haze: "#C8BFA0"
+  shadow: "#3A3A2E"
+  black: "#1E1E16"
+
+  # Accent
+  nuclear_glow: "#8EC44A"
+  warning_red: "#B83030"
+  pip_green: "#40C040"
+
+# Resolution and tile geometry
+tiles:
+  base_width: 128        # Tile width in pixels
+  base_height: 64        # Tile height in pixels (2:1 ratio for isometric)
+  wall_height: 128       # Additional height for wall tiles
+  format: "png"
+  transparent_bg: true   # Use transparent backgrounds for compositing
+
+sprites:
+  base_width: 64
+  base_height: 96        # Taller than wide for character proportions
+  directions: 8          # N, NE, E, SE, S, SW, W, NW
+  format: "png"
+  transparent_bg: true
+
+items:
+  icon_size: 64          # Square icons for inventory
+  format: "png"
+  transparent_bg: true
+
+portraits:
+  width: 200
+  height: 200
+  format: "png"
+
+# Gemini API settings
+api:
+  model: "gemini-2.0-flash-exp"  # Model with image generation support
+  requests_per_minute: 10        # Rate limiting
+  retry_attempts: 3
+  retry_delay_seconds: 5
+  output_format: "png"
+
+# Batch definitions for proof-of-concept
+batches:
+  ground_tiles:
+    count: 20
+    category: "tiles/ground"
+    variants:
+      - name: "cracked-earth"
+        count: 4
+        description: "Dry, cracked desert ground with fine dust"
+      - name: "sand"
+        count: 3
+        description: "Sandy wasteland terrain, wind-swept"
+      - name: "dirt-road"
+        count: 3
+        description: "Worn dirt path or road"
+      - name: "rubble"
+        count: 3
+        description: "Concrete and brick rubble, demolished buildings"
+      - name: "dead-grass"
+        count: 3
+        description: "Patches of dead, brown grass on dirt"
+      - name: "asphalt-broken"
+        count: 2
+        description: "Cracked, broken asphalt road surface"
+      - name: "concrete-floor"
+        count: 2
+        description: "Interior concrete floor, stained and cracked"
+
+  wall_tiles:
+    count: 10
+    category: "tiles/walls"
+    variants:
+      - name: "brick-wall"
+        count: 2
+        description: "Weathered red brick wall, partially crumbling"
+      - name: "concrete-wall"
+        count: 2
+        description: "Reinforced concrete wall, cracks and rebar visible"
+      - name: "corrugated-metal"
+        count: 2
+        description: "Rusty corrugated sheet metal wall"
+      - name: "sandbag"
+        count: 2
+        description: "Stacked sandbag fortification wall"
+      - name: "chain-link-fence"
+        count: 2
+        description: "Damaged chain-link fence with barbed wire"
+
+  terrain_tiles:
+    count: 10
+    category: "tiles/terrain"
+    variants:
+      - name: "water-puddle"
+        count: 2
+        description: "Irradiated green-tinged water puddle"
+      - name: "crater"
+        count: 2
+        description: "Small impact crater or sinkhole"
+      - name: "toxic-waste"
+        count: 2
+        description: "Barrel of toxic waste, glowing green leak"
+      - name: "campfire"
+        count: 2
+        description: "Makeshift campfire with stones and debris"
+      - name: "scrap-pile"
+        count: 2
+        description: "Pile of scrap metal and junk parts"
