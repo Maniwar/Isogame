@@ -275,12 +275,10 @@ export class Renderer {
 
       switch (vfx.type) {
         case "projectile": {
-          // Yellow bullet trail from attacker to target
           ctx.globalAlpha = alpha;
           ctx.strokeStyle = vfx.color;
           ctx.lineWidth = 2;
           ctx.beginPath();
-          // Animate: trail sweeps from source to target
           const headX = vfx.fromX + (vfx.toX - vfx.fromX) * Math.min(1, progress * 2);
           const headY = vfx.fromY + (vfx.toY - vfx.fromY) * Math.min(1, progress * 2);
           const tailProgress = Math.max(0, progress * 2 - 0.5);
@@ -290,19 +288,18 @@ export class Renderer {
           ctx.lineTo(headX, headY);
           ctx.stroke();
 
-          // Muzzle flash at source (early in animation)
+          // Muzzle flash
           if (progress < 0.3) {
             const flashAlpha = (0.3 - progress) / 0.3;
             ctx.fillStyle = `rgba(255, 200, 60, ${flashAlpha})`;
             ctx.beginPath();
-            ctx.arc(vfx.fromX, vfx.fromY, 4 + progress * 8, 0, Math.PI * 2);
+            ctx.arc(vfx.fromX, vfx.fromY, 4 + progress * 10, 0, Math.PI * 2);
             ctx.fill();
           }
 
-          // Impact spark at target (late in animation)
+          // Impact spark
           if (progress > 0.5) {
-            const sparkAlpha = alpha * 0.8;
-            ctx.fillStyle = `rgba(255, 100, 50, ${sparkAlpha})`;
+            ctx.fillStyle = `rgba(255, 100, 50, ${alpha * 0.8})`;
             ctx.beginPath();
             ctx.arc(vfx.toX, vfx.toY, 3, 0, Math.PI * 2);
             ctx.fill();
@@ -312,7 +309,6 @@ export class Renderer {
         }
 
         case "slash": {
-          // Melee slash arc
           ctx.globalAlpha = alpha;
           ctx.strokeStyle = vfx.color;
           ctx.lineWidth = 3;
@@ -320,21 +316,20 @@ export class Renderer {
           const midX = (vfx.fromX + vfx.toX) / 2;
           const midY = (vfx.fromY + vfx.toY) / 2;
           const angle = Math.atan2(vfx.toY - vfx.fromY, vfx.toX - vfx.fromX);
-          const sweep = progress * Math.PI * 0.6;
+          const sweep = progress * Math.PI * 0.8;
 
           ctx.beginPath();
-          ctx.arc(midX, midY, 12, angle - sweep / 2, angle + sweep / 2);
+          ctx.arc(midX, midY, 14, angle - sweep / 2, angle + sweep / 2);
           ctx.stroke();
 
           // Impact sparks
           if (progress > 0.3) {
-            const numSparks = 3;
-            for (let i = 0; i < numSparks; i++) {
-              const sparkAngle = angle + (i - 1) * 0.4;
-              const dist = 6 + progress * 10;
+            for (let i = 0; i < 4; i++) {
+              const sparkAngle = angle + (i - 1.5) * 0.5;
+              const dist = 6 + progress * 14;
               const sx = vfx.toX + Math.cos(sparkAngle) * dist;
               const sy = vfx.toY + Math.sin(sparkAngle) * dist;
-              ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 0.6})`;
+              ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 0.7})`;
               ctx.fillRect(sx - 1, sy - 1, 2, 2);
             }
           }
@@ -343,15 +338,92 @@ export class Renderer {
         }
 
         case "damage_number": {
-          // Float upward with fade
           const curX = vfx.fromX + (vfx.toX - vfx.fromX) * progress;
           const curY = vfx.fromY + (vfx.toY - vfx.fromY) * progress;
+          const severity = vfx.intensity ?? 5;
+          const fontSize = Math.min(16, 8 + severity * 0.5);
 
           ctx.globalAlpha = alpha;
-          ctx.fillStyle = vfx.color;
-          ctx.font = "bold 10px monospace";
+          // Shadow for readability
+          ctx.fillStyle = "rgba(0,0,0,0.6)";
+          ctx.font = `bold ${fontSize}px monospace`;
           ctx.textAlign = "center";
+          ctx.fillText(vfx.text ?? "", curX + 1, curY + 1);
+          // Colored text
+          ctx.fillStyle = vfx.color;
           ctx.fillText(vfx.text ?? "", curX, curY);
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "blood_burst": {
+          // Blood particles spray outward from impact point
+          const particles = vfx.particles ?? [];
+          ctx.globalAlpha = alpha;
+          for (const p of particles) {
+            const px = vfx.fromX + p.dx * progress * p.speed;
+            // Gravity: particles arc downward
+            const py = vfx.fromY + p.dy * progress * p.speed + progress * progress * 20;
+            const size = p.size * (1 - progress * 0.5);
+            ctx.fillStyle = vfx.color;
+            ctx.fillRect(px - size / 2, py - size / 2, size, size);
+          }
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "gore_chunk": {
+          // Larger debris pieces that fly out and tumble
+          const chunks = vfx.particles ?? [];
+          ctx.globalAlpha = alpha;
+          for (const c of chunks) {
+            const cx = vfx.fromX + c.dx * progress * c.speed;
+            const cy = vfx.fromY + c.dy * progress * c.speed + progress * progress * 30;
+            const size = c.size;
+            const rot = progress * c.speed * 0.1;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(rot);
+            ctx.fillStyle = vfx.color;
+            ctx.fillRect(-size / 2, -size / 2, size, size * 0.7);
+            // Darker edge
+            ctx.fillStyle = "rgba(60,10,10,0.5)";
+            ctx.fillRect(-size / 2, -size * 0.1, size, size * 0.2);
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "blood_pool": {
+          // Expanding dark pool under a corpse
+          const maxRadius = (vfx.intensity ?? 6) + 2;
+          const radius = maxRadius * Math.min(1, progress * 2);
+          ctx.globalAlpha = Math.min(alpha, 0.6);
+          ctx.fillStyle = vfx.color;
+          ctx.beginPath();
+          // Slightly oval for isometric perspective
+          ctx.ellipse(vfx.fromX, vfx.fromY + 4, radius * 1.2, radius * 0.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "hit_flash": {
+          // Brief red/white flash at hit location
+          const flashSize = 8 + (vfx.intensity ?? 5) * 0.5;
+          const flashProgress = progress < 0.5 ? progress * 2 : 2 - progress * 2;
+          ctx.globalAlpha = flashProgress * 0.8;
+          ctx.fillStyle = vfx.color;
+          ctx.beginPath();
+          ctx.arc(vfx.fromX, vfx.fromY, flashSize * flashProgress, 0, Math.PI * 2);
+          ctx.fill();
+          // Inner bright core
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(vfx.fromX, vfx.fromY, flashSize * flashProgress * 0.4, 0, Math.PI * 2);
+          ctx.fill();
           ctx.globalAlpha = 1;
           break;
         }

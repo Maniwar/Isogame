@@ -190,9 +190,18 @@ export interface Notification {
   timeLeft: number;
 }
 
-/** Visual effect (projectile line, floating number, etc.) */
+/** Visual effect types */
+export type VFXType =
+  | "projectile"   // bullet trail
+  | "slash"        // melee arc
+  | "damage_number"// floating text
+  | "blood_burst"  // blood particles spraying outward
+  | "blood_pool"   // expanding pool under corpse
+  | "hit_flash"    // red flash on target
+  | "gore_chunk";  // flying debris/chunks
+
 export interface VFX {
-  type: "projectile" | "slash" | "damage_number";
+  type: VFXType;
   fromX: number;     // world coords
   fromY: number;
   toX: number;
@@ -201,6 +210,10 @@ export interface VFX {
   color: string;
   timeLeft: number;
   duration: number;
+  /** Extra data: particle count, spread angle, severity, etc. */
+  intensity?: number;
+  /** Seeded random particles (pre-computed for consistent animation) */
+  particles?: { dx: number; dy: number; size: number; speed: number }[];
 }
 
 /** Isometric constants */

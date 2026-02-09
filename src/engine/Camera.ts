@@ -10,6 +10,13 @@ export class Camera {
   screenW = 800;
   screenH = 600;
 
+  // Screen shake
+  private shakeIntensity = 0;
+  private shakeDuration = 0;
+  private shakeElapsed = 0;
+  shakeOffsetX = 0;
+  shakeOffsetY = 0;
+
   resize(w: number, h: number) {
     this.screenW = w;
     this.screenH = h;
@@ -34,6 +41,28 @@ export class Camera {
   update() {
     this.x += (this.targetX - this.x) * this.smoothing;
     this.y += (this.targetY - this.y) * this.smoothing;
+
+    // Update screen shake
+    if (this.shakeElapsed < this.shakeDuration) {
+      this.shakeElapsed += 16; // ~60fps
+      const decay = 1 - this.shakeElapsed / this.shakeDuration;
+      const intensity = this.shakeIntensity * decay;
+      this.shakeOffsetX = (Math.random() * 2 - 1) * intensity;
+      this.shakeOffsetY = (Math.random() * 2 - 1) * intensity;
+    } else {
+      this.shakeOffsetX = 0;
+      this.shakeOffsetY = 0;
+    }
+  }
+
+  /** Trigger screen shake. Intensity in pixels, duration in ms. */
+  shake(intensity: number, duration: number) {
+    // Stack with existing shake if stronger
+    if (intensity > this.shakeIntensity * (1 - this.shakeElapsed / this.shakeDuration)) {
+      this.shakeIntensity = intensity;
+      this.shakeDuration = duration;
+      this.shakeElapsed = 0;
+    }
   }
 
   /** Pan camera by pixel delta (for drag) */
@@ -77,8 +106,14 @@ export class Camera {
     return this.worldToTile(this.screenToWorld(screen));
   }
 
-  /** Apply camera transform to canvas context */
+  /** Apply camera transform to canvas context (includes shake) */
   applyTransform(ctx: CanvasRenderingContext2D) {
-    ctx.setTransform(this.zoom, 0, 0, this.zoom, -this.x * this.zoom, -this.y * this.zoom);
+    const sx = this.shakeOffsetX;
+    const sy = this.shakeOffsetY;
+    ctx.setTransform(
+      this.zoom, 0, 0, this.zoom,
+      -(this.x + sx) * this.zoom,
+      -(this.y + sy) * this.zoom,
+    );
   }
 }

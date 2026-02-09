@@ -12,6 +12,7 @@ import { InventorySystem } from "../systems/InventorySystem";
 import { HUD } from "../ui/HUD";
 import { DialogueUI } from "../ui/DialogueUI";
 import { InventoryUI } from "../ui/InventoryUI";
+import { Sound } from "./Sound";
 import { GameState, GamePhase, Entity, TILE_HALF_W, TILE_HALF_H } from "../types";
 
 export class Game {
@@ -34,6 +35,9 @@ export class Game {
   private hud: HUD;
   private dialogueUI: DialogueUI;
   private inventoryUI: InventoryUI;
+
+  // Audio
+  private sound: Sound;
 
   // State
   state!: GameState;
@@ -59,6 +63,16 @@ export class Game {
     this.hud = new HUD();
     this.dialogueUI = new DialogueUI();
     this.inventoryUI = new InventoryUI();
+    this.sound = new Sound();
+
+    // Init audio on first user interaction (required by browsers)
+    const initAudio = () => {
+      this.sound.init();
+      window.removeEventListener("click", initAudio);
+      window.removeEventListener("touchstart", initAudio);
+    };
+    window.addEventListener("click", initAudio);
+    window.addEventListener("touchstart", initAudio);
 
     window.addEventListener("resize", () => {
       this.renderer.resize();
@@ -286,6 +300,7 @@ export class Game {
     // Init combat if needed
     if (state.combatQueue.length === 0) {
       this.combatSystem.initCombat(state);
+      this.sound.combatStart();
       this.notify("COMBAT INITIATED. Click enemies to attack. [SPACE] end turn.", "rgb(184, 48, 48)");
     }
 
@@ -349,8 +364,17 @@ export class Game {
         }
       }
     } else {
-      // AI turn
+      // AI turn — track HP before to detect hits
+      const playerHpBefore = state.player.stats.hp;
       this.combatSystem.aiTurn(state, current);
+
+      // Spawn VFX for AI attacks on player
+      const dmg = playerHpBefore - state.player.stats.hp;
+      if (dmg > 0) {
+        this.animationSystem.triggerAttack(current);
+        this.spawnAttackVFX(current, state.player, true, dmg);
+      }
+
       this.combatSystem.nextTurn(state);
     }
   }
@@ -452,11 +476,12 @@ export class Game {
     const tx = (target.pos.x - target.pos.y) * TILE_HALF_W;
     const ty = (target.pos.x + target.pos.y) * TILE_HALF_H;
 
-    // Determine if ranged or melee weapon
     const weapon = attacker.inventory.find((i) => i.equipped);
     const isRanged = weapon && (weapon.itemId === "10mm_pistol" || weapon.itemId === "pipe_rifle");
+    const isCrit = damage >= 15;
+    const killed = target.dead;
 
-    // Projectile or slash line
+    // --- Weapon effect (projectile or slash) ---
     this.state.vfx.push({
       type: isRanged ? "projectile" : "slash",
       fromX: ax, fromY: ay - 12,
@@ -466,18 +491,201 @@ export class Game {
       duration: 300,
     });
 
-    // Floating damage number
+    // --- Sound ---
+    if (isRanged) {
+      this.sound.gunshot();
+    } else {
+      this.sound.slash();
+    }
+
     if (hit) {
+      // Impact sound (scales with damage)
+      setTimeout(() => this.sound.impact(damage), isRanged ? 80 : 50);
+
+      if (isCrit) {
+        setTimeout(() => this.sound.critical(), 100);
+      }
+
+      // --- Hit flash ---
+      this.state.vfx.push({
+        type: "hit_flash",
+        fromX: tx, fromY: ty - 12,
+        toX: tx, toY: ty - 12,
+        color: isCrit ? "#ff2222" : "#ff6644",
+        timeLeft: 150 + damage * 5,
+        duration: 150 + damage * 5,
+        intensity: damage,
+      });
+
+      // --- Blood burst (scales with damage) ---
+      const particleCount = Math.min(25, 4 + damage * 1.5);
+      const bloodParticles = [];
+      for (let i = 0; i < particleCount; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 15 + Math.random() * 25 + damage;
+        bloodParticles.push({
+          dx: Math.cos(angle) * (0.5 + Math.random()),
+          dy: Math.sin(angle) * (0.5 + Math.random()) - 0.5,
+          size: 1 + Math.random() * (1.5 + damage * 0.15),
+          speed,
+        });
+      }
+      this.state.vfx.push({
+        type: "blood_burst",
+        fromX: tx, fromY: ty - 12,
+        toX: tx, toY: ty,
+        color: "#8b0000",
+        timeLeft: 400 + damage * 20,
+        duration: 400 + damage * 20,
+        intensity: damage,
+        particles: bloodParticles,
+      });
+
+      // Second burst in brighter red for heavy hits
+      if (damage >= 8) {
+        const burst2 = [];
+        for (let i = 0; i < Math.min(12, damage); i++) {
+          const angle = Math.random() * Math.PI * 2;
+          burst2.push({
+            dx: Math.cos(angle) * (0.3 + Math.random()),
+            dy: Math.sin(angle) * (0.3 + Math.random()) - 0.3,
+            size: 0.8 + Math.random() * 1.5,
+            speed: 20 + Math.random() * 15,
+          });
+        }
+        this.state.vfx.push({
+          type: "blood_burst",
+          fromX: tx + (Math.random() - 0.5) * 6,
+          fromY: ty - 10 + (Math.random() - 0.5) * 4,
+          toX: tx, toY: ty,
+          color: "#cc1111",
+          timeLeft: 350 + damage * 15,
+          duration: 350 + damage * 15,
+          particles: burst2,
+        });
+      }
+
+      // --- Gore chunks for critical/heavy damage ---
+      if (isCrit || damage >= 12) {
+        const chunkCount = Math.min(6, Math.floor(damage / 4));
+        const chunks = [];
+        for (let i = 0; i < chunkCount; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          chunks.push({
+            dx: Math.cos(angle) * (0.5 + Math.random() * 0.8),
+            dy: Math.sin(angle) * (0.5 + Math.random() * 0.5) - 0.8,
+            size: 2 + Math.random() * 3,
+            speed: 20 + Math.random() * 20,
+          });
+        }
+        this.state.vfx.push({
+          type: "gore_chunk",
+          fromX: tx, fromY: ty - 14,
+          toX: tx, toY: ty,
+          color: "#660000",
+          timeLeft: 600,
+          duration: 600,
+          intensity: damage,
+          particles: chunks,
+        });
+      }
+
+      // --- Screen shake (scales with damage) ---
+      if (damage >= 5) {
+        const shakeIntensity = Math.min(8, 1 + damage * 0.4);
+        const shakeDuration = Math.min(400, 100 + damage * 15);
+        this.camera.shake(shakeIntensity, shakeDuration);
+      }
+
+      // --- Floating damage number ---
       this.state.vfx.push({
         type: "damage_number",
         fromX: tx, fromY: ty - 24,
-        toX: tx, toY: ty - 60,
-        text: `-${damage}`,
-        color: damage >= 10 ? "#ff4444" : "#ffcc44",
-        timeLeft: 800,
-        duration: 800,
+        toX: tx, toY: ty - 65,
+        text: isCrit ? `CRIT -${damage}!` : `-${damage}`,
+        color: isCrit ? "#ff0000" : damage >= 10 ? "#ff4444" : "#ffcc44",
+        timeLeft: 1000,
+        duration: 1000,
+        intensity: damage,
       });
+
+      // --- Death effects ---
+      if (killed) {
+        setTimeout(() => this.sound.death(), 150);
+
+        // Big screen shake
+        this.camera.shake(6, 350);
+
+        // Blood pool under corpse
+        this.state.vfx.push({
+          type: "blood_pool",
+          fromX: tx, fromY: ty,
+          toX: tx, toY: ty,
+          color: "#4a0000",
+          timeLeft: 5000,
+          duration: 5000,
+          intensity: damage,
+        });
+
+        // Death burst — extra blood spray
+        const deathParticles = [];
+        for (let i = 0; i < 20; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          deathParticles.push({
+            dx: Math.cos(angle) * (0.5 + Math.random()),
+            dy: Math.sin(angle) * (0.3 + Math.random()) - 0.6,
+            size: 1.5 + Math.random() * 2.5,
+            speed: 25 + Math.random() * 30,
+          });
+        }
+        this.state.vfx.push({
+          type: "blood_burst",
+          fromX: tx, fromY: ty - 8,
+          toX: tx, toY: ty,
+          color: "#990000",
+          timeLeft: 700,
+          duration: 700,
+          intensity: 20,
+          particles: deathParticles,
+        });
+
+        // Gore chunks on death
+        const deathChunks = [];
+        for (let i = 0; i < 4; i++) {
+          const angle = Math.random() * Math.PI * 2;
+          deathChunks.push({
+            dx: Math.cos(angle) * (0.6 + Math.random()),
+            dy: Math.sin(angle) * (0.4 + Math.random()) - 1.0,
+            size: 2.5 + Math.random() * 3,
+            speed: 18 + Math.random() * 25,
+          });
+        }
+        this.state.vfx.push({
+          type: "gore_chunk",
+          fromX: tx, fromY: ty - 10,
+          toX: tx, toY: ty,
+          color: "#551111",
+          timeLeft: 800,
+          duration: 800,
+          particles: deathChunks,
+        });
+
+        // "KILLED" text
+        this.state.vfx.push({
+          type: "damage_number",
+          fromX: tx, fromY: ty - 35,
+          toX: tx, toY: ty - 75,
+          text: "KILLED",
+          color: "#ff0000",
+          timeLeft: 1200,
+          duration: 1200,
+          intensity: 20,
+        });
+      }
     } else {
+      // --- Miss ---
+      this.sound.miss();
+
       this.state.vfx.push({
         type: "damage_number",
         fromX: tx, fromY: ty - 24,
