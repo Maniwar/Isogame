@@ -51,16 +51,24 @@ ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
 
 
 def deploy(source: Path, target: Path) -> dict:
-    """Copy assets and build manifest."""
-    manifest: dict = {
-        "tiles": {},
-        "sprites": {},
-        "animations": {},
-        "weapons": {},
-        "objects": {},
-        "items": {},
-        "portraits": {},
-    }
+    """Copy assets and build manifest.
+
+    Merges with any existing manifest.json in the target directory so that
+    deploying a single category (e.g. tiles) doesn't erase entries from
+    a previous category (e.g. characters).
+    """
+    # Load existing manifest to preserve entries from earlier runs
+    existing_manifest_path = target / "manifest.json"
+    if existing_manifest_path.exists():
+        with open(existing_manifest_path) as f:
+            manifest: dict = json.load(f)
+        print(f"  Loaded existing manifest with sections: {list(manifest.keys())}")
+    else:
+        manifest = {}
+
+    # Ensure all sections exist
+    for section in ("tiles", "sprites", "animations", "weapons", "objects", "items", "portraits"):
+        manifest.setdefault(section, {})
 
     # Ensure target directories exist
     for subdir in ["tiles", "sprites", "weapons", "objects", "items", "portraits"]:

@@ -362,17 +362,15 @@ def slice_spritesheet(
     return frames
 
 
-def force_transparent_bg(image: Image.Image, threshold: int = 240) -> Image.Image:
-    """Force white/near-white AND chroma key green backgrounds to transparent.
-    Gemini can't generate true alpha — we use white for characters and
-    green (#00FF00) for weapon overlays."""
+def force_transparent_bg(image: Image.Image) -> Image.Image:
+    """Remove chroma key green (#00FF00) background pixels.
+    All prompts request bright green backgrounds for reliable extraction.
+    White stripping was removed to avoid damaging light-colored character details."""
     arr = np.array(image.convert("RGBA"))
     r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
-    # White/near-white pixels
-    is_white = (r > threshold) & (g > threshold) & (b > threshold)
-    # Chroma key green pixels (G dominant, R+B low)
+    # Chroma key green: G channel dominant, R and B low
     is_green = (g > 200) & (r < 80) & (b < 80)
-    arr[is_white | is_green, 3] = 0
+    arr[is_green, 3] = 0
     return Image.fromarray(arr, "RGBA")
 
 
