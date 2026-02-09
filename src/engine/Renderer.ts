@@ -265,11 +265,10 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
 
-    // Scale: AI sprites are 64x96 (green removed, full frame).
-    // Scale so the visible character (~42% of frame width) matches
-    // procedural sprite width (~24px).  56x84 achieves this.
-    const MAX_W = 56;
-    const MAX_H = 84;
+    // After green removal + crop, AI sprites are ~27x78.
+    // Cap to ~24px wide (matching procedural) and proportional height.
+    const MAX_W = 24;
+    const MAX_H = 70;
     let sw = sprite ? sprite.width : 24;
     let sh = sprite ? sprite.height : 36;
     if (sw > MAX_W || sh > MAX_H) {
@@ -289,10 +288,8 @@ export class Renderer {
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          // Weapon drawn at ~30% of character size, at hand position
-          const wScale = 0.35;
-          const ww = Math.round(sw * wScale);
-          const wh = Math.round(sh * wScale);
+          const ww = 12;
+          const wh = 10;
           const [xFrac, yFrac] = HAND_OFFSET[entity.direction] ?? [0.2, 0.55];
           const spriteTop = drawY - sh + TILE_HALF_H;
           const handX = drawX + sw * xFrac;
