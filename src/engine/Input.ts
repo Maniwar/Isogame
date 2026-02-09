@@ -20,9 +20,16 @@ export class Input {
   private canvas: HTMLCanvasElement;
   private lastMouse: ScreenPos = { x: 0, y: 0 };
 
+  // Touch state
+  private touchStartPos: ScreenPos | null = null;
+  private touchStartTime = 0;
+  private twoFingerDist = 0;
+  private isTouchDragging = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.bind();
+    this.bindTouch();
   }
 
   private bind() {
@@ -64,6 +71,94 @@ export class Input {
       this.wheelDelta += e.deltaY > 0 ? -0.25 : 0.25;
     }, { passive: false });
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  }
+
+  /**
+   * Touch input mapping:
+   *   - Single tap → left click (move / interact)
+   *   - Single finger drag → pan camera
+   *   - Two-finger pinch → zoom
+   */
+  private bindTouch() {
+    this.canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const pos = this.touchPos(t);
+        this.touchStartPos = pos;
+        this.touchStartTime = Date.now();
+        this.isTouchDragging = false;
+        this.mouse = pos;
+        this.lastMouse = pos;
+      }
+      if (e.touches.length === 2) {
+        this.twoFingerDist = this.pinchDist(e.touches);
+      }
+    }, { passive: false });
+
+    this.canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const t = e.touches[0];
+        const pos = this.touchPos(t);
+        this.mouse = pos;
+
+        // Start dragging after 8px movement threshold
+        if (this.touchStartPos) {
+          const dx = pos.x - this.touchStartPos.x;
+          const dy = pos.y - this.touchStartPos.y;
+          if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+            this.isTouchDragging = true;
+          }
+        }
+
+        if (this.isTouchDragging) {
+          this.dragging = true;
+          this.dragDelta.x += pos.x - this.lastMouse.x;
+          this.dragDelta.y += pos.y - this.lastMouse.y;
+        }
+        this.lastMouse = pos;
+      }
+      if (e.touches.length === 2) {
+        const newDist = this.pinchDist(e.touches);
+        const delta = newDist - this.twoFingerDist;
+        // Convert pinch distance to zoom (scale sensitivity)
+        if (Math.abs(delta) > 2) {
+          this.wheelDelta += delta > 0 ? 0.05 : -0.05;
+          this.twoFingerDist = newDist;
+        }
+      }
+    }, { passive: false });
+
+    this.canvas.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      if (e.changedTouches.length >= 1 && !this.isTouchDragging) {
+        // Tap = left click (only if we didn't drag)
+        const t = e.changedTouches[0];
+        const pos = this.touchPos(t);
+        const elapsed = Date.now() - this.touchStartTime;
+        if (elapsed < 300) {
+          this.mouseClicked.set("left", pos);
+        }
+      }
+      this.dragging = false;
+      this.isTouchDragging = false;
+      this.touchStartPos = null;
+    }, { passive: false });
+  }
+
+  private touchPos(t: Touch): ScreenPos {
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: (t.clientX - rect.left) * (this.canvas.width / rect.width),
+      y: (t.clientY - rect.top) * (this.canvas.height / rect.height),
+    };
+  }
+
+  private pinchDist(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   private toButton(b: number): MouseButton {

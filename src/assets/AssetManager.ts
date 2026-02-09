@@ -45,6 +45,14 @@ export class AssetManager {
   private loadedCount = 0;
   private totalToLoad = 0;
 
+  /** Resolve a path relative to the app's base URL (handles GitHub Pages subpath) */
+  private resolvePath(path: string): string {
+    const base = import.meta.env.BASE_URL || "/";
+    // Strip leading slash from path since base already ends with one
+    const clean = path.startsWith("/") ? path.slice(1) : path;
+    return `${base}${clean}`;
+  }
+
   /**
    * Initialize: generate procedural fallbacks, then try to load AI art on top.
    */
@@ -54,7 +62,7 @@ export class AssetManager {
 
     // Step 2: Attempt to load manifest and override with real PNGs
     try {
-      const resp = await fetch("/assets/manifest.json");
+      const resp = await fetch(this.resolvePath("assets/manifest.json"));
       if (resp.ok) {
         const manifest: AssetManifest = await resp.json();
         await this.loadFromManifest(manifest);
@@ -248,7 +256,8 @@ export class AssetManager {
         console.warn(`[AssetManager] Failed to load: ${path}`);
         resolve(null);
       };
-      img.src = path;
+      // Resolve path relative to base URL for GitHub Pages compatibility
+      img.src = this.resolvePath(path);
     });
   }
 
