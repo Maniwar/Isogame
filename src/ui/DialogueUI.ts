@@ -1,5 +1,6 @@
 import { GameState } from "../types";
 import type { Game } from "../engine/Game";
+import type { AssetManager } from "../assets/AssetManager";
 
 export class DialogueUI {
   private hoveredResponse = -1;
@@ -20,6 +21,7 @@ export class DialogueUI {
     screenW: number,
     screenH: number,
     game: Game,
+    assets?: AssetManager,
   ) {
     this.lastState = state;
     this.lastScreenH = screenH;
@@ -43,16 +45,33 @@ export class DialogueUI {
     ctx.lineTo(screenW, panelY);
     ctx.stroke();
 
+    // Portrait (if available for the selected NPC)
+    let textOffsetX = 0;
+    if (assets && state.selectedEntity) {
+      const portrait = assets.getPortrait(state.selectedEntity.spriteKey);
+      if (portrait) {
+        const pSize = 64;
+        const px = this.padding;
+        const py = panelY + 10;
+        // Draw portrait frame
+        ctx.strokeStyle = "#40c040";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - 1, py - 1, pSize + 2, pSize + 2);
+        ctx.drawImage(portrait, px, py, pSize, pSize);
+        textOffsetX = pSize + 12;
+      }
+    }
+
     // Speaker name
     ctx.fillStyle = "#40c040";
     ctx.font = "bold 14px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(node.speaker, this.padding, panelY + 25);
+    ctx.fillText(node.speaker, this.padding + textOffsetX, panelY + 25);
 
     // Dialogue text (word-wrap)
     ctx.fillStyle = "#d4c4a0";
     ctx.font = "13px monospace";
-    this.drawWrappedText(ctx, node.text, this.padding, panelY + 50, screenW - this.padding * 2, 16);
+    this.drawWrappedText(ctx, node.text, this.padding + textOffsetX, panelY + 50, screenW - this.padding * 2 - textOffsetX, 16);
 
     // Response options
     const mouseY = this.getMouseY();

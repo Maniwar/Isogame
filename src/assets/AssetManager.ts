@@ -199,12 +199,26 @@ export class AssetManager {
   private async loadFromManifest(manifest: AssetManifest) {
     const promises: Promise<void>[] = [];
 
-    // Tiles — skip AI tiles for now.
-    // The AI tiles at 128x64 don't tessellate cleanly as 64x32 isometric
-    // diamonds (edge artifacts, checkerboard bleed, style inconsistency).
-    // Procedural tiles are designed for the exact tile grid and look clean.
-    // AI tiles will be re-enabled once the generation pipeline produces
-    // tiles at native 64x32 resolution with proper diamond masking.
+    // Tiles — composite AI tiles onto procedural base.
+    // AI tiles are 128x64, pre-diamond-masked by postprocess.py.  Drawing
+    // the procedural tile first fills any edge gaps from clip anti-aliasing.
+    if (manifest.tiles) {
+      for (const [terrainName, path] of Object.entries(manifest.tiles)) {
+        const terrain = Terrain[terrainName as keyof typeof Terrain];
+        if (terrain !== undefined) {
+          this.totalToLoad++;
+          const proceduralBase = this.tiles.get(terrain);
+          promises.push(
+            this.loadImage(path).then((img) => {
+              if (img) {
+                this.tiles.set(terrain, this.compositeAiTile(img, proceduralBase));
+                this.loadedCount++;
+              }
+            }),
+          );
+        }
+      }
+    }
 
     // Sprites — keys are sprite keys, values are {direction: path}
     if (manifest.sprites) {
@@ -331,6 +345,24 @@ export class AssetManager {
     await Promise.all(promises);
   }
 
+  /** Composite an AI tile onto the procedural base tile to fill edge gaps. */
+  private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
+    const canvas = this.createCanvas(TILE_W, TILE_H);
+    const ctx = canvas.getContext("2d")!;
+    if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(TILE_HALF_W, 0);
+    ctx.lineTo(TILE_W, TILE_HALF_H);
+    ctx.lineTo(TILE_HALF_W, TILE_H);
+    ctx.lineTo(0, TILE_HALF_H);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
+    ctx.restore();
+    return canvas;
+  }
+
   /**
    * Remove green chroma-key background pixels from a loaded image.
    *
@@ -376,55 +408,15 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image, strip green background, and crop to content.
-   *
-   * The deployed sprites have green backgrounds baked in and characters
-   * shrunk to ~38% of the frame (due to the slicer treating green as
-   * content).  After removing green, we crop to the actual character
-   * content so the Renderer scales an appropriately-sized sprite
-   * instead of a mostly-empty 64x96 frame.
+   * Load a sprite image and strip green background.
+   * Keeps the full frame size (64x96) so all directions and animation
+   * frames share the same coordinate space — critical for weapon overlay
+   * alignment and consistent walk animation.
    */
   private async loadSpriteImage(path: string): Promise<HTMLCanvasElement | null> {
     const img = await this.loadImage(path);
     if (!img) return null;
-    const cleaned = this.removeGreenBg(img);
-    return this.cropToContent(cleaned);
-  }
-
-  /** Crop a canvas to the bounding box of its non-transparent content. */
-  private cropToContent(src: HTMLCanvasElement): HTMLCanvasElement {
-    const ctx = src.getContext("2d")!;
-    const imageData = ctx.getImageData(0, 0, src.width, src.height);
-    const data = imageData.data;
-    const w = src.width;
-    const h = src.height;
-
-    // Find bounding box of opaque pixels
-    let top = h, bottom = 0, left = w, right = 0;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (data[(y * w + x) * 4 + 3] > 10) {
-          if (y < top) top = y;
-          if (y > bottom) bottom = y;
-          if (x < left) left = x;
-          if (x > right) right = x;
-        }
-      }
-    }
-
-    // No content found — return as-is
-    if (top > bottom || left > right) return src;
-
-    const cw = right - left + 1;
-    const ch = bottom - top + 1;
-
-    // Don't bother cropping if content fills most of the frame
-    if (cw >= w * 0.9 && ch >= h * 0.9) return src;
-
-    const cropped = this.createCanvas(cw, ch);
-    const cctx = cropped.getContext("2d")!;
-    cctx.drawImage(src, left, top, cw, ch, 0, 0, cw, ch);
-    return cropped;
+    return this.removeGreenBg(img);
   }
 
   // -----------------------------------------------------------------------
