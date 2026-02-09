@@ -6,63 +6,64 @@
 
 **Isogame** is an isometric RPG game project inspired by classic titles like Fallout 2. The project aims to deliver a post-apocalyptic isometric role-playing experience with tile-based maps, character sprites, turn-based or real-time combat, dialogue systems, and inventory management.
 
-**Repository status:** Early-stage / greenfield — the project is being bootstrapped and conventions below should be followed as code is added.
-
 ## Repository Structure
 
 ```
 Isogame/
 ├── CLAUDE.md              # This file — AI assistant reference
-├── src/                   # Application source code (to be created)
-│   ├── engine/            # Core game engine (rendering, input, game loop)
-│   ├── systems/           # ECS or game systems (combat, dialogue, inventory)
-│   ├── entities/          # Game entities and components
-│   ├── ui/                # HUD, menus, dialogue UI
-│   ├── maps/              # Map loading, tile management, pathfinding
-│   └── utils/             # Shared utilities and helpers
-├── assets/                # Game assets
-│   ├── tiles/             # Isometric tilesets (ground, walls, terrain)
-│   ├── sprites/           # Character and NPC sprite sheets
-│   ├── items/             # Inventory and item icons
-│   ├── portraits/         # Dialogue character portraits
-│   ├── ui/                # UI elements (HUD frames, buttons)
-│   └── audio/             # Sound effects and music
+├── index.html             # Entry HTML — loads the game canvas
+├── package.json           # Node dependencies (vite, typescript)
+├── tsconfig.json          # TypeScript strict config
+├── vite.config.ts         # Vite dev server + build config
+├── src/
+│   ├── main.ts            # Boot sequence — init, load, start game loop
+│   ├── types.ts           # All shared types, enums, constants (TILE_W=64, TILE_H=32)
+│   ├── engine/
+│   │   ├── Game.ts        # Main game class — loop, phase routing, update/draw
+│   │   ├── Renderer.ts    # Isometric tile + entity + UI rendering
+│   │   ├── Camera.ts      # Pan, zoom, smooth follow, iso coordinate transforms
+│   │   └── Input.ts       # Keyboard + mouse state, drag, wheel, click tracking
+│   ├── systems/
+│   │   ├── MapSystem.ts   # Procedural map generation (40x40 wasteland)
+│   │   ├── EntitySystem.ts    # Entity factory (player + NPCs)
+│   │   ├── MovementSystem.ts  # A* pathfinding + smooth movement interpolation
+│   │   ├── CombatSystem.ts    # Turn-based combat (initiative, attack, AI)
+│   │   ├── DialogueSystem.ts  # Dialogue trees with branching + item rewards
+│   │   └── InventorySystem.ts # Item database, add/remove/use/equip
+│   ├── ui/
+│   │   ├── HUD.ts         # Health/AP bars, equipped weapon, game time, controls
+│   │   ├── DialogueUI.ts  # Full-screen dialogue panel with clickable responses
+│   │   └── InventoryUI.ts # Categorized inventory with use/equip on click
+│   └── assets/
+│       └── AssetManager.ts    # Procedural art generator (tiles, sprites, objects, items)
 ├── scripts/
 │   └── asset-gen/         # AI asset generation pipeline (Gemini API)
 │       ├── config.yaml    # Style, palette, dimensions, batch definitions
 │       ├── generate.py    # Main generation script
 │       ├── postprocess.py # Palette reduction, resizing, sprite sheets
 │       └── prompts/       # Prompt templates per asset category
-├── tests/                 # Test files
-├── docs/                  # Additional documentation
-└── config/                # Game configuration files
+└── dist/                  # Production build output (gitignored)
 ```
 
 ## Tech Stack
 
-To be finalized. Likely candidates based on project goals:
-
-- **Language:** TypeScript or Python
-- **Rendering:** HTML5 Canvas / WebGL, or a framework like Phaser / Pixi.js
-- **Build tool:** Vite, Webpack, or similar bundler
-- **Package manager:** npm or yarn
-- **Testing:** Jest, Vitest, or pytest depending on language choice
+- **Language:** TypeScript (strict mode)
+- **Rendering:** HTML5 Canvas 2D — raw API, no framework
+- **Build tool:** Vite 5
+- **Package manager:** npm
+- **Isometric engine:** Custom — 64x32 diamond tiles, 2:1 projection
 - **Asset pipeline:** Python scripts using Gemini API for AI-generated art, plus Pillow/NumPy for post-processing
+- **Procedural placeholders:** All art generated at runtime via Canvas 2D (no external images required)
 
 ## Development Workflow
 
 ### Getting Started
 
 ```bash
-# Clone the repository
-git clone <repo-url>
-cd Isogame
-
-# Install dependencies (once package.json exists)
-npm install   # or: pip install -r requirements.txt
-
-# Run in development mode (once configured)
-npm run dev   # or: python main.py
+npm install          # Install dependencies
+npm run dev          # Start dev server at localhost:3000
+npm run build        # Production build to dist/
+npx tsc --noEmit     # Type-check without emitting
 ```
 
 ### Branch Strategy
@@ -98,20 +99,28 @@ npm run dev   # or: python main.py
 - **Data-driven design:** Game content (maps, items, dialogue) should be defined in data files (JSON/YAML), not hardcoded
 - **Modularity:** Systems should be independently testable and loosely coupled
 
+### Isometric Coordinate System
+
+- Tile size: 64x32 pixels (2:1 ratio diamond)
+- Tile-to-screen: `screenX = (tileX - tileY) * 32`, `screenY = (tileX + tileY) * 16`
+- Rendering order: iterate `y` then `x` (painter's algorithm, back-to-front)
+- Constants defined in `src/types.ts`: `TILE_W`, `TILE_H`, `TILE_HALF_W`, `TILE_HALF_H`
+
 ### Asset Conventions
 
-- Isometric tiles should use a consistent base size (e.g., 64x32 or 128x64 pixels)
-- Sprite sheets should follow a standardized layout per entity type
-- Use a consistent, muted post-apocalyptic color palette
-- Asset file names: lowercase, hyphen-separated (e.g., `wasteland-ground-01.png`)
-- Keep raw/source assets separate from processed/optimized assets
+- Tile sprites: 64x32 isometric diamonds with transparent backgrounds
+- Character sprites: 24x36, generated for 8 directions (N, NE, E, SE, S, SW, W, NW)
+- Item icons: 20x20
+- All placeholder art is procedurally generated in `AssetManager.ts`
+- File names: lowercase, underscore-separated for sprite keys (e.g., `npc_sheriff`)
 
-### Map & Tile System
+### Map System
 
-- Maps are tile-based with isometric projection
-- Tile coordinates use a standard isometric grid system
-- Map data should be stored in a structured format (JSON or custom format)
-- Support for multiple layers (ground, objects, overhead)
+- Maps are 2D arrays of `Tile` objects (`tiles[y][x]`)
+- Terrain enum: Sand, Dirt, CrackedEarth, Rubble, Road, Concrete, Grass, Water
+- Collision enum: None (walkable), Solid (blocked), Water (impassable)
+- Tiles can have optional `object` keys (wall, barrel, rock)
+- Maps define spawn points, NPC spawns, and item pickups
 
 ## Testing
 
@@ -181,8 +190,37 @@ python generate.py --category portraits   # Generate NPC portraits
 python generate.py                        # Generate everything
 python postprocess.py                     # Post-process all output
 
-# Game (once configured)
-npm run dev          # Start development server
-npm run build        # Production build
-npm run test         # Run test suite
+# Game
+npm run dev                               # Dev server on localhost:3000
+npm run build                             # Production build
+npx tsc --noEmit                          # Type-check
 ```
+
+## Game Controls
+
+- **Left click** — Move player / interact with NPCs / attack in combat
+- **Right drag** — Pan camera
+- **Scroll wheel** — Zoom in/out
+- **TAB** — Toggle inventory
+- **C** — Toggle combat mode
+- **SPACE** — End turn (combat)
+- **ESC** — Cancel / return to explore mode
+
+## Game Content
+
+### Current Map: "Dusty Springs" (40x40)
+- Settlement in center with 3 buildings (sheriff office, trading post, clinic)
+- Roads cross through the middle
+- Water borders, scattered rocks/barrels, varied terrain
+
+### NPCs
+- **Sheriff Morgan** — Quest giver (raider clearing quest, gives stimpak)
+- **Scrapper Joe** — Merchant (sells stimpaks, Nuka-Cola)
+- **Doc Hendricks** — Healer (free stimpak on first visit)
+- **3 Raiders** — Hostile, northwest and southeast of settlement
+
+### Items (12 types)
+- Weapons: 10mm Pistol, Pipe Rifle, Combat Knife, Baseball Bat
+- Armor: Leather Armor
+- Consumables: Stimpak, Rad-Away, Nuka-Cola, Canned Food
+- Misc: Bottle Caps, Bobby Pin, Holotape
