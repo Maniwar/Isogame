@@ -145,28 +145,34 @@ When working in this repository:
 
 The `scripts/asset-gen/` directory contains a complete AI-powered asset pipeline using Google's Gemini API.
 
-### Quick Start
+### Full Workflow: Generate -> Process -> Deploy -> Play
 
 ```bash
 cd scripts/asset-gen
 pip install -r requirements.txt
 export GEMINI_API_KEY="your-key"
 
-# Preview prompts (no API calls)
-python generate.py --dry-run
+# Step 1: Generate raw art via Gemini API
+python generate.py --category tiles       # Start with tiles to validate style
+python generate.py                        # Or generate everything
 
-# Generate a specific category
-python generate.py --category tiles
-
-# Post-process generated assets
+# Step 2: Post-process (palette, resize, sprite sheets)
 python postprocess.py
+
+# Step 3: Deploy into game's public/ directory + generate manifest.json
+python deploy-assets.py
+
+# Step 4: Play — game auto-loads AI art, falls back to procedural
+cd ../..
+npm run dev
 ```
 
 ### Pipeline Overview
 
-1. **generate.py** — Calls Gemini API with crafted prompts to produce raw images
-2. **postprocess.py** — Enforces palette consistency, resizes to exact dimensions, cleans transparency, assembles sprite sheets
-3. **config.yaml** — Central config for palette colors, tile dimensions, batch definitions, and API settings
+1. **generate.py** — Calls Gemini API with crafted prompts to produce raw PNGs in `output/`
+2. **postprocess.py** — Palette reduction, resize to game dimensions, transparency cleanup → `processed/`
+3. **deploy-assets.py** — Copies processed assets into `public/assets/` and generates `manifest.json`
+4. **AssetManager.ts** — At runtime, loads `manifest.json`, fetches PNGs, falls back to procedural for any missing assets
 4. **prompts/** — Modular prompt templates for tiles, characters, items, and portraits
 
 ### Style Consistency

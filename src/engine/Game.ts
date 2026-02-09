@@ -63,8 +63,8 @@ export class Game {
   async init() {
     this.renderer.resize();
 
-    // Generate procedural assets
-    this.assets.generateAll();
+    // Load assets: tries AI-generated PNGs first, falls back to procedural
+    await this.assets.init();
 
     // Build map
     const map = this.mapSystem.generateWastelandMap(40, 40);

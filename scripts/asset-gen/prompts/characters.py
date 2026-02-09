@@ -41,32 +41,56 @@ REFERENCE_FOLLOW_UP = (
 )
 
 
-# Pre-defined character archetypes for the proof of concept
+# Character archetypes — sprite_key must match the game's entity spriteKey values
 CHARACTER_ARCHETYPES = [
     {
-        "name": "Wastelander",
+        "sprite_key": "player",
+        "name": "Wanderer",
         "description": (
             "A rugged wasteland survivor wearing patched leather armor, "
             "a dusty duster coat, and a gas mask hanging around the neck. "
-            "Carries a makeshift rifle on the back."
+            "Carries a makeshift rifle on the back. Green-tinted goggles on forehead."
         ),
         "pose": "standing idle",
     },
     {
+        "sprite_key": "npc_sheriff",
+        "name": "Sheriff Morgan",
+        "description": (
+            "A grizzled older woman with short gray hair, a sheriff's star pinned "
+            "to a leather duster, a scar across her left cheek, and a holstered "
+            "revolver on her hip. Sturdy boots, weathered but authoritative."
+        ),
+        "pose": "standing idle, hands near belt",
+    },
+    {
+        "sprite_key": "npc_merchant",
+        "name": "Scrapper Joe",
+        "description": (
+            "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
+            "full of goods, and a worn but clean outfit. Friendly posture. "
+            "Belts with pouches and trinkets hanging off them."
+        ),
+        "pose": "standing idle",
+    },
+    {
+        "sprite_key": "npc_doc",
+        "name": "Doc Hendricks",
+        "description": (
+            "A middle-aged man with round glasses, thinning hair, a stained lab coat "
+            "over a sweater vest, and ink-stained fingers. Carries a medical bag."
+        ),
+        "pose": "standing idle",
+    },
+    {
+        "sprite_key": "npc_raider",
         "name": "Raider",
         "description": (
             "An aggressive raider with spiked shoulder pads, torn clothing, "
-            "face paint, and a mohawk. Carries a lead pipe."
+            "face paint, and a mohawk. Carries a lead pipe. "
+            "Red cloth armband, menacing posture."
         ),
         "pose": "standing idle, menacing stance",
-    },
-    {
-        "name": "Merchant",
-        "description": (
-            "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
-            "full of goods, and a worn but clean outfit. Friendly posture."
-        ),
-        "pose": "standing idle",
     },
 ]
 

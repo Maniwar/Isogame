@@ -72,15 +72,28 @@ asset-gen/
 ├── config.yaml          # Style, palette, dimensions, batch definitions
 ├── generate.py          # Main generation script (Gemini API)
 ├── postprocess.py       # Palette reduction, resizing, sprite sheets
+├── deploy-assets.py     # Copy processed assets into game's public/ + manifest
 ├── requirements.txt     # Python dependencies
 ├── prompts/
 │   ├── tiles.py         # Tile prompt templates
-│   ├── characters.py    # Character sprite prompt templates
-│   ├── items.py         # Inventory icon prompt templates
+│   ├── characters.py    # Character sprite prompt templates (sprite_key mapped to game)
+│   ├── items.py         # Inventory icon prompt templates (icon_key mapped to game)
 │   └── portraits.py     # NPC portrait prompt templates
 ├── output/              # Raw generated assets (gitignored)
 └── processed/           # Post-processed assets (gitignored)
 ```
+
+## Deploying to the Game
+
+After generating and post-processing assets, deploy them into the game:
+
+```bash
+python deploy-assets.py
+```
+
+This copies processed PNGs into `../../public/assets/` and generates a `manifest.json`.
+The game's `AssetManager` loads the manifest at startup and uses AI art for any asset
+that has a PNG, falling back to procedural for the rest. No code changes needed.
 
 ## Configuration
 

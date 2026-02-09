@@ -17,31 +17,27 @@ ITEM_TEMPLATE = (
     "No text, no labels, no watermarks."
 )
 
-# Pre-defined item categories for proof of concept
+# Item catalog — icon_key must match the game's ITEM_DB icon values in InventorySystem.ts
 ITEM_CATALOG = [
     # Weapons
-    {"name": "Pipe Rifle", "description": "A makeshift rifle assembled from pipes and scrap metal, held together with duct tape", "category": "weapons"},
-    {"name": "Combat Knife", "description": "A sturdy military combat knife with a worn leather grip", "category": "weapons"},
-    {"name": "Molotov Cocktail", "description": "A glass bottle filled with fuel, rag stuffed in the neck", "category": "weapons"},
-    {"name": "10mm Pistol", "description": "A well-used semi-automatic pistol, scratched and dented", "category": "weapons"},
-    {"name": "Baseball Bat", "description": "A wooden baseball bat with nails driven through the head", "category": "weapons"},
+    {"name": "10mm Pistol", "icon_key": "item_pistol", "description": "A well-used semi-automatic pistol, scratched and dented", "category": "weapons"},
+    {"name": "Pipe Rifle", "icon_key": "item_rifle", "description": "A makeshift rifle assembled from pipes and scrap metal, held together with duct tape", "category": "weapons"},
+    {"name": "Combat Knife", "icon_key": "item_knife", "description": "A sturdy military combat knife with a worn leather grip", "category": "weapons"},
+    {"name": "Baseball Bat", "icon_key": "item_bat", "description": "A wooden baseball bat with nails driven through the head", "category": "weapons"},
 
     # Armor
-    {"name": "Leather Armor", "description": "Patched leather chest armor with metal studs", "category": "armor"},
-    {"name": "Metal Helmet", "description": "A dented military-style metal helmet with scratches", "category": "armor"},
-    {"name": "Combat Boots", "description": "Heavy-duty military boots, worn but sturdy", "category": "armor"},
+    {"name": "Leather Armor", "icon_key": "item_armor", "description": "Patched leather chest armor with metal studs", "category": "armor"},
 
     # Consumables
-    {"name": "Stimpak", "description": "A medical syringe with a red cross label, futuristic 1950s design", "category": "consumables"},
-    {"name": "Rad-Away", "description": "An IV bag filled with amber anti-radiation fluid", "category": "consumables"},
-    {"name": "Canned Food", "description": "A dented tin can with a faded, peeling food label", "category": "consumables"},
-    {"name": "Dirty Water", "description": "A plastic bottle of murky, slightly greenish water", "category": "consumables"},
-    {"name": "Nuka-Cola", "description": "A retro-futuristic glass soda bottle with a rocket-shaped logo, glowing slightly", "category": "consumables"},
+    {"name": "Stimpak", "icon_key": "item_stimpak", "description": "A medical syringe with a red cross label, futuristic 1950s design", "category": "consumables"},
+    {"name": "Rad-Away", "icon_key": "item_radaway", "description": "An IV bag filled with amber anti-radiation fluid", "category": "consumables"},
+    {"name": "Nuka-Cola", "icon_key": "item_nuka", "description": "A retro-futuristic glass soda bottle with a rocket-shaped logo, glowing slightly", "category": "consumables"},
+    {"name": "Canned Food", "icon_key": "item_food", "description": "A dented tin can with a faded, peeling food label", "category": "consumables"},
 
     # Misc
-    {"name": "Bottle Caps", "description": "A small pile of metal bottle caps used as currency", "category": "misc"},
-    {"name": "Bobby Pin", "description": "A bent hair pin used for lockpicking", "category": "misc"},
-    {"name": "Holotape", "description": "A small retro-futuristic data cassette tape", "category": "misc"},
+    {"name": "Bottle Caps", "icon_key": "item_caps", "description": "A small pile of metal bottle caps used as currency", "category": "misc"},
+    {"name": "Bobby Pin", "icon_key": "item_pin", "description": "A bent hair pin used for lockpicking", "category": "misc"},
+    {"name": "Holotape", "icon_key": "item_holotape", "description": "A small retro-futuristic data cassette tape", "category": "misc"},
 ]
 
 

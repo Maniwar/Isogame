@@ -222,11 +222,12 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     print(f"\n--- Generating character sprites ---")
 
     for char in CHARACTER_ARCHETYPES:
-        char_dir = OUTPUT_DIR / "sprites" / char["name"].lower().replace(" ", "-")
-        print(f"\n  Character: {char['name']}")
+        sprite_key = char.get("sprite_key", char["name"].lower().replace(" ", "-"))
+        char_dir = OUTPUT_DIR / "sprites" / sprite_key
+        print(f"\n  Character: {char['name']} (sprite_key: {sprite_key})")
 
         for direction in DIRECTIONS:
-            filename = f"{char['name'].lower().replace(' ', '-')}-{direction.lower()}.png"
+            filename = f"{sprite_key}-{direction.lower()}.png"
             output_path = char_dir / filename
 
             prompt = build_character_prompt(
@@ -263,7 +264,8 @@ def generate_items(client: genai.Client, config: dict, dry_run: bool,
 
     for item in ITEM_CATALOG:
         cat_dir = OUTPUT_DIR / "items" / item["category"]
-        filename = f"{item['name'].lower().replace(' ', '-')}.png"
+        icon_key = item.get("icon_key", item["name"].lower().replace(" ", "-"))
+        filename = f"{icon_key}.png"
         output_path = cat_dir / filename
 
         prompt = build_item_prompt(item["name"], item["description"], config)
