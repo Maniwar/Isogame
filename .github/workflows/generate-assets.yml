@@ -109,6 +109,20 @@ jobs:
           else
             ASSET_COUNT=$(git diff --staged --name-only | grep -c '\.png$' || true)
             git commit -m "assets: Generate ${{ inputs.category }} — ${ASSET_COUNT} images via Gemini"
-            git push
-            echo "Committed and pushed ${ASSET_COUNT} asset files"
+
+            # Retry push up to 4 times with exponential backoff (GitHub 500s are transient)
+            for attempt in 1 2 3 4; do
+              echo "Push attempt $attempt..."
+              if git push; then
+                echo "Committed and pushed ${ASSET_COUNT} asset files"
+                exit 0
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                DELAY=$((2 ** attempt))
+                echo "::warning::Push failed (attempt $attempt/4). Retrying in ${DELAY}s..."
+                sleep $DELAY
+              fi
+            done
+            echo "::error::Push failed after 4 attempts"
+            exit 1
           fi
