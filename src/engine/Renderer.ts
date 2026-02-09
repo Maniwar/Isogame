@@ -13,13 +13,13 @@ import {
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
 
-/** Maps item IDs to weapon sprite keys used in the asset manifest */
-const WEAPON_SPRITE_MAP: Record<string, string> = {
-  "10mm_pistol": "weapon_pistol",
-  "pipe_rifle": "weapon_rifle",
-  "combat_knife": "weapon_knife",
-  "baseball_bat": "weapon_bat",
-};
+// Weapon overlay map — disabled until pipeline produces correctly sliced weapons.
+// const WEAPON_SPRITE_MAP: Record<string, string> = {
+//   "10mm_pistol": "weapon_pistol",
+//   "pipe_rifle": "weapon_rifle",
+//   "combat_knife": "weapon_knife",
+//   "baseball_bat": "weapon_bat",
+// };
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -265,26 +265,10 @@ export class Renderer {
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
     }
 
-    // Draw equipped weapon overlay on top of character
-    const equippedItem = entity.inventory.find((i) => i.equipped);
-    if (equippedItem) {
-      const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
-      if (weaponSpriteKey) {
-        const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
-        if (weaponSprite) {
-          const MAX_WPN_W = 32;
-          const MAX_WPN_H = 80;
-          let ww = weaponSprite.width;
-          let wh = weaponSprite.height;
-          if (ww > MAX_WPN_W || wh > MAX_WPN_H) {
-            const scale = Math.min(MAX_WPN_W / ww, MAX_WPN_H / wh);
-            ww = Math.round(ww * scale);
-            wh = Math.round(wh * scale);
-          }
-          ctx.drawImage(weaponSprite, drawX - ww / 2, drawY - wh + TILE_HALF_H, ww, wh);
-        }
-      }
-    }
+    // Weapon overlays disabled — the current AI weapon sprites were sliced
+    // from a 4x4 sheet into an 8x4 grid (wrong grid), AND content-cropping
+    // the character sprite shifts its anchor so weapon overlays can't align.
+    // Will re-enable after re-running the asset pipeline with fixed slicing.
 
     // Draw name tag
     ctx.fillStyle = entity.isPlayer
