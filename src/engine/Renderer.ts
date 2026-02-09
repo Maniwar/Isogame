@@ -250,14 +250,16 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
     if (sprite) {
-      // Scale AI sprites (64x96) down to fit the tile grid.
-      // Procedural sprites are 24x36; cap width at 28px and scale proportionally.
-      const MAX_SPRITE_W = 28;
+      // Scale sprites to fit the tile grid.
+      // After green removal + content crop, AI sprites are ~27x78.
+      // Procedural sprites are 24x36.  Cap dimensions proportionally.
+      const MAX_W = 32;
+      const MAX_H = 80;
       let sw = sprite.width;
       let sh = sprite.height;
-      if (sw > MAX_SPRITE_W) {
-        const scale = MAX_SPRITE_W / sw;
-        sw = MAX_SPRITE_W;
+      if (sw > MAX_W || sh > MAX_H) {
+        const scale = Math.min(MAX_W / sw, MAX_H / sh);
+        sw = Math.round(sw * scale);
         sh = Math.round(sh * scale);
       }
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
@@ -270,12 +272,13 @@ export class Renderer {
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          const MAX_WEAPON_W = 28;
+          const MAX_WPN_W = 32;
+          const MAX_WPN_H = 80;
           let ww = weaponSprite.width;
           let wh = weaponSprite.height;
-          if (ww > MAX_WEAPON_W) {
-            const scale = MAX_WEAPON_W / ww;
-            ww = MAX_WEAPON_W;
+          if (ww > MAX_WPN_W || wh > MAX_WPN_H) {
+            const scale = Math.min(MAX_WPN_W / ww, MAX_WPN_H / wh);
+            ww = Math.round(ww * scale);
             wh = Math.round(wh * scale);
           }
           ctx.drawImage(weaponSprite, drawX - ww / 2, drawY - wh + TILE_HALF_H, ww, wh);

@@ -200,16 +200,20 @@ export class AssetManager {
     const promises: Promise<void>[] = [];
 
     // Tiles — keys are Terrain enum names: "Sand", "Dirt", etc.
-    // Diamond-mask each loaded tile to clip away rectangular backgrounds.
+    // AI tiles are 128x64 and pre-diamond-masked in postprocess.
+    // Composite them onto the procedural tile base so any edge artifacts
+    // or bad transparency (checkerboard baked in, etc.) show the clean
+    // procedural color underneath instead of black gaps.
     if (manifest.tiles) {
       for (const [terrainName, path] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
         if (terrain !== undefined) {
           this.totalToLoad++;
+          const proceduralBase = this.tiles.get(terrain);
           promises.push(
             this.loadImage(path).then((img) => {
               if (img) {
-                this.tiles.set(terrain, this.maskTileToDiamond(img));
+                this.tiles.set(terrain, this.compositeAiTile(img, proceduralBase));
                 this.loadedCount++;
               }
             }),
@@ -344,13 +348,25 @@ export class AssetManager {
   }
 
   /**
-   * Mask an image to the isometric diamond shape (64x32) so that
-   * AI-generated tiles with non-transparent rectangular backgrounds
-   * only show within the diamond area.
+   * Composite an AI-generated tile onto a procedural base tile.
+   *
+   * AI tiles are 128x64, pre-diamond-masked in postprocess.py, but often
+   * have checkerboard artifacts or imperfect edge transparency.  Drawing
+   * the procedural tile first ensures any gaps show the correct terrain
+   * color instead of black.  A diamond clip prevents rectangular leftovers
+   * from leaking outside the tile footprint.
    */
-  private maskTileToDiamond(img: HTMLImageElement): HTMLCanvasElement {
+  private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
     const ctx = canvas.getContext("2d")!;
+
+    // 1. Draw procedural base tile (fills entire diamond with solid color)
+    if (base) {
+      ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
+    }
+
+    // 2. Clip to diamond and draw AI tile on top (scaled from 128x64 → 64x32)
+    ctx.save();
     ctx.beginPath();
     ctx.moveTo(TILE_HALF_W, 0);
     ctx.lineTo(TILE_W, TILE_HALF_H);
@@ -359,13 +375,18 @@ export class AssetManager {
     ctx.closePath();
     ctx.clip();
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
+    ctx.restore();
+
     return canvas;
   }
 
   /**
    * Remove green chroma-key background pixels from a loaded image.
-   * AI-generated sprites often have bright green backgrounds that
-   * survive the postprocess pipeline.
+   *
+   * The AI pipeline generates sprites on bright green backgrounds.
+   * After palette reduction the green often gets mapped to palette
+   * colors like nuclear_glow (#8EC44A) or pip_green (#40C040), so
+   * we need aggressive thresholds that catch these mapped colors too.
    */
   private removeGreenBg(img: HTMLImageElement): HTMLCanvasElement {
     const canvas = this.createCanvas(img.width, img.height);
@@ -378,9 +399,10 @@ export class AssetManager {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      // Catch green-dominant pixels: green channel bright and much higher than r and b
-      if ((g > 150 && g > r * 1.5 && g > b * 1.5) ||
-          (g > 200 && r < 100 && b < 100)) {
+      // Green-dominant: g channel must be bright and clearly above r and b.
+      // Threshold tuned to catch palette-mapped greens like #8EC44A (142,196,74)
+      // while preserving skin tones, earth tones, and grays.
+      if (g > 120 && g > r * 1.2 && g > b * 1.2) {
         data[i + 3] = 0;
       }
     }
@@ -402,11 +424,56 @@ export class AssetManager {
     });
   }
 
-  /** Load an image and strip green chroma-key background */
+  /**
+   * Load a sprite image, strip green background, and crop to content.
+   *
+   * The deployed sprites have green backgrounds baked in and characters
+   * shrunk to ~38% of the frame (due to the slicer treating green as
+   * content).  After removing green, we crop to the actual character
+   * content so the Renderer scales an appropriately-sized sprite
+   * instead of a mostly-empty 64x96 frame.
+   */
   private async loadSpriteImage(path: string): Promise<HTMLCanvasElement | null> {
     const img = await this.loadImage(path);
     if (!img) return null;
-    return this.removeGreenBg(img);
+    const cleaned = this.removeGreenBg(img);
+    return this.cropToContent(cleaned);
+  }
+
+  /** Crop a canvas to the bounding box of its non-transparent content. */
+  private cropToContent(src: HTMLCanvasElement): HTMLCanvasElement {
+    const ctx = src.getContext("2d")!;
+    const imageData = ctx.getImageData(0, 0, src.width, src.height);
+    const data = imageData.data;
+    const w = src.width;
+    const h = src.height;
+
+    // Find bounding box of opaque pixels
+    let top = h, bottom = 0, left = w, right = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 10) {
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+          if (x < left) left = x;
+          if (x > right) right = x;
+        }
+      }
+    }
+
+    // No content found — return as-is
+    if (top > bottom || left > right) return src;
+
+    const cw = right - left + 1;
+    const ch = bottom - top + 1;
+
+    // Don't bother cropping if content fills most of the frame
+    if (cw >= w * 0.9 && ch >= h * 0.9) return src;
+
+    const cropped = this.createCanvas(cw, ch);
+    const cctx = cropped.getContext("2d")!;
+    cctx.drawImage(src, left, top, cw, ch, 0, 0, cw, ch);
+    return cropped;
   }
 
   // -----------------------------------------------------------------------

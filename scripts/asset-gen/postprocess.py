@@ -363,18 +363,21 @@ def slice_spritesheet(
 
 
 def force_transparent_bg(image: Image.Image) -> Image.Image:
-    """Remove chroma key green background pixels.
-    All prompts request bright green backgrounds for reliable extraction.
-    Uses relaxed thresholds to catch the wide range of green shades that
-    Gemini produces (not just pure #00FF00).
-    White stripping was removed to avoid damaging light-colored character details."""
+    """Remove green chroma-key background pixels.
+
+    Gemini generates a wide range of green shades — not just pure #00FF00.
+    Measured mean on raw sheets: R≈121, G≈185, B≈71.  These thresholds
+    are tuned to catch that range while preserving brown/tan character
+    details.  This runs BEFORE palette reduction so the raw Gemini colors
+    are still present.
+    """
     arr = np.array(image.convert("RGBA"))
-    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
-    # Green-dominant pixels: green channel bright and much higher than r and b
-    is_green = (
-        ((g > 150) & (g > r * 1.5) & (g > b * 1.5)) |
-        ((g > 200) & (r < 100) & (b < 100))
-    )
+    r = arr[:, :, 0].astype(np.int16)
+    g = arr[:, :, 1].astype(np.int16)
+    b = arr[:, :, 2].astype(np.int16)
+    # Green-dominant: G must be bright and clearly above both R and B.
+    # Using int16 to avoid overflow when multiplying.
+    is_green = (g > 100) & (g > r + 20) & (g > b + 30)
     arr[is_green, 3] = 0
     return Image.fromarray(arr, "RGBA")
 
