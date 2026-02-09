@@ -770,7 +770,7 @@ export class Game {
     this.hud.draw(ctx, this.state, this.canvas.width, this.canvas.height);
 
     if (this.state.phase === "dialogue") {
-      this.dialogueUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this);
+      this.dialogueUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this, this.assets);
     }
     if (this.state.phase === "inventory") {
       this.inventoryUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this);

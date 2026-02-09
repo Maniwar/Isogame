@@ -13,13 +13,13 @@ import {
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
 
-// Weapon overlay map — disabled until pipeline produces correctly sliced weapons.
-// const WEAPON_SPRITE_MAP: Record<string, string> = {
-//   "10mm_pistol": "weapon_pistol",
-//   "pipe_rifle": "weapon_rifle",
-//   "combat_knife": "weapon_knife",
-//   "baseball_bat": "weapon_bat",
-// };
+/** Maps item IDs to weapon sprite keys used in the asset manifest */
+const WEAPON_SPRITE_MAP: Record<string, string> = {
+  "10mm_pistol": "weapon_pistol",
+  "pipe_rifle": "weapon_rifle",
+  "combat_knife": "weapon_knife",
+  "baseball_bat": "weapon_bat",
+};
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -249,28 +249,38 @@ export class Renderer {
     // Use animation frame if available, otherwise static sprite
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
+
+    // Scale: AI sprites are 64x96 (green removed, full frame).
+    // Scale so the visible character (~42% of frame width) matches
+    // procedural sprite width (~24px).  56x84 achieves this.
+    const MAX_W = 56;
+    const MAX_H = 84;
+    let sw = sprite ? sprite.width : 24;
+    let sh = sprite ? sprite.height : 36;
+    if (sw > MAX_W || sh > MAX_H) {
+      const scale = Math.min(MAX_W / sw, MAX_H / sh);
+      sw = Math.round(sw * scale);
+      sh = Math.round(sh * scale);
+    }
+
     if (sprite) {
-      // Scale sprites to fit the tile grid.
-      // After green removal + content crop, AI sprites are ~27x78.
-      // Procedural sprites are 24x36.  Cap dimensions proportionally.
-      const MAX_W = 32;
-      const MAX_H = 80;
-      let sw = sprite.width;
-      let sh = sprite.height;
-      if (sw > MAX_W || sh > MAX_H) {
-        const scale = Math.min(MAX_W / sw, MAX_H / sh);
-        sw = Math.round(sw * scale);
-        sh = Math.round(sh * scale);
-      }
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
     }
 
-    // Weapon overlays disabled — the current AI weapon sprites were sliced
-    // from a 4x4 sheet into an 8x4 grid (wrong grid), AND content-cropping
-    // the character sprite shifts its anchor so weapon overlays can't align.
-    // Will re-enable after re-running the asset pipeline with fixed slicing.
+    // Draw weapon overlay at same scale/position (same frame size = perfect alignment)
+    const equippedItem = entity.inventory.find((i) => i.equipped);
+    if (equippedItem) {
+      const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
+      if (weaponSpriteKey) {
+        const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
+        if (weaponSprite) {
+          ctx.drawImage(weaponSprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
+        }
+      }
+    }
 
-    // Draw name tag
+    // Draw name tag — position above sprite top
+    const labelY = drawY - sh + TILE_HALF_H - 4;
     ctx.fillStyle = entity.isPlayer
       ? "#40c040"
       : entity.isHostile
@@ -278,14 +288,14 @@ export class Renderer {
         : "#d4c4a0";
     ctx.font = "7px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(entity.name, drawX, drawY - 36);
+    ctx.fillText(entity.name, drawX, labelY);
 
     // Health bar (always show in combat, or when damaged)
     if (!entity.isPlayer && (isCombat || entity.stats.hp < entity.stats.maxHp)) {
       const barW = 24;
       const barH = 3;
       const bx = drawX - barW / 2;
-      const by = drawY - 32;
+      const by = labelY + 4;
       const ratio = entity.stats.hp / entity.stats.maxHp;
 
       ctx.fillStyle = "#3a3a2e";
