@@ -363,13 +363,18 @@ def slice_spritesheet(
 
 
 def force_transparent_bg(image: Image.Image) -> Image.Image:
-    """Remove chroma key green (#00FF00) background pixels.
+    """Remove chroma key green background pixels.
     All prompts request bright green backgrounds for reliable extraction.
+    Uses relaxed thresholds to catch the wide range of green shades that
+    Gemini produces (not just pure #00FF00).
     White stripping was removed to avoid damaging light-colored character details."""
     arr = np.array(image.convert("RGBA"))
     r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
-    # Chroma key green: G channel dominant, R and B low
-    is_green = (g > 200) & (r < 80) & (b < 80)
+    # Green-dominant pixels: green channel bright and much higher than r and b
+    is_green = (
+        ((g > 150) & (g > r * 1.5) & (g > b * 1.5)) |
+        ((g > 200) & (r < 100) & (b < 100))
+    )
     arr[is_green, 3] = 0
     return Image.fromarray(arr, "RGBA")
 
