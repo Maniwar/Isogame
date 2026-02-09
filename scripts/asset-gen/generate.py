@@ -409,11 +409,27 @@ def main():
         CONFIG_PATH = args.config
     config = load_config()
 
+    # Load .env file (project root or scripts/asset-gen/)
+    for env_path in (SCRIPT_DIR / ".env", SCRIPT_DIR.parent.parent / ".env"):
+        if env_path.exists():
+            with open(env_path) as ef:
+                for line in ef:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        key, _, val = line.partition("=")
+                        val = val.strip().strip("'\"")
+                        os.environ.setdefault(key.strip(), val)
+            break
+
     # Check API key
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key and not args.dry_run:
-        print("ERROR: GEMINI_API_KEY environment variable is required.")
-        print("Get your key at https://aistudio.google.com/apikey")
+        print("ERROR: GEMINI_API_KEY not found.")
+        print("Set it in .env (project root or scripts/asset-gen/) or as env var:")
+        print("  echo 'GEMINI_API_KEY=your-key' > .env")
+        print("  — or —")
+        print("  export GEMINI_API_KEY=your-key")
+        print("\nGet your key at https://aistudio.google.com/apikey")
         sys.exit(1)
 
     # Create output directory

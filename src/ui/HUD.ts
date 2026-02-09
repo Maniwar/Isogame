@@ -174,17 +174,19 @@ export class HUD {
       screenH - 18,
     );
 
-    // Top-right: minimap info
-    this.drawPanel(ctx, screenW - 210, 10, 200, 50);
-    ctx.fillStyle = "#40c040";
-    ctx.font = "10px monospace";
-    ctx.textAlign = "left";
-    ctx.fillText(`${state.map.name}`, screenW - 200, 30);
+    // Top-right: minimap info (hidden during combat to avoid overlap)
+    if (state.phase !== "combat") {
+      this.drawPanel(ctx, screenW - 210, 10, 200, 50);
+      ctx.fillStyle = "#40c040";
+      ctx.font = "10px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`${state.map.name}`, screenW - 200, 30);
 
-    const hour = Math.floor(state.gameTime);
-    const min = Math.floor((state.gameTime % 1) * 60);
-    const timeStr = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
-    ctx.fillText(`Time: ${timeStr}`, screenW - 200, 48);
+      const hour = Math.floor(state.gameTime);
+      const min = Math.floor((state.gameTime % 1) * 60);
+      const timeStr = `${hour.toString().padStart(2, "0")}:${min.toString().padStart(2, "0")}`;
+      ctx.fillText(`Time: ${timeStr}`, screenW - 200, 48);
+    }
 
     // Controls hint (top-left) — only on desktop
     if (!this.isTouchDevice) {
