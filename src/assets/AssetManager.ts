@@ -227,7 +227,7 @@ export class AssetManager {
         for (const [dir, path] of Object.entries(directions)) {
           this.totalToLoad++;
           promises.push(
-            this.loadImage(path).then((img) => {
+            this.loadSpriteImage(path).then((img) => {
               if (img) {
                 this.sprites.get(spriteKey)!.set(dir as Direction, img);
                 this.loadedCount++;
@@ -256,7 +256,7 @@ export class AssetManager {
           for (const [dir, path] of Object.entries(directions)) {
             this.totalToLoad++;
             promises.push(
-              this.loadImage(path).then((img) => {
+              this.loadSpriteImage(path).then((img) => {
                 if (img) {
                   dirMap.set(dir as Direction, img);
                   this.loadedCount++;
@@ -285,7 +285,7 @@ export class AssetManager {
           for (const [dir, path] of Object.entries(directions)) {
             this.totalToLoad++;
             promises.push(
-              this.loadImage(path).then((img) => {
+              this.loadSpriteImage(path).then((img) => {
                 if (img) {
                   dirMap.set(dir as Direction, img);
                   this.loadedCount++;
@@ -362,6 +362,33 @@ export class AssetManager {
     return canvas;
   }
 
+  /**
+   * Remove green chroma-key background pixels from a loaded image.
+   * AI-generated sprites often have bright green backgrounds that
+   * survive the postprocess pipeline.
+   */
+  private removeGreenBg(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = this.createCanvas(img.width, img.height);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Catch green-dominant pixels: green channel bright and much higher than r and b
+      if ((g > 150 && g > r * 1.5 && g > b * 1.5) ||
+          (g > 200 && r < 100 && b < 100)) {
+        data[i + 3] = 0;
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }
+
   private loadImage(path: string): Promise<HTMLImageElement | null> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -373,6 +400,13 @@ export class AssetManager {
       // Resolve path relative to base URL for GitHub Pages compatibility
       img.src = this.resolvePath(path);
     });
+  }
+
+  /** Load an image and strip green chroma-key background */
+  private async loadSpriteImage(path: string): Promise<HTMLCanvasElement | null> {
+    const img = await this.loadImage(path);
+    if (!img) return null;
+    return this.removeGreenBg(img);
   }
 
   // -----------------------------------------------------------------------

@@ -250,8 +250,16 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
     if (sprite) {
-      const sw = sprite.width;
-      const sh = sprite.height;
+      // Scale AI sprites (64x96) down to fit the tile grid.
+      // Procedural sprites are 24x36; cap width at 28px and scale proportionally.
+      const MAX_SPRITE_W = 28;
+      let sw = sprite.width;
+      let sh = sprite.height;
+      if (sw > MAX_SPRITE_W) {
+        const scale = MAX_SPRITE_W / sw;
+        sw = MAX_SPRITE_W;
+        sh = Math.round(sh * scale);
+      }
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
     }
 
@@ -262,8 +270,14 @@ export class Renderer {
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          const ww = weaponSprite.width;
-          const wh = weaponSprite.height;
+          const MAX_WEAPON_W = 28;
+          let ww = weaponSprite.width;
+          let wh = weaponSprite.height;
+          if (ww > MAX_WEAPON_W) {
+            const scale = MAX_WEAPON_W / ww;
+            ww = MAX_WEAPON_W;
+            wh = Math.round(wh * scale);
+          }
           ctx.drawImage(weaponSprite, drawX - ww / 2, drawY - wh + TILE_HALF_H, ww, wh);
         }
       }
