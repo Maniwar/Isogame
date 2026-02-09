@@ -1,4 +1,12 @@
-import { Entity, Stats, TilePos, NpcSpawn, AnimState } from "../types";
+import { Entity, Stats, TilePos, NpcSpawn, AnimState, CrippleState } from "../types";
+
+const DEFAULT_CRIPPLE: CrippleState = {
+  head: false,
+  left_arm: false,
+  right_arm: false,
+  left_leg: false,
+  right_leg: false,
+};
 
 const DEFAULT_ANIM: AnimState = {
   current: "idle",
@@ -52,6 +60,7 @@ export class EntitySystem {
       moveProgress: 0,
       dead: false,
       anim: { ...DEFAULT_ANIM },
+      crippled: { ...DEFAULT_CRIPPLE },
     };
   }
 
@@ -73,6 +82,7 @@ export class EntitySystem {
       moveProgress: 0,
       dead: false,
       anim: { ...DEFAULT_ANIM },
+      crippled: { ...DEFAULT_CRIPPLE },
     };
   }
 }

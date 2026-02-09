@@ -8,12 +8,12 @@ import { MovementSystem } from "../systems/MovementSystem";
 import { CombatSystem } from "../systems/CombatSystem";
 import { AnimationSystem } from "../systems/AnimationSystem";
 import { DialogueSystem } from "../systems/DialogueSystem";
-import { InventorySystem } from "../systems/InventorySystem";
+import { InventorySystem, ITEM_DB } from "../systems/InventorySystem";
 import { HUD } from "../ui/HUD";
 import { DialogueUI } from "../ui/DialogueUI";
 import { InventoryUI } from "../ui/InventoryUI";
 import { Sound } from "./Sound";
-import { GameState, GamePhase, Entity, TILE_HALF_W, TILE_HALF_H } from "../types";
+import { GameState, GamePhase, Entity, BodyPart, BODY_PARTS, TILE_HALF_W, TILE_HALF_H } from "../types";
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -38,6 +38,10 @@ export class Game {
 
   // Audio
   private sound: Sound;
+
+  // AI turn pacing
+  private aiActionTimer = 0;
+  private readonly AI_ACTION_DELAY = 500; // ms between AI actions
 
   // State
   state!: GameState;
@@ -116,6 +120,11 @@ export class Game {
       notifications: [],
       gameTime: 8, // 8:00 AM
       vfx: [],
+      combatLog: [],
+      targetBodyPart: null,
+      combatPending: null,
+      combatTurnDelay: 0,
+      lootTarget: null,
     };
 
     // Center camera on player
@@ -171,17 +180,42 @@ export class Game {
 
     // Keyboard shortcuts
     if (input.pressed("Tab")) {
-      this.togglePhase("inventory");
+      if (state.lootTarget) {
+        state.lootTarget = null; // close loot window
+      } else {
+        this.togglePhase("inventory");
+      }
     }
     if (input.pressed("KeyC") && state.phase !== "dialogue") {
       this.togglePhase("combat");
     }
     if (input.pressed("Escape")) {
-      state.phase = "explore";
-      state.dialogueTree = null;
-      state.dialogueNodeId = null;
-      state.selectedEntity = null;
-      state.combatQueue = [];
+      if (state.lootTarget) {
+        state.lootTarget = null;
+      } else if (state.combatPending) {
+        state.combatPending = null;
+        this.notify("Action cancelled.", "#d4c4a0");
+      } else {
+        state.phase = "explore";
+        state.dialogueTree = null;
+        state.dialogueNodeId = null;
+        state.selectedEntity = null;
+        state.combatQueue = [];
+        state.targetBodyPart = null;
+        state.combatPending = null;
+      }
+    }
+
+    // Body part targeting keys (1-6) in combat
+    if (state.phase === "combat") {
+      const parts: BodyPart[] = ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"];
+      for (let i = 0; i < parts.length; i++) {
+        if (input.pressed(`Digit${i + 1}`)) {
+          state.targetBodyPart = state.targetBodyPart === parts[i] ? null : parts[i];
+          const label = state.targetBodyPart ? BODY_PARTS[state.targetBodyPart].label : "Torso (default)";
+          this.notify(`Targeting: ${label}`, "#c4703a");
+        }
+      }
     }
 
     // Hovered tile
@@ -232,6 +266,34 @@ export class Game {
     if (click) {
       const tile = camera.screenToTile(click);
 
+      // Check if clicking on a dead body (loot)
+      const corpse = state.entities.find(
+        (e) => !e.isPlayer && e.dead && e.pos.x === tile.x && e.pos.y === tile.y,
+      );
+
+      if (corpse && corpse.inventory.length > 0) {
+        // Walk to corpse first, then loot
+        const dist = Math.abs(state.player.pos.x - tile.x) + Math.abs(state.player.pos.y - tile.y);
+        if (dist <= 1) {
+          this.openLoot(corpse);
+        } else {
+          const adj = this.movementSystem.findAdjacentTile(state.map, corpse.pos, state.player.pos);
+          if (adj) {
+            const path = this.movementSystem.findPath(state.map, state.player.pos, adj);
+            state.player.path = path;
+            const checkArrival = () => {
+              if (state.player.path.length === 0) {
+                this.openLoot(corpse);
+              } else {
+                setTimeout(checkArrival, 100);
+              }
+            };
+            setTimeout(checkArrival, 100);
+          }
+        }
+        return;
+      }
+
       // Check if clicking on an NPC
       const npc = state.entities.find(
         (e) => !e.isPlayer && !e.dead && e.pos.x === tile.x && e.pos.y === tile.y,
@@ -243,7 +305,6 @@ export class Game {
         if (adj) {
           const path = this.movementSystem.findPath(state.map, state.player.pos, adj);
           state.player.path = path;
-          // Queue dialogue after arriving
           const checkArrival = () => {
             if (state.player.path.length === 0) {
               this.openDialogue(npc);
@@ -284,9 +345,11 @@ export class Game {
     );
     if (itemIdx >= 0 && state.player.path.length === 0) {
       const item = state.map.items[itemIdx];
+      const def = ITEM_DB[item.itemId];
+      const name = def ? def.name : item.itemId;
       this.inventorySystem.addItem(state.player, item.itemId, item.count);
       state.map.items.splice(itemIdx, 1);
-      this.notify(`Picked up: ${item.itemId} x${item.count}`, "rgb(64, 192, 64)");
+      this.notify(`Picked up: ${name} x${item.count}`, "rgb(64, 192, 64)");
     }
 
     // Advance game time slowly while exploring
@@ -294,7 +357,7 @@ export class Game {
     if (state.gameTime >= 24) state.gameTime -= 24;
   }
 
-  private updateCombat(_dt: number) {
+  private updateCombat(dt: number) {
     const { state, input, camera } = this;
 
     // Init combat if needed
@@ -304,7 +367,13 @@ export class Game {
       this.notify("COMBAT INITIATED. Click enemies to attack. [SPACE] end turn.", "rgb(184, 48, 48)");
     }
 
-    // Player's turn
+    // Turn delay timer — prevents spam by forcing a pause between turns
+    if (state.combatTurnDelay > 0) {
+      state.combatTurnDelay -= dt;
+      return; // don't process any actions during delay
+    }
+
+    // Current combatant
     const currentId = state.combatQueue[state.activeCombatIdx];
     const current = state.entities.find((e) => e.id === currentId);
 
@@ -314,68 +383,226 @@ export class Game {
     }
 
     if (current.isPlayer) {
-      // End turn
-      if (input.pressed("Space")) {
-        this.combatSystem.nextTurn(state);
-        this.notify("Turn ended.", "rgb(212, 196, 160)");
+      this.updatePlayerCombatTurn(current, input, camera);
+    } else {
+      this.updateAICombatTurn(current, dt);
+    }
+  }
+
+  private updatePlayerCombatTurn(player: Entity, input: Input, camera: Camera) {
+    const { state } = this;
+
+    // End turn
+    if (input.pressed("Space")) {
+      state.combatPending = null;
+      this.combatSystem.nextTurn(state);
+      this.notify("Turn ended.", "rgb(212, 196, 160)");
+      return;
+    }
+
+    const click = input.leftClick();
+    if (!click) return;
+
+    const tile = camera.screenToTile(click);
+
+    // Check if clicking on an enemy
+    const target = state.entities.find(
+      (e) => !e.isPlayer && !e.dead && e.pos.x === tile.x && e.pos.y === tile.y,
+    );
+
+    if (target) {
+      const apCost = this.combatSystem.getWeaponApCost(player);
+      const bodyPart = state.targetBodyPart ?? "torso";
+      const range = this.combatSystem.getWeaponRange(player);
+      const dist = Math.abs(player.pos.x - target.pos.x) + Math.abs(player.pos.y - target.pos.y);
+
+      // Check range
+      if (dist > range) {
+        this.notify(`Out of range! Need ${range} tiles, target is ${dist} away.`, "#b83030");
         return;
       }
 
-      const click = input.leftClick();
-      if (click) {
-        const tile = camera.screenToTile(click);
-        const target = state.entities.find(
-          (e) => !e.isPlayer && !e.dead && e.pos.x === tile.x && e.pos.y === tile.y,
-        );
-
-        if (target) {
-          this.animationSystem.triggerAttack(current);
-          const result = this.combatSystem.attack(state, current, target);
-          this.spawnAttackVFX(current, target, result.hit, result.damage);
-          this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
-
-          if (target.dead) {
-            this.notify(`${target.name} has been killed!`, "rgb(184, 48, 48)");
-            // Drop loot
-            for (const item of target.inventory) {
-              state.map.items.push({
-                itemId: item.itemId,
-                pos: { ...target.pos },
-                count: item.count,
-              });
-            }
-          }
-
-          // Check combat end
-          const hostiles = state.entities.filter((e) => e.isHostile && !e.dead);
-          if (hostiles.length === 0) {
-            state.phase = "explore";
-            state.combatQueue = [];
-            this.notify("All enemies defeated! Returning to exploration.", "rgb(64, 192, 64)");
-          }
-        } else {
-          // Move in combat (costs AP)
-          if (current.stats.ap > 0) {
-            const path = this.movementSystem.findPath(state.map, current.pos, tile);
-            const maxSteps = Math.min(path.length, current.stats.ap);
-            current.path = path.slice(0, maxSteps);
-            current.stats.ap -= maxSteps;
-          }
-        }
+      // Check AP
+      if (player.stats.ap < apCost) {
+        this.notify(`Not enough AP! Need ${apCost}, have ${player.stats.ap}.`, "#b83030");
+        return;
       }
-    } else {
-      // AI turn — track HP before to detect hits
-      const playerHpBefore = state.player.stats.hp;
-      this.combatSystem.aiTurn(state, current);
 
-      // Spawn VFX for AI attacks on player
+      // If we have a pending attack on the same target, confirm it
+      if (
+        state.combatPending &&
+        state.combatPending.type === "attack" &&
+        state.combatPending.targetEntity === target &&
+        state.combatPending.bodyPart === bodyPart
+      ) {
+        // CONFIRMED — execute the attack
+        this.executePlayerAttack(player, target, bodyPart);
+        state.combatPending = null;
+        return;
+      }
+
+      // First click — show AP cost preview, require second click to confirm
+      const partLabel = BODY_PARTS[bodyPart].label;
+      const hitMod = BODY_PARTS[bodyPart].hitMod;
+      const hitPct = Math.round(hitMod * 100);
+      state.combatPending = {
+        type: "attack",
+        targetTile: { x: tile.x, y: tile.y },
+        targetEntity: target,
+        apCost,
+        bodyPart,
+      };
+      this.notify(
+        `Attack ${target.name}'s ${partLabel}? (${apCost} AP, ~${hitPct}% accuracy) Click again to confirm.`,
+        "#c4703a",
+      );
+    } else {
+      // Clicking empty ground — movement preview/confirm
+      if (
+        tile.x < 0 || tile.x >= state.map.width ||
+        tile.y < 0 || tile.y >= state.map.height
+      ) return;
+
+      const path = this.movementSystem.findPath(state.map, player.pos, tile);
+      if (path.length === 0) return;
+
+      const moveCost = this.combatSystem.getMoveCost(player);
+      const maxSteps = Math.min(path.length, Math.floor(player.stats.ap / moveCost));
+
+      if (maxSteps === 0) {
+        this.notify("Not enough AP to move!", "#b83030");
+        return;
+      }
+
+      const totalAP = maxSteps * moveCost;
+
+      // If pending move to same tile, confirm it
+      if (
+        state.combatPending &&
+        state.combatPending.type === "move" &&
+        state.combatPending.targetTile.x === tile.x &&
+        state.combatPending.targetTile.y === tile.y
+      ) {
+        // CONFIRMED — execute movement
+        player.path = path.slice(0, maxSteps);
+        player.stats.ap -= totalAP;
+        state.combatPending = null;
+        state.combatLog.push({
+          text: `You move ${maxSteps} tile${maxSteps > 1 ? "s" : ""} (${totalAP} AP).`,
+          color: "#d4c4a0",
+          turn: state.turn,
+        });
+        return;
+      }
+
+      // First click — show preview
+      state.combatPending = {
+        type: "move",
+        targetTile: { x: tile.x, y: tile.y },
+        apCost: totalAP,
+      };
+      this.notify(
+        `Move ${maxSteps} tile${maxSteps > 1 ? "s" : ""}? (${totalAP} AP) Click again to confirm.`,
+        "#c4703a",
+      );
+    }
+  }
+
+  private executePlayerAttack(player: Entity, target: Entity, bodyPart: BodyPart) {
+    const { state } = this;
+
+    this.animationSystem.triggerAttack(player);
+    const result = this.combatSystem.attack(state, player, target, bodyPart);
+    this.spawnAttackVFX(player, target, result);
+    this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
+
+    // Log to combat log
+    state.combatLog.push({
+      text: result.message,
+      color: result.hit ? "#b83030" : "#999999",
+      turn: state.turn,
+    });
+
+    if (result.crippled) {
+      const effectMsg = this.getCrippleEffectMsg(result.crippled);
+      state.combatLog.push({ text: effectMsg, color: "#ff6600", turn: state.turn });
+      this.notify(effectMsg, "#ff6600");
+    }
+
+    if (result.severed) {
+      state.combatLog.push({
+        text: `${target.name}'s ${BODY_PARTS[bodyPart].label} has been severed!`,
+        color: "#ff0000",
+        turn: state.turn,
+      });
+      // Extra gore for severed limb
+      this.spawnSeverVFX(target);
+    }
+
+    if (target.dead) {
+      this.notify(`${target.name} has been killed!`, "rgb(184, 48, 48)");
+      state.combatLog.push({
+        text: `${target.name} is dead.`,
+        color: "#b83030",
+        turn: state.turn,
+      });
+    }
+
+    // Check combat end
+    const hostiles = state.entities.filter((e) => e.isHostile && !e.dead);
+    if (hostiles.length === 0) {
+      state.phase = "explore";
+      state.combatQueue = [];
+      state.combatPending = null;
+      state.targetBodyPart = null;
+      this.notify("All enemies defeated! Search bodies for loot.", "rgb(64, 192, 64)");
+    }
+  }
+
+  private updateAICombatTurn(npc: Entity, dt: number) {
+    const { state } = this;
+
+    // Pace AI actions with a timer
+    this.aiActionTimer -= dt;
+    if (this.aiActionTimer > 0) return;
+
+    // AI does one action at a time with delays between them
+    const playerHpBefore = state.player.stats.hp;
+    const didAct = this.combatSystem.aiAct(state, npc);
+
+    if (didAct) {
       const dmg = playerHpBefore - state.player.stats.hp;
       if (dmg > 0) {
-        this.animationSystem.triggerAttack(current);
-        this.spawnAttackVFX(current, state.player, true, dmg);
+        this.animationSystem.triggerAttack(npc);
+        // Find the last combat log entry for the attack result details
+        const lastLog = state.combatLog[state.combatLog.length - 1];
+        const isCrit = lastLog?.text.includes("CRITICAL") ?? false;
+        const crippled = lastLog?.text.includes("CRIPPLED") ? true : false;
+        // Create a synthetic result for VFX
+        this.spawnAttackVFX(npc, state.player, {
+          hit: true,
+          damage: dmg,
+          message: "",
+          crit: isCrit,
+          crippled: crippled ? "torso" : undefined,
+          severed: lastLog?.text.includes("SEVERED"),
+        });
       }
 
+      // Set delay before next AI action
+      this.aiActionTimer = this.AI_ACTION_DELAY;
+
+      // Check if player died
+      if (state.player.dead) {
+        this.notify("You have been killed. Game Over.", "#ff0000");
+        state.phase = "explore";
+        state.combatQueue = [];
+        return;
+      }
+    } else {
+      // AI has no more actions — end their turn
       this.combatSystem.nextTurn(state);
+      this.aiActionTimer = 0;
     }
   }
 
@@ -395,6 +622,47 @@ export class Game {
       this.state.dialogueNodeId = tree.startNodeId;
       this.state.selectedEntity = npc;
     }
+  }
+
+  private openLoot(corpse: Entity) {
+    this.state.lootTarget = corpse;
+    this.notify(`Searching ${corpse.name}'s body...`, "#c4703a");
+  }
+
+  /** Transfer an item from loot target to player */
+  lootItem(itemId: string) {
+    const { state } = this;
+    if (!state.lootTarget) return;
+
+    const invItem = state.lootTarget.inventory.find((i) => i.itemId === itemId);
+    if (!invItem) return;
+
+    this.inventorySystem.addItem(state.player, itemId, invItem.count);
+    state.lootTarget.inventory = state.lootTarget.inventory.filter((i) => i.itemId !== itemId);
+
+    const def = ITEM_DB[itemId];
+    const name = def ? def.name : itemId;
+    this.notify(`Looted: ${name} x${invItem.count}`, "rgb(64, 192, 64)");
+
+    // Close loot window if body is empty
+    if (state.lootTarget.inventory.length === 0) {
+      this.notify("Body is empty.", "#6e6e5e");
+      state.lootTarget = null;
+    }
+  }
+
+  /** Take all items from loot target */
+  lootAll() {
+    const { state } = this;
+    if (!state.lootTarget) return;
+
+    for (const item of [...state.lootTarget.inventory]) {
+      this.inventorySystem.addItem(state.player, item.itemId, item.count);
+    }
+    const count = state.lootTarget.inventory.length;
+    state.lootTarget.inventory = [];
+    this.notify(`Looted ${count} item${count > 1 ? "s" : ""}.`, "rgb(64, 192, 64)");
+    state.lootTarget = null;
   }
 
   selectDialogueResponse(index: number) {
@@ -445,6 +713,17 @@ export class Game {
     }
   }
 
+  private getCrippleEffectMsg(part: BodyPart): string {
+    switch (part) {
+      case "head": return "Target blinded! Accuracy severely reduced.";
+      case "left_arm":
+      case "right_arm": return "Arm crippled! Attack damage reduced.";
+      case "left_leg":
+      case "right_leg": return "Leg crippled! Movement costs 2 AP per step.";
+      default: return "";
+    }
+  }
+
   private draw() {
     const { ctx } = this.canvas.getContext("2d")
       ? { ctx: this.canvas.getContext("2d")! }
@@ -468,17 +747,26 @@ export class Game {
     if (this.state.phase === "combat") {
       this.drawCombatUI(ctx);
     }
+
+    // Loot overlay (can appear in any phase)
+    if (this.state.lootTarget) {
+      this.drawLootUI(ctx);
+    }
   }
 
-  private spawnAttackVFX(attacker: Entity, target: Entity, hit: boolean, damage: number) {
+  private spawnAttackVFX(
+    attacker: Entity,
+    target: Entity,
+    result: { hit: boolean; damage: number; crit: boolean; crippled?: BodyPart; severed?: boolean; message: string },
+  ) {
     const ax = (attacker.pos.x - attacker.pos.y) * TILE_HALF_W;
     const ay = (attacker.pos.x + attacker.pos.y) * TILE_HALF_H;
     const tx = (target.pos.x - target.pos.y) * TILE_HALF_W;
     const ty = (target.pos.x + target.pos.y) * TILE_HALF_H;
 
-    const weapon = attacker.inventory.find((i) => i.equipped);
-    const isRanged = weapon && (weapon.itemId === "10mm_pistol" || weapon.itemId === "pipe_rifle");
-    const isCrit = damage >= 15;
+    const isRanged = this.combatSystem.isRangedWeapon(attacker);
+    const damage = result.damage;
+    const isCrit = result.crit;
     const killed = target.dead;
 
     // --- Weapon effect (projectile or slash) ---
@@ -498,7 +786,7 @@ export class Game {
       this.sound.slash();
     }
 
-    if (hit) {
+    if (result.hit) {
       // Impact sound (scales with damage)
       setTimeout(() => this.sound.impact(damage), isRanged ? 80 : 50);
 
@@ -541,7 +829,7 @@ export class Game {
         particles: bloodParticles,
       });
 
-      // Second burst in brighter red for heavy hits
+      // Second burst for heavy hits
       if (damage >= 8) {
         const burst2 = [];
         for (let i = 0; i < Math.min(12, damage); i++) {
@@ -598,22 +886,36 @@ export class Game {
       }
 
       // --- Floating damage number ---
+      const bodyPartLabel = result.crippled ? ` [${BODY_PARTS[result.crippled].label}]` : "";
       this.state.vfx.push({
         type: "damage_number",
         fromX: tx, fromY: ty - 24,
         toX: tx, toY: ty - 65,
-        text: isCrit ? `CRIT -${damage}!` : `-${damage}`,
+        text: isCrit ? `CRIT -${damage}!${bodyPartLabel}` : `-${damage}${bodyPartLabel}`,
         color: isCrit ? "#ff0000" : damage >= 10 ? "#ff4444" : "#ffcc44",
         timeLeft: 1000,
         duration: 1000,
         intensity: damage,
       });
 
+      // --- Cripple text ---
+      if (result.crippled) {
+        this.state.vfx.push({
+          type: "damage_number",
+          fromX: tx + 10, fromY: ty - 10,
+          toX: tx + 10, toY: ty - 45,
+          text: `${BODY_PARTS[result.crippled].label} CRIPPLED!`,
+          color: "#ff6600",
+          timeLeft: 1200,
+          duration: 1200,
+          intensity: 10,
+        });
+      }
+
       // --- Death effects ---
       if (killed) {
         setTimeout(() => this.sound.death(), 150);
 
-        // Big screen shake
         this.camera.shake(6, 350);
 
         // Blood pool under corpse
@@ -627,7 +929,7 @@ export class Game {
           intensity: damage,
         });
 
-        // Death burst — extra blood spray
+        // Death burst
         const deathParticles = [];
         for (let i = 0; i < 20; i++) {
           const angle = Math.random() * Math.PI * 2;
@@ -698,10 +1000,54 @@ export class Game {
     }
   }
 
+  /** Extra gore VFX for severed limbs */
+  private spawnSeverVFX(target: Entity) {
+    const tx = (target.pos.x - target.pos.y) * TILE_HALF_W;
+    const ty = (target.pos.x + target.pos.y) * TILE_HALF_H;
+
+    this.camera.shake(8, 500);
+
+    // Big blood spray
+    const chunks = [];
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      chunks.push({
+        dx: Math.cos(angle) * (0.8 + Math.random()),
+        dy: Math.sin(angle) * (0.5 + Math.random()) - 1.2,
+        size: 3 + Math.random() * 4,
+        speed: 25 + Math.random() * 30,
+      });
+    }
+    this.state.vfx.push({
+      type: "gore_chunk",
+      fromX: tx, fromY: ty - 12,
+      toX: tx, toY: ty,
+      color: "#880000",
+      timeLeft: 1000,
+      duration: 1000,
+      intensity: 25,
+      particles: chunks,
+    });
+
+    // "SEVERED!" text
+    this.state.vfx.push({
+      type: "damage_number",
+      fromX: tx - 10, fromY: ty - 5,
+      toX: tx - 10, toY: ty - 50,
+      text: "SEVERED!",
+      color: "#ff0000",
+      timeLeft: 1500,
+      duration: 1500,
+      intensity: 20,
+    });
+  }
+
   private drawCombatUI(ctx: CanvasRenderingContext2D) {
     const { state } = this;
     const w = this.canvas.width;
+    const h = this.canvas.height;
 
+    // Top bar
     ctx.fillStyle = "rgba(184, 48, 48, 0.15)";
     ctx.fillRect(0, 0, w, 36);
 
@@ -711,14 +1057,244 @@ export class Game {
     ctx.fillText("[ COMBAT MODE ]", w / 2, 14);
 
     const weapon = state.player.inventory.find((i) => i.equipped);
-    const weaponName = weapon ? weapon.itemId.replace(/_/g, " ") : "Fists";
+    const weaponDef = weapon ? ITEM_DB[weapon.itemId] : null;
+    const weaponName = weaponDef ? weaponDef.name : "Fists";
+    const range = this.combatSystem.getWeaponRange(state.player);
+    const apCost = this.combatSystem.getWeaponApCost(state.player);
+    const bodyPart = state.targetBodyPart ?? "torso";
+    const partLabel = BODY_PARTS[bodyPart].label;
+
     const isTouchDev = Input.isTouchDevice();
     const hint = isTouchDev
-      ? `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName}  |  Tap enemy to attack`
-      : `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName}  |  Click enemy  [SPACE] end turn  [ESC] flee`;
+      ? `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName} (${apCost}AP, rng:${range})  |  Target: ${partLabel}`
+      : `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName} (${apCost}AP, rng:${range})  |  Target: ${partLabel}  |  [1-6] body part  [SPACE] end`;
 
     ctx.font = "12px monospace";
     ctx.fillStyle = "#d4c4a0";
     ctx.fillText(hint, w / 2, 30);
+
+    // Pending action indicator
+    if (state.combatPending) {
+      const pendText = state.combatPending.type === "attack"
+        ? `CONFIRM ATTACK (${state.combatPending.apCost} AP) — Click again or [ESC] cancel`
+        : `CONFIRM MOVE (${state.combatPending.apCost} AP) — Click again or [ESC] cancel`;
+      ctx.fillStyle = "rgba(196, 112, 58, 0.2)";
+      ctx.fillRect(0, 36, w, 20);
+      ctx.fillStyle = "#c4703a";
+      ctx.font = "bold 11px monospace";
+      ctx.fillText(pendText, w / 2, 50);
+    }
+
+    // Body part selector (bottom of screen)
+    this.drawBodyPartSelector(ctx, w, h);
+
+    // Combat log (left side)
+    this.drawCombatLog(ctx, h);
+  }
+
+  private drawBodyPartSelector(ctx: CanvasRenderingContext2D, w: number, h: number) {
+    const { state } = this;
+    const parts: BodyPart[] = ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"];
+    const selected = state.targetBodyPart ?? "torso";
+
+    const btnW = 70;
+    const btnH = 24;
+    const gap = 4;
+    const totalW = parts.length * (btnW + gap) - gap;
+    const startX = (w - totalW) / 2;
+    const startY = h - 130;
+
+    // Label
+    ctx.fillStyle = "#d4c4a0";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("TARGET BODY PART [1-6]", w / 2, startY - 6);
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const mod = BODY_PARTS[part];
+      const bx = startX + i * (btnW + gap);
+      const isSelected = part === selected;
+
+      // Button background
+      ctx.fillStyle = isSelected ? "rgba(184, 48, 48, 0.4)" : "rgba(30, 30, 22, 0.85)";
+      ctx.fillRect(bx, startY, btnW, btnH);
+
+      // Border
+      ctx.strokeStyle = isSelected ? "#b83030" : "#6e6e5e";
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.strokeRect(bx, startY, btnW, btnH);
+
+      // Label
+      ctx.fillStyle = isSelected ? "#ff6644" : "#d4c4a0";
+      ctx.font = "bold 9px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${i + 1}:${mod.label}`, bx + btnW / 2, startY + 10);
+
+      // Hit chance modifier
+      ctx.fillStyle = "#8ec44a";
+      ctx.font = "8px monospace";
+      ctx.fillText(`${Math.round(mod.hitMod * 100)}%`, bx + btnW / 2, startY + 20);
+    }
+  }
+
+  private drawCombatLog(ctx: CanvasRenderingContext2D, h: number) {
+    const { state } = this;
+    const log = state.combatLog;
+    if (log.length === 0) return;
+
+    const logX = 10;
+    const logW = 320;
+    const lineH = 14;
+    const maxLines = 12;
+    const visibleLog = log.slice(-maxLines);
+    const logH = visibleLog.length * lineH + 20;
+    const logY = h - 160 - logH;
+
+    // Background panel
+    ctx.fillStyle = "rgba(20, 20, 16, 0.8)";
+    ctx.fillRect(logX, logY, logW, logH);
+    ctx.strokeStyle = "rgba(64, 192, 64, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(logX, logY, logW, logH);
+
+    // Title
+    ctx.fillStyle = "#40c040";
+    ctx.font = "bold 9px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText("COMBAT LOG", logX + 5, logY + 11);
+
+    // Entries
+    ctx.font = "9px monospace";
+    for (let i = 0; i < visibleLog.length; i++) {
+      const entry = visibleLog[i];
+      ctx.fillStyle = entry.color;
+      // Truncate long lines
+      const text = entry.text.length > 45 ? entry.text.substring(0, 42) + "..." : entry.text;
+      ctx.fillText(text, logX + 5, logY + 24 + i * lineH);
+    }
+  }
+
+  private drawLootUI(ctx: CanvasRenderingContext2D) {
+    const { state } = this;
+    const target = state.lootTarget;
+    if (!target) return;
+
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const pw = Math.min(350, w - 20);
+    const itemH = 32;
+    const headerH = 50;
+    const footerH = 40;
+    const ph = Math.min(headerH + target.inventory.length * itemH + footerH + 20, h - 40);
+    const px = (w - pw) / 2;
+    const py = (h - ph) / 2;
+
+    // Background
+    ctx.fillStyle = "rgba(20, 20, 16, 0.95)";
+    ctx.fillRect(px, py, pw, ph);
+
+    // Border
+    ctx.strokeStyle = "#c4703a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px, py, pw, ph);
+
+    // Title
+    ctx.fillStyle = "#c4703a";
+    ctx.font = "bold 14px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`LOOT: ${target.name}`, px + pw / 2, py + 25);
+
+    // Divider
+    ctx.strokeStyle = "rgba(196, 112, 58, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(px + 10, py + 40);
+    ctx.lineTo(px + pw - 10, py + 40);
+    ctx.stroke();
+
+    // Items
+    ctx.textAlign = "left";
+    for (let i = 0; i < target.inventory.length; i++) {
+      const item = target.inventory[i];
+      const def = ITEM_DB[item.itemId];
+      const iy = py + headerH + i * itemH;
+
+      // Hover check
+      const mx = InventoryUI._mouseX;
+      const my = InventoryUI._mouseY;
+      const isHovered = mx >= px && mx <= px + pw && my >= iy && my < iy + itemH;
+
+      if (isHovered) {
+        ctx.fillStyle = "rgba(196, 112, 58, 0.15)";
+        ctx.fillRect(px + 5, iy, pw - 10, itemH);
+      }
+
+      ctx.fillStyle = "#d4c4a0";
+      ctx.font = "12px monospace";
+      ctx.fillText(def ? def.name : item.itemId, px + 15, iy + 15);
+
+      if (item.count > 1) {
+        ctx.fillStyle = "#8ec44a";
+        ctx.font = "10px monospace";
+        ctx.fillText(`x${item.count}`, px + 15, iy + 28);
+      }
+
+      // Value on right
+      if (def) {
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#6e6e5e";
+        ctx.font = "10px monospace";
+        ctx.fillText(`${def.value} caps`, px + pw - 15, iy + 15);
+        ctx.textAlign = "left";
+      }
+    }
+
+    // Footer
+    ctx.fillStyle = "rgba(212, 196, 160, 0.5)";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Click item to take  |  [ESC] close", px + pw / 2, py + ph - 12);
+
+    this.ensureLootClickHandler();
+  }
+
+  private lootClickBound = false;
+  private ensureLootClickHandler() {
+    if (this.lootClickBound) return;
+    this.lootClickBound = true;
+
+    const handler = (clientX: number, clientY: number) => {
+      const { state } = this;
+      if (!state.lootTarget) return;
+
+      const w = this.canvas.width;
+      const h = this.canvas.height;
+      const pw = Math.min(350, w - 20);
+      const itemH = 32;
+      const headerH = 50;
+      const footerH = 40;
+      const ph = Math.min(headerH + state.lootTarget.inventory.length * itemH + footerH + 20, h - 40);
+      const px = (w - pw) / 2;
+      const py = (h - ph) / 2;
+
+      if (clientX < px || clientX > px + pw || clientY < py || clientY > py + ph) return;
+
+      for (let i = 0; i < state.lootTarget.inventory.length; i++) {
+        const iy = py + headerH + i * itemH;
+        if (clientY >= iy && clientY < iy + itemH) {
+          this.lootItem(state.lootTarget.inventory[i].itemId);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("click", (e) => handler(e.clientX, e.clientY));
+    window.addEventListener("touchend", (e) => {
+      if (e.changedTouches.length > 0) {
+        const t = e.changedTouches[0];
+        handler(t.clientX, t.clientY);
+      }
+    }, { passive: true });
   }
 }
