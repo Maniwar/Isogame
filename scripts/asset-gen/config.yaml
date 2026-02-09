@@ -98,6 +98,9 @@ batches:
       - name: "sand"
         count: 3
         description: "Sandy wasteland terrain, wind-swept"
+      - name: "dirt"
+        count: 3
+        description: "Hard-packed brown dirt, dry and dusty"
       - name: "dirt-road"
         count: 3
         description: "Worn dirt path or road"

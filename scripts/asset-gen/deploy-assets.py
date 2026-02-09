@@ -32,6 +32,7 @@ DEFAULT_TARGET = SCRIPT_DIR.parent.parent / "public" / "assets"
 TILE_TERRAIN_MAP = {
     "cracked-earth": "CrackedEarth",
     "sand": "Sand",
+    "dirt": "Dirt",
     "dirt-road": "Road",
     "rubble": "Rubble",
     "dead-grass": "Grass",

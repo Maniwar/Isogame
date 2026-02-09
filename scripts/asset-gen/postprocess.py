@@ -451,6 +451,23 @@ def slice_and_save_character_sheet(
 # Processing pipelines
 # ---------------------------------------------------------------------------
 
+def mask_to_diamond(image: Image.Image) -> Image.Image:
+    """Mask a tile image to the isometric diamond shape.
+    Pixels outside the diamond become fully transparent.
+    This prevents rectangular AI-generated tiles from overlapping neighbours."""
+    w, h = image.size
+    hw, hh = w // 2, h // 2
+    arr = np.array(image.convert("RGBA"))
+
+    # Build a diamond mask: for each pixel (x, y), inside iff
+    #   |x - hw| / hw + |y - hh| / hh <= 1
+    ys, xs = np.mgrid[0:h, 0:w]
+    outside = (np.abs(xs - hw).astype(np.float64) / hw +
+               np.abs(ys - hh).astype(np.float64) / hh) > 1.0
+    arr[outside, 3] = 0
+    return Image.fromarray(arr, "RGBA")
+
+
 def process_tiles(config: dict, apply_palette: bool = True) -> int:
     """Process all tile images: resize, palette reduce, clean transparency."""
     tile_w = config["tiles"]["base_width"]
@@ -477,6 +494,11 @@ def process_tiles(config: dict, apply_palette: bool = True) -> int:
 
             # Clean transparency
             img = cleanup_transparency(img)
+
+            # Apply diamond mask to ground and terrain tiles
+            # (walls are taller and don't use the standard diamond)
+            if subdir != "walls":
+                img = mask_to_diamond(img)
 
             # Palette reduction
             if apply_palette:
