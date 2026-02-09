@@ -60,11 +60,15 @@ export class Game {
     this.dialogueUI = new DialogueUI();
     this.inventoryUI = new InventoryUI();
 
-    window.addEventListener("resize", () => this.renderer.resize());
+    window.addEventListener("resize", () => {
+      this.renderer.resize();
+      this.hud.initTouchButtons(this.canvas.width, this.canvas.height);
+    });
   }
 
   async init() {
     this.renderer.resize();
+    this.hud.initTouchButtons(this.canvas.width, this.canvas.height);
 
     // Load assets: tries AI-generated PNGs first, falls back to procedural
     await this.assets.init();
@@ -102,7 +106,11 @@ export class Game {
     // Center camera on player
     this.camera.centerOn(player.pos);
 
-    this.notify("Welcome to the Wasteland. Click to move. [TAB] inventory, [C] combat mode.", "rgb(64, 192, 64)");
+    if (Input.isTouchDevice()) {
+      this.notify("Welcome to the Wasteland. Tap to move. Use buttons for actions.", "rgb(64, 192, 64)");
+    } else {
+      this.notify("Welcome to the Wasteland. Click to move. [TAB] inventory, [C] combat mode.", "rgb(64, 192, 64)");
+    }
   }
 
   start() {
@@ -133,6 +141,17 @@ export class Game {
     }
     if (input.dragging) {
       camera.pan(input.dragDelta.x, input.dragDelta.y);
+    }
+
+    // On-screen touch button handling — intercept taps before game processes them
+    const tapClick = input.leftClick();
+    if (tapClick) {
+      const btnKey = this.hud.handleTap(tapClick.x, tapClick.y, state.phase);
+      if (btnKey) {
+        input.injectKey(btnKey);
+        // Clear the click so game systems don't also process it
+        input.mouseClicked.set("left", null);
+      }
     }
 
     // Keyboard shortcuts

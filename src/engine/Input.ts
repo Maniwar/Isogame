@@ -195,4 +195,14 @@ export class Input {
   rightClick(): ScreenPos | null {
     return this.mouseClicked.get("right") ?? null;
   }
+
+  /** Inject a virtual key press (for on-screen buttons) */
+  injectKey(code: string) {
+    this.keysPressed.add(code);
+  }
+
+  /** Detect if we're on a touch device */
+  static isTouchDevice(): boolean {
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  }
 }
