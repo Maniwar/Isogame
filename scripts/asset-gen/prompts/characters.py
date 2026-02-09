@@ -57,7 +57,7 @@ SPRITESHEET_TEMPLATE = (
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
     "- Keep the character centered in each cell.\n"
     "- Use a pure white (#FFFFFF) background in every cell — NO scenery, NO ground shadows.\n"
-    "- Characters must be holding their weapons visibly in every frame.\n"
+    "- Characters should have EMPTY HANDS — no weapons (weapons are rendered separately).\n"
     "- No text, no labels, no watermarks, no grid lines.\n"
     "- The grid should be precise — characters aligned in their cells.\n"
 )
@@ -88,6 +88,7 @@ REFERENCE_FOLLOW_UP = (
 
 
 # Character archetypes — sprite_key must match the game's entity spriteKey values
+# Characters are generated UNARMED — weapons are separate overlays
 CHARACTER_ARCHETYPES = [
     {
         "sprite_key": "player",
@@ -95,10 +96,10 @@ CHARACTER_ARCHETYPES = [
         "description": (
             "A rugged wasteland survivor wearing patched leather armor and "
             "a dusty duster coat. Green-tinted goggles on forehead. "
-            "Holding a 10mm pistol in their right hand, ready stance. "
+            "Empty hands at sides, relaxed but alert stance. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing ready, holding pistol at side",
+        "pose": "standing idle, hands empty at sides",
     },
     {
         "sprite_key": "npc_sheriff",
@@ -106,21 +107,21 @@ CHARACTER_ARCHETYPES = [
         "description": (
             "A grizzled older woman with short gray hair, a sheriff's star pinned "
             "to a leather duster, a scar across her left cheek. "
-            "Holding a revolver in her right hand. Sturdy boots. "
+            "Hands on belt, no weapon drawn. Sturdy boots. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing alert, holding revolver",
+        "pose": "standing alert, hands on belt",
     },
     {
         "sprite_key": "npc_merchant",
         "name": "Scrapper Joe",
         "description": (
             "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
-            "full of goods, and a worn outfit. Belts with pouches. "
-            "Hands visible, one hand resting on a walking stick. "
+            "full of goods, and a worn outfit. Belts with pouches and trinkets. "
+            "Hands empty, friendly open posture. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing idle, leaning on walking stick",
+        "pose": "standing idle, friendly posture",
     },
     {
         "sprite_key": "npc_doc",
@@ -128,7 +129,7 @@ CHARACTER_ARCHETYPES = [
         "description": (
             "A middle-aged man with round glasses, thinning hair, a stained lab coat "
             "over a sweater vest. Carrying a medical bag in one hand. "
-            "Full body visible from head to shoes."
+            "No weapons. Full body visible from head to shoes."
         ),
         "pose": "standing idle, holding medical bag",
     },
@@ -137,11 +138,11 @@ CHARACTER_ARCHETYPES = [
         "name": "Raider",
         "description": (
             "An aggressive raider with spiked shoulder pads, torn clothing, "
-            "face paint, and a mohawk. Holding a lead pipe weapon in right hand, "
-            "menacing stance. Red cloth armband. "
+            "face paint, and a mohawk. Red cloth armband. "
+            "Empty hands, fists clenched, menacing stance. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing menacing, gripping lead pipe weapon",
+        "pose": "standing menacing, fists clenched",
     },
 ]
 
