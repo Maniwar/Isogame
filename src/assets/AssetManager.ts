@@ -345,21 +345,14 @@ export class AssetManager {
     await Promise.all(promises);
   }
 
-  /** Composite an AI tile onto the procedural base tile to fill edge gaps. */
+  /** Composite an AI tile onto the procedural base tile to fill edge gaps.
+   *  AI tiles are already diamond-masked at 128x64 — no additional clip
+   *  needed (double-clipping caused anti-aliasing border artifacts). */
   private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
     const ctx = canvas.getContext("2d")!;
     if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(TILE_HALF_W, 0);
-    ctx.lineTo(TILE_W, TILE_HALF_H);
-    ctx.lineTo(TILE_HALF_W, TILE_H);
-    ctx.lineTo(0, TILE_HALF_H);
-    ctx.closePath();
-    ctx.clip();
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
-    ctx.restore();
     return canvas;
   }
 
@@ -408,15 +401,43 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image and strip green background.
-   * Keeps the full frame size (64x96) so all directions and animation
-   * frames share the same coordinate space — critical for weapon overlay
-   * alignment and consistent walk animation.
+   * Load a sprite image, strip green background, and crop to content.
+   * Cropping removes the large transparent frame so the Renderer can
+   * scale the actual character to the right size for the tile grid.
    */
   private async loadSpriteImage(path: string): Promise<HTMLCanvasElement | null> {
     const img = await this.loadImage(path);
     if (!img) return null;
-    return this.removeGreenBg(img);
+    const cleaned = this.removeGreenBg(img);
+    return this.cropToContent(cleaned);
+  }
+
+  /** Crop a canvas to the bounding box of its non-transparent content. */
+  private cropToContent(src: HTMLCanvasElement): HTMLCanvasElement {
+    const ctx = src.getContext("2d")!;
+    const { width: w, height: h } = src;
+    const data = ctx.getImageData(0, 0, w, h).data;
+
+    let top = h, bottom = 0, left = w, right = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 10) {
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+          if (x < left) left = x;
+          if (x > right) right = x;
+        }
+      }
+    }
+    if (top > bottom || left > right) return src;
+
+    const cw = right - left + 1;
+    const ch = bottom - top + 1;
+    if (cw >= w * 0.9 && ch >= h * 0.9) return src;
+
+    const cropped = this.createCanvas(cw, ch);
+    cropped.getContext("2d")!.drawImage(src, left, top, cw, ch, 0, 0, cw, ch);
+    return cropped;
   }
 
   // -----------------------------------------------------------------------

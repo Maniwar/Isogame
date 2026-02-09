@@ -21,6 +21,21 @@ const WEAPON_SPRITE_MAP: Record<string, string> = {
   "baseball_bat": "weapon_bat",
 };
 
+/**
+ * Hand offsets per direction, as fraction of sprite width/height.
+ * [xFrac, yFrac] — positive x = right of center, yFrac from sprite top.
+ */
+const HAND_OFFSET: Record<string, [number, number]> = {
+  S:  [ 0.20, 0.55],
+  N:  [-0.20, 0.55],
+  E:  [ 0.35, 0.50],
+  W:  [-0.35, 0.50],
+  SE: [ 0.30, 0.52],
+  SW: [-0.30, 0.52],
+  NE: [ 0.30, 0.52],
+  NW: [-0.30, 0.52],
+};
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private camera: Camera;
@@ -250,11 +265,10 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
 
-    // Scale: AI sprites are 64x96 (green removed, full frame).
-    // Scale so the visible character (~42% of frame width) matches
-    // procedural sprite width (~24px).  56x84 achieves this.
-    const MAX_W = 56;
-    const MAX_H = 84;
+    // After green removal + crop, AI sprites are ~27x78.
+    // Cap to ~24px wide (matching procedural) and proportional height.
+    const MAX_W = 24;
+    const MAX_H = 70;
     let sw = sprite ? sprite.width : 24;
     let sh = sprite ? sprite.height : 36;
     if (sw > MAX_W || sh > MAX_H) {
@@ -267,14 +281,20 @@ export class Renderer {
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
     }
 
-    // Draw weapon overlay at same scale/position (same frame size = perfect alignment)
+    // Draw weapon at the character's hand position (small, direction-aware)
     const equippedItem = entity.inventory.find((i) => i.equipped);
     if (equippedItem) {
       const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          ctx.drawImage(weaponSprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
+          const ww = 12;
+          const wh = 10;
+          const [xFrac, yFrac] = HAND_OFFSET[entity.direction] ?? [0.2, 0.55];
+          const spriteTop = drawY - sh + TILE_HALF_H;
+          const handX = drawX + sw * xFrac;
+          const handY = spriteTop + sh * yFrac;
+          ctx.drawImage(weaponSprite, handX - ww / 2, handY - wh / 2, ww, wh);
         }
       }
     }
