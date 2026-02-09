@@ -181,12 +181,39 @@ export interface GameState {
   dialogueNodeId: string | null;
   notifications: Notification[];
   gameTime: number;          // in-game hours elapsed
+  vfx: VFX[];
 }
 
 export interface Notification {
   text: string;
   color: string;
   timeLeft: number;
+}
+
+/** Visual effect types */
+export type VFXType =
+  | "projectile"   // bullet trail
+  | "slash"        // melee arc
+  | "damage_number"// floating text
+  | "blood_burst"  // blood particles spraying outward
+  | "blood_pool"   // expanding pool under corpse
+  | "hit_flash"    // red flash on target
+  | "gore_chunk";  // flying debris/chunks
+
+export interface VFX {
+  type: VFXType;
+  fromX: number;     // world coords
+  fromY: number;
+  toX: number;
+  toY: number;
+  text?: string;
+  color: string;
+  timeLeft: number;
+  duration: number;
+  /** Extra data: particle count, spread angle, severity, etc. */
+  intensity?: number;
+  /** Seeded random particles (pre-computed for consistent animation) */
+  particles?: { dx: number; dy: number; size: number; speed: number }[];
 }
 
 /** Isometric constants */
