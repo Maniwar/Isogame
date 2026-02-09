@@ -199,28 +199,12 @@ export class AssetManager {
   private async loadFromManifest(manifest: AssetManifest) {
     const promises: Promise<void>[] = [];
 
-    // Tiles — keys are Terrain enum names: "Sand", "Dirt", etc.
-    // AI tiles are 128x64 and pre-diamond-masked in postprocess.
-    // Composite them onto the procedural tile base so any edge artifacts
-    // or bad transparency (checkerboard baked in, etc.) show the clean
-    // procedural color underneath instead of black gaps.
-    if (manifest.tiles) {
-      for (const [terrainName, path] of Object.entries(manifest.tiles)) {
-        const terrain = Terrain[terrainName as keyof typeof Terrain];
-        if (terrain !== undefined) {
-          this.totalToLoad++;
-          const proceduralBase = this.tiles.get(terrain);
-          promises.push(
-            this.loadImage(path).then((img) => {
-              if (img) {
-                this.tiles.set(terrain, this.compositeAiTile(img, proceduralBase));
-                this.loadedCount++;
-              }
-            }),
-          );
-        }
-      }
-    }
+    // Tiles — skip AI tiles for now.
+    // The AI tiles at 128x64 don't tessellate cleanly as 64x32 isometric
+    // diamonds (edge artifacts, checkerboard bleed, style inconsistency).
+    // Procedural tiles are designed for the exact tile grid and look clean.
+    // AI tiles will be re-enabled once the generation pipeline produces
+    // tiles at native 64x32 resolution with proper diamond masking.
 
     // Sprites — keys are sprite keys, values are {direction: path}
     if (manifest.sprites) {
@@ -345,39 +329,6 @@ export class AssetManager {
     }
 
     await Promise.all(promises);
-  }
-
-  /**
-   * Composite an AI-generated tile onto a procedural base tile.
-   *
-   * AI tiles are 128x64, pre-diamond-masked in postprocess.py, but often
-   * have checkerboard artifacts or imperfect edge transparency.  Drawing
-   * the procedural tile first ensures any gaps show the correct terrain
-   * color instead of black.  A diamond clip prevents rectangular leftovers
-   * from leaking outside the tile footprint.
-   */
-  private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
-    const canvas = this.createCanvas(TILE_W, TILE_H);
-    const ctx = canvas.getContext("2d")!;
-
-    // 1. Draw procedural base tile (fills entire diamond with solid color)
-    if (base) {
-      ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
-    }
-
-    // 2. Clip to diamond and draw AI tile on top (scaled from 128x64 → 64x32)
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(TILE_HALF_W, 0);
-    ctx.lineTo(TILE_W, TILE_HALF_H);
-    ctx.lineTo(TILE_HALF_W, TILE_H);
-    ctx.lineTo(0, TILE_HALF_H);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
-    ctx.restore();
-
-    return canvas;
   }
 
   /**
