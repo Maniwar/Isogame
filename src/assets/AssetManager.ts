@@ -346,11 +346,14 @@ export class AssetManager {
   }
 
   /** Composite an AI tile onto the procedural base tile to fill edge gaps.
-   *  AI tiles are already diamond-masked at 128x64 — no additional clip
-   *  needed (double-clipping caused anti-aliasing border artifacts). */
+   *  AI tiles are already diamond-masked at 128x64.  We disable image
+   *  smoothing so the 128x64 → 64x32 downscale uses nearest-neighbor,
+   *  preserving crisp diamond edges and preventing semi-transparent seams
+   *  between adjacent tiles. */
   private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
     const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
     if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
     return canvas;
@@ -360,9 +363,11 @@ export class AssetManager {
    * Remove green chroma-key background pixels from a loaded image.
    *
    * The AI pipeline generates sprites on bright green backgrounds.
-   * After palette reduction the green often gets mapped to palette
-   * colors like nuclear_glow (#8EC44A) or pip_green (#40C040), so
-   * we need aggressive thresholds that catch these mapped colors too.
+   * After palette reduction the green background maps to #8EC44A
+   * (142, 196, 74).  We use color-distance matching to this known
+   * background color rather than generic green detection, which was
+   * too aggressive and stripped character accent colors like the
+   * player's green highlight (#40C040).
    */
   private removeGreenBg(img: HTMLImageElement): HTMLCanvasElement {
     const canvas = this.createCanvas(img.width, img.height);
@@ -371,14 +376,34 @@ export class AssetManager {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
+    // Known background color after palette reduction: (142, 196, 74)
+    const BG_R = 142, BG_G = 196, BG_B = 74;
+
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
-      // Green-dominant: g channel must be bright and clearly above r and b.
-      // Threshold tuned to catch palette-mapped greens like #8EC44A (142,196,74)
-      // while preserving skin tones, earth tones, and grays.
-      if (g > 120 && g > r * 1.2 && g > b * 1.2) {
+
+      // Squared color distance to the known background
+      const dr = r - BG_R, dg = g - BG_G, db = b - BG_B;
+      const distSq = dr * dr + dg * dg + db * db;
+
+      // Close match to the pipeline background color
+      if (distSq < 3000) {
+        data[i + 3] = 0;
+        continue;
+      }
+
+      // Anti-aliased fringe pixels: still very bright-green and close-ish
+      // to the background.  The threshold excludes character accent greens
+      // like (64, 192, 64) which have distSq > 6000.
+      if (g > 160 && g > r * 1.3 && g > b * 2.0 && distSq < 5500) {
+        data[i + 3] = 0;
+        continue;
+      }
+
+      // Catch pure bright green (original chroma key before palette map)
+      if (g > 220 && r < 60 && b < 60) {
         data[i + 3] = 0;
       }
     }

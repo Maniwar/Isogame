@@ -36,6 +36,22 @@ const HAND_OFFSET: Record<string, [number, number]> = {
   NW: [-0.30, 0.52],
 };
 
+/**
+ * Attack lean offsets per direction (pixels).
+ * Shifts the sprite slightly forward during the attack animation
+ * to make the action more visible.
+ */
+const ATTACK_LEAN: Record<string, [number, number]> = {
+  S:  [ 0,  3],
+  N:  [ 0, -3],
+  E:  [ 3,  1],
+  W:  [-3,  1],
+  SE: [ 2,  2],
+  SW: [-2,  2],
+  NE: [ 2, -2],
+  NW: [-2, -2],
+};
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private camera: Camera;
@@ -265,10 +281,10 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
 
-    // After green removal + crop, AI sprites are ~27x78.
-    // Cap to ~24px wide (matching procedural) and proportional height.
-    const MAX_W = 24;
-    const MAX_H = 70;
+    // Scale AI sprites to fit the isometric tile grid.
+    // Characters should be roughly half a tile wide and 1.5 tiles tall.
+    const MAX_W = 32;
+    const MAX_H = 56;
     let sw = sprite ? sprite.width : 24;
     let sh = sprite ? sprite.height : 36;
     if (sw > MAX_W || sh > MAX_H) {
@@ -277,22 +293,57 @@ export class Renderer {
       sh = Math.round(sh * scale);
     }
 
-    if (sprite) {
-      ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
+    // Walking bob: add a subtle vertical bounce during walk animation
+    // to reinforce movement even when walk frames are similar.
+    let bobY = 0;
+    if (entity.anim.current === "walk") {
+      // Sinusoidal bob based on walk elapsed time (period = anim speed)
+      const phase = (entity.anim.elapsed / entity.anim.speed) * Math.PI * 2;
+      bobY = Math.sin(phase) * -2;  // ±2px vertical bounce
     }
 
-    // Draw weapon at the character's hand position (small, direction-aware)
+    // Attack lean: slight forward shift during attack animation
+    let attackOffsetX = 0;
+    let attackOffsetY = 0;
+    if (entity.anim.current === "attack") {
+      const dirOff = ATTACK_LEAN[entity.direction];
+      if (dirOff) {
+        const progress = Math.min(1, entity.anim.elapsed / 200);
+        const ease = progress < 0.5 ? progress * 2 : 2 - progress * 2;
+        attackOffsetX = dirOff[0] * ease;
+        attackOffsetY = dirOff[1] * ease;
+      }
+    }
+
+    const finalDrawX = drawX + attackOffsetX;
+    const finalDrawY = drawY + bobY + attackOffsetY;
+
+    if (sprite) {
+      ctx.drawImage(sprite, finalDrawX - sw / 2, finalDrawY - sh + TILE_HALF_H, sw, sh);
+    }
+
+    // Draw weapon overlay — weapon sprites share the same frame format
+    // as characters, so they're scaled proportionally and positioned
+    // at the hand area relative to the character sprite.
     const equippedItem = entity.inventory.find((i) => i.equipped);
     if (equippedItem) {
       const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          const ww = 12;
-          const wh = 10;
+          // Scale weapon proportionally — roughly 60% of character dimensions
+          let ww = weaponSprite.width;
+          let wh = weaponSprite.height;
+          const maxWW = Math.round(sw * 0.65);
+          const maxWH = Math.round(sh * 0.45);
+          if (ww > maxWW || wh > maxWH) {
+            const wScale = Math.min(maxWW / ww, maxWH / wh);
+            ww = Math.round(ww * wScale);
+            wh = Math.round(wh * wScale);
+          }
           const [xFrac, yFrac] = HAND_OFFSET[entity.direction] ?? [0.2, 0.55];
-          const spriteTop = drawY - sh + TILE_HALF_H;
-          const handX = drawX + sw * xFrac;
+          const spriteTop = finalDrawY - sh + TILE_HALF_H;
+          const handX = finalDrawX + sw * xFrac;
           const handY = spriteTop + sh * yFrac;
           ctx.drawImage(weaponSprite, handX - ww / 2, handY - wh / 2, ww, wh);
         }
@@ -300,7 +351,7 @@ export class Renderer {
     }
 
     // Draw name tag — position above sprite top
-    const labelY = drawY - sh + TILE_HALF_H - 4;
+    const labelY = finalDrawY - sh + TILE_HALF_H - 4;
     ctx.fillStyle = entity.isPlayer
       ? "#40c040"
       : entity.isHostile
