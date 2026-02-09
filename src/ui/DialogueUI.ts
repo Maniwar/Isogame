@@ -4,7 +4,9 @@ import type { Game } from "../engine/Game";
 export class DialogueUI {
   private hoveredResponse = -1;
   private boundClick: ((e: MouseEvent) => void) | null = null;
+  private boundTouch: ((e: TouchEvent) => void) | null = null;
   private lastState: GameState | null = null;
+  private lastScreenH = 0;
 
   // Layout constants
   private readonly panelH = 220;
@@ -20,6 +22,7 @@ export class DialogueUI {
     game: Game,
   ) {
     this.lastState = state;
+    this.lastScreenH = screenH;
 
     if (!state.dialogueTree || !state.dialogueNodeId) return;
 
@@ -69,12 +72,11 @@ export class DialogueUI {
       ctx.fillText(`${i + 1}. ${response.text}`, this.padding + 10, ry + 18);
     });
 
-    // Set up click handler
+    // Set up click/touch handlers
     this.ensureClickHandler(game);
   }
 
   private getMouseY(): number {
-    // Use a simple tracking approach — updated via mousemove on window
     return DialogueUI._mouseY;
   }
 
@@ -85,6 +87,30 @@ export class DialogueUI {
       DialogueUI._mouseY = e.clientY;
       DialogueUI._mouseX = e.clientX;
     });
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length > 0) {
+        DialogueUI._mouseY = e.touches[0].clientY;
+        DialogueUI._mouseX = e.touches[0].clientX;
+      }
+    }, { passive: true });
+  }
+
+  private findResponseAtY(y: number): number {
+    const state = this.lastState;
+    if (!state || !state.dialogueTree || !state.dialogueNodeId) return -1;
+
+    const node = state.dialogueTree.nodes[state.dialogueNodeId];
+    if (!node) return -1;
+
+    const panelY = this.lastScreenH - this.panelH;
+
+    for (let i = 0; i < node.responses.length; i++) {
+      const ry = panelY + this.responseStartY + i * this.responseLineH;
+      if (y >= ry && y < ry + this.responseLineH) {
+        return i;
+      }
+    }
+    return -1;
   }
 
   private ensureClickHandler(game: Game) {
@@ -92,25 +118,29 @@ export class DialogueUI {
 
     this.boundClick = (e: MouseEvent) => {
       const state = this.lastState;
-      if (!state || !state.dialogueTree || !state.dialogueNodeId) return;
-      if (state.phase !== "dialogue") return;
+      if (!state || state.phase !== "dialogue") return;
 
-      const node = state.dialogueTree.nodes[state.dialogueNodeId];
-      if (!node) return;
-
-      const screenH = window.innerHeight;
-      const panelY = screenH - this.panelH;
-      const y = e.clientY;
-
-      for (let i = 0; i < node.responses.length; i++) {
-        const ry = panelY + this.responseStartY + i * this.responseLineH;
-        if (y >= ry && y < ry + this.responseLineH) {
-          game.selectDialogueResponse(i);
-          break;
-        }
+      const idx = this.findResponseAtY(e.clientY);
+      if (idx >= 0) {
+        game.selectDialogueResponse(idx);
       }
     };
     window.addEventListener("click", this.boundClick);
+
+    // Touch support — touchend fires on tap
+    this.boundTouch = (e: TouchEvent) => {
+      const state = this.lastState;
+      if (!state || state.phase !== "dialogue") return;
+      if (e.changedTouches.length === 0) return;
+
+      const touch = e.changedTouches[0];
+      const idx = this.findResponseAtY(touch.clientY);
+      if (idx >= 0) {
+        e.preventDefault();
+        game.selectDialogueResponse(idx);
+      }
+    };
+    window.addEventListener("touchend", this.boundTouch, { passive: false });
   }
 
   private drawWrappedText(

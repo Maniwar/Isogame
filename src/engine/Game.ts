@@ -12,7 +12,7 @@ import { InventorySystem } from "../systems/InventorySystem";
 import { HUD } from "../ui/HUD";
 import { DialogueUI } from "../ui/DialogueUI";
 import { InventoryUI } from "../ui/InventoryUI";
-import { GameState, GamePhase, Entity } from "../types";
+import { GameState, GamePhase, Entity, TILE_HALF_W, TILE_HALF_H } from "../types";
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -101,6 +101,7 @@ export class Game {
       dialogueNodeId: null,
       notifications: [],
       gameTime: 8, // 8:00 AM
+      vfx: [],
     };
 
     // Center camera on player
@@ -203,6 +204,11 @@ export class Game {
     state.notifications = state.notifications
       .map((n) => ({ ...n, timeLeft: n.timeLeft - dt }))
       .filter((n) => n.timeLeft > 0);
+
+    // Update VFX
+    state.vfx = state.vfx
+      .map((v) => ({ ...v, timeLeft: v.timeLeft - dt }))
+      .filter((v) => v.timeLeft > 0);
   }
 
   private updateExplore(dt: number) {
@@ -310,6 +316,7 @@ export class Game {
         if (target) {
           this.animationSystem.triggerAttack(current);
           const result = this.combatSystem.attack(state, current, target);
+          this.spawnAttackVFX(current, target, result.hit, result.damage);
           this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
 
           if (target.dead) {
@@ -439,6 +446,50 @@ export class Game {
     }
   }
 
+  private spawnAttackVFX(attacker: Entity, target: Entity, hit: boolean, damage: number) {
+    const ax = (attacker.pos.x - attacker.pos.y) * TILE_HALF_W;
+    const ay = (attacker.pos.x + attacker.pos.y) * TILE_HALF_H;
+    const tx = (target.pos.x - target.pos.y) * TILE_HALF_W;
+    const ty = (target.pos.x + target.pos.y) * TILE_HALF_H;
+
+    // Determine if ranged or melee weapon
+    const weapon = attacker.inventory.find((i) => i.equipped);
+    const isRanged = weapon && (weapon.itemId === "10mm_pistol" || weapon.itemId === "pipe_rifle");
+
+    // Projectile or slash line
+    this.state.vfx.push({
+      type: isRanged ? "projectile" : "slash",
+      fromX: ax, fromY: ay - 12,
+      toX: tx, toY: ty - 12,
+      color: isRanged ? "#ffcc44" : "#cccccc",
+      timeLeft: 300,
+      duration: 300,
+    });
+
+    // Floating damage number
+    if (hit) {
+      this.state.vfx.push({
+        type: "damage_number",
+        fromX: tx, fromY: ty - 24,
+        toX: tx, toY: ty - 60,
+        text: `-${damage}`,
+        color: damage >= 10 ? "#ff4444" : "#ffcc44",
+        timeLeft: 800,
+        duration: 800,
+      });
+    } else {
+      this.state.vfx.push({
+        type: "damage_number",
+        fromX: tx, fromY: ty - 24,
+        toX: tx, toY: ty - 50,
+        text: "MISS",
+        color: "#999999",
+        timeLeft: 600,
+        duration: 600,
+      });
+    }
+  }
+
   private drawCombatUI(ctx: CanvasRenderingContext2D) {
     const { state } = this;
     const w = this.canvas.width;
@@ -451,12 +502,15 @@ export class Game {
     ctx.textAlign = "center";
     ctx.fillText("[ COMBAT MODE ]", w / 2, 14);
 
+    const weapon = state.player.inventory.find((i) => i.equipped);
+    const weaponName = weapon ? weapon.itemId.replace(/_/g, " ") : "Fists";
+    const isTouchDev = Input.isTouchDevice();
+    const hint = isTouchDev
+      ? `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName}  |  Tap enemy to attack`
+      : `AP: ${state.player.stats.ap}/${state.player.stats.maxAp}  |  ${weaponName}  |  Click enemy  [SPACE] end turn  [ESC] flee`;
+
     ctx.font = "12px monospace";
     ctx.fillStyle = "#d4c4a0";
-    ctx.fillText(
-      `AP: ${state.player.stats.ap} / ${state.player.stats.maxAp}  |  [CLICK] attack  [SPACE] end turn  [ESC] flee`,
-      w / 2,
-      30,
-    );
+    ctx.fillText(hint, w / 2, 30);
   }
 }

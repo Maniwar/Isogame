@@ -8,7 +8,7 @@ import {
   TILE_HALF_W,
   TILE_HALF_H,
   Entity,
-  Notification,
+  VFX,
 } from "../types";
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
@@ -77,9 +77,14 @@ export class Renderer {
       }
     }
 
+    // Combat overlays (range tiles, enemy highlights)
+    if (state.phase === "combat") {
+      this.drawCombatOverlays(state, minX, minY, maxX, maxY);
+    }
+
     // Draw hovered tile highlight
     if (this.hoveredTile) {
-      this.drawTileHighlight(this.hoveredTile);
+      this.drawTileHighlight(this.hoveredTile, state.phase === "combat");
     }
 
     // Draw item pickups on ground
@@ -93,14 +98,14 @@ export class Renderer {
       .sort((a, b) => (a.pos.y + a.pos.x) - (b.pos.y + b.pos.x));
 
     for (const entity of sorted) {
-      this.drawEntity(entity);
+      this.drawEntity(entity, state.phase === "combat");
     }
+
+    // Draw VFX (projectiles, damage numbers) — in world space
+    this.drawVFX(state.vfx);
 
     // Reset transform for UI
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-    // Draw notifications
-    this.drawNotifications(state.notifications);
   }
 
   private drawTile(x: number, y: number, tile: Tile) {
@@ -122,12 +127,61 @@ export class Renderer {
     }
   }
 
-  private drawTileHighlight(pos: TilePos) {
+  private drawCombatOverlays(state: GameState, minX: number, minY: number, maxX: number, maxY: number) {
+    const { ctx } = this;
+    const player = state.player;
+    const px = player.pos.x;
+    const py = player.pos.y;
+
+    // Draw attack range overlay on tiles (manhattan distance 5)
+    const attackRange = 5;
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const dist = Math.abs(x - px) + Math.abs(y - py);
+        if (dist > 0 && dist <= attackRange) {
+          const wx = (x - y) * TILE_HALF_W;
+          const wy = (x + y) * TILE_HALF_H;
+
+          // Subtle red tint for attack range
+          ctx.fillStyle = "rgba(184, 48, 48, 0.08)";
+          ctx.beginPath();
+          ctx.moveTo(wx, wy - TILE_HALF_H);
+          ctx.lineTo(wx + TILE_HALF_W, wy);
+          ctx.lineTo(wx, wy + TILE_HALF_H);
+          ctx.lineTo(wx - TILE_HALF_W, wy);
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
+    }
+
+    // Draw range border diamond around player
+    const borderDist = attackRange;
+    ctx.strokeStyle = "rgba(184, 48, 48, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+
+    // Draw a diamond outline at range distance
+    const centerWx = (px - py) * TILE_HALF_W;
+    const centerWy = (px + py) * TILE_HALF_H;
+    const rangeW = borderDist * TILE_HALF_W;
+    const rangeH = borderDist * TILE_HALF_H;
+    ctx.beginPath();
+    ctx.moveTo(centerWx, centerWy - rangeH);
+    ctx.lineTo(centerWx + rangeW, centerWy);
+    ctx.lineTo(centerWx, centerWy + rangeH);
+    ctx.lineTo(centerWx - rangeW, centerWy);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  private drawTileHighlight(pos: TilePos, isCombat: boolean) {
     const { ctx } = this;
     const wx = (pos.x - pos.y) * TILE_HALF_W;
     const wy = (pos.x + pos.y) * TILE_HALF_H;
 
-    ctx.strokeStyle = "rgba(64, 192, 64, 0.6)";
+    ctx.strokeStyle = isCombat ? "rgba(184, 48, 48, 0.8)" : "rgba(64, 192, 64, 0.6)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(wx, wy - TILE_HALF_H);
@@ -138,7 +192,7 @@ export class Renderer {
     ctx.stroke();
   }
 
-  private drawEntity(entity: Entity) {
+  private drawEntity(entity: Entity, isCombat: boolean) {
     const { ctx, assets } = this;
 
     // Interpolate position for smooth movement
@@ -156,6 +210,26 @@ export class Renderer {
     } else {
       drawX = (entity.pos.x - entity.pos.y) * TILE_HALF_W;
       drawY = (entity.pos.x + entity.pos.y) * TILE_HALF_H;
+    }
+
+    // Combat: highlight hostile enemies with pulsing red circle
+    if (isCombat && entity.isHostile && !entity.dead) {
+      const pulse = Math.sin(Date.now() / 200) * 0.2 + 0.5;
+      ctx.strokeStyle = `rgba(184, 48, 48, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY - 10, 16, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Red target marker on tile
+      ctx.fillStyle = `rgba(184, 48, 48, ${pulse * 0.3})`;
+      ctx.beginPath();
+      ctx.moveTo(drawX, drawY - TILE_HALF_H);
+      ctx.lineTo(drawX + TILE_HALF_W, drawY);
+      ctx.lineTo(drawX, drawY + TILE_HALF_H);
+      ctx.lineTo(drawX - TILE_HALF_W, drawY);
+      ctx.closePath();
+      ctx.fill();
     }
 
     // Use animation frame if available, otherwise static sprite
@@ -177,8 +251,8 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.fillText(entity.name, drawX, drawY - 36);
 
-    // Health bar for non-player entities
-    if (!entity.isPlayer && entity.stats.hp < entity.stats.maxHp) {
+    // Health bar (always show in combat, or when damaged)
+    if (!entity.isPlayer && (isCombat || entity.stats.hp < entity.stats.maxHp)) {
       const barW = 24;
       const barH = 3;
       const bx = drawX - barW / 2;
@@ -189,6 +263,99 @@ export class Renderer {
       ctx.fillRect(bx, by, barW, barH);
       ctx.fillStyle = ratio > 0.5 ? "#40c040" : ratio > 0.25 ? "#c4703a" : "#b83030";
       ctx.fillRect(bx, by, barW * ratio, barH);
+    }
+  }
+
+  private drawVFX(vfxList: VFX[]) {
+    const { ctx } = this;
+
+    for (const vfx of vfxList) {
+      const progress = 1 - vfx.timeLeft / vfx.duration;
+      const alpha = Math.min(1, vfx.timeLeft / (vfx.duration * 0.3));
+
+      switch (vfx.type) {
+        case "projectile": {
+          // Yellow bullet trail from attacker to target
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = vfx.color;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          // Animate: trail sweeps from source to target
+          const headX = vfx.fromX + (vfx.toX - vfx.fromX) * Math.min(1, progress * 2);
+          const headY = vfx.fromY + (vfx.toY - vfx.fromY) * Math.min(1, progress * 2);
+          const tailProgress = Math.max(0, progress * 2 - 0.5);
+          const tailX = vfx.fromX + (vfx.toX - vfx.fromX) * tailProgress;
+          const tailY = vfx.fromY + (vfx.toY - vfx.fromY) * tailProgress;
+          ctx.moveTo(tailX, tailY);
+          ctx.lineTo(headX, headY);
+          ctx.stroke();
+
+          // Muzzle flash at source (early in animation)
+          if (progress < 0.3) {
+            const flashAlpha = (0.3 - progress) / 0.3;
+            ctx.fillStyle = `rgba(255, 200, 60, ${flashAlpha})`;
+            ctx.beginPath();
+            ctx.arc(vfx.fromX, vfx.fromY, 4 + progress * 8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Impact spark at target (late in animation)
+          if (progress > 0.5) {
+            const sparkAlpha = alpha * 0.8;
+            ctx.fillStyle = `rgba(255, 100, 50, ${sparkAlpha})`;
+            ctx.beginPath();
+            ctx.arc(vfx.toX, vfx.toY, 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "slash": {
+          // Melee slash arc
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = vfx.color;
+          ctx.lineWidth = 3;
+
+          const midX = (vfx.fromX + vfx.toX) / 2;
+          const midY = (vfx.fromY + vfx.toY) / 2;
+          const angle = Math.atan2(vfx.toY - vfx.fromY, vfx.toX - vfx.fromX);
+          const sweep = progress * Math.PI * 0.6;
+
+          ctx.beginPath();
+          ctx.arc(midX, midY, 12, angle - sweep / 2, angle + sweep / 2);
+          ctx.stroke();
+
+          // Impact sparks
+          if (progress > 0.3) {
+            const numSparks = 3;
+            for (let i = 0; i < numSparks; i++) {
+              const sparkAngle = angle + (i - 1) * 0.4;
+              const dist = 6 + progress * 10;
+              const sx = vfx.toX + Math.cos(sparkAngle) * dist;
+              const sy = vfx.toY + Math.sin(sparkAngle) * dist;
+              ctx.fillStyle = `rgba(255, 255, 200, ${alpha * 0.6})`;
+              ctx.fillRect(sx - 1, sy - 1, 2, 2);
+            }
+          }
+          ctx.globalAlpha = 1;
+          break;
+        }
+
+        case "damage_number": {
+          // Float upward with fade
+          const curX = vfx.fromX + (vfx.toX - vfx.fromX) * progress;
+          const curY = vfx.fromY + (vfx.toY - vfx.fromY) * progress;
+
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = vfx.color;
+          ctx.font = "bold 10px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(vfx.text ?? "", curX, curY);
+          ctx.globalAlpha = 1;
+          break;
+        }
+      }
     }
   }
 
@@ -209,17 +376,5 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(wx, wy - 4, 4, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  private drawNotifications(notifications: Notification[]) {
-    const { ctx } = this;
-    ctx.textAlign = "center";
-    ctx.font = "14px monospace";
-
-    notifications.forEach((n, i) => {
-      const alpha = Math.min(1, n.timeLeft / 500);
-      ctx.fillStyle = n.color.replace(")", `, ${alpha})`).replace("rgb", "rgba");
-      ctx.fillText(n.text, this.canvas.width / 2, this.canvas.height - 60 - i * 22);
-    });
   }
 }

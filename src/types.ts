@@ -181,12 +181,26 @@ export interface GameState {
   dialogueNodeId: string | null;
   notifications: Notification[];
   gameTime: number;          // in-game hours elapsed
+  vfx: VFX[];
 }
 
 export interface Notification {
   text: string;
   color: string;
   timeLeft: number;
+}
+
+/** Visual effect (projectile line, floating number, etc.) */
+export interface VFX {
+  type: "projectile" | "slash" | "damage_number";
+  fromX: number;     // world coords
+  fromY: number;
+  toX: number;
+  toY: number;
+  text?: string;
+  color: string;
+  timeLeft: number;
+  duration: number;
 }
 
 /** Isometric constants */

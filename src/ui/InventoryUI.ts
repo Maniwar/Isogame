@@ -4,6 +4,7 @@ import type { Game } from "../engine/Game";
 
 export class InventoryUI {
   private boundClick: ((e: MouseEvent) => void) | null = null;
+  private boundTouch: ((e: TouchEvent) => void) | null = null;
   private lastState: GameState | null = null;
 
   private readonly panelW = 400;
@@ -20,29 +21,32 @@ export class InventoryUI {
   ) {
     this.lastState = state;
 
-    const px = (screenW - this.panelW) / 2;
-    const py = (screenH - this.panelH) / 2;
+    // Clamp panel to screen width on small devices
+    const pw = Math.min(this.panelW, screenW - 20);
+    const ph = Math.min(this.panelH, screenH - 40);
+    const px = (screenW - pw) / 2;
+    const py = (screenH - ph) / 2;
 
     // Background
     ctx.fillStyle = "rgba(20, 20, 16, 0.95)";
-    ctx.fillRect(px, py, this.panelW, this.panelH);
+    ctx.fillRect(px, py, pw, ph);
 
     // Border
     ctx.strokeStyle = "#40c040";
     ctx.lineWidth = 2;
-    ctx.strokeRect(px, py, this.panelW, this.panelH);
+    ctx.strokeRect(px, py, pw, ph);
 
     // Header
     ctx.fillStyle = "#40c040";
     ctx.font = "bold 16px monospace";
     ctx.textAlign = "center";
-    ctx.fillText("INVENTORY", px + this.panelW / 2, py + 30);
+    ctx.fillText("INVENTORY", px + pw / 2, py + 30);
 
     // Divider
     ctx.strokeStyle = "rgba(64, 192, 64, 0.3)";
     ctx.beginPath();
     ctx.moveTo(px + 10, py + this.headerH);
-    ctx.lineTo(px + this.panelW - 10, py + this.headerH);
+    ctx.lineTo(px + pw - 10, py + this.headerH);
     ctx.stroke();
 
     // Items
@@ -75,13 +79,13 @@ export class InventoryUI {
         const itemY = yOff;
         const isHovered =
           InventoryUI._mouseX >= px &&
-          InventoryUI._mouseX <= px + this.panelW &&
+          InventoryUI._mouseX <= px + pw &&
           InventoryUI._mouseY >= itemY &&
           InventoryUI._mouseY < itemY + this.itemH;
 
         if (isHovered) {
           ctx.fillStyle = "rgba(64, 192, 64, 0.1)";
-          ctx.fillRect(px + 5, itemY, this.panelW - 10, this.itemH);
+          ctx.fillRect(px + 5, itemY, pw - 10, this.itemH);
         }
 
         // Equipped indicator
@@ -106,10 +110,10 @@ export class InventoryUI {
         ctx.textAlign = "right";
         ctx.fillStyle = "#6e6e5e";
         ctx.font = "10px monospace";
-        if (def.damage) ctx.fillText(`DMG: ${def.damage}`, px + this.panelW - 15, itemY + 15);
-        if (def.healing) ctx.fillText(`HEAL: +${def.healing}`, px + this.panelW - 15, itemY + 15);
-        if (def.armorValue) ctx.fillText(`DEF: ${def.armorValue}`, px + this.panelW - 15, itemY + 15);
-        ctx.fillText(`${def.value} caps`, px + this.panelW - 15, itemY + 30);
+        if (def.damage) ctx.fillText(`DMG: ${def.damage}`, px + pw - 15, itemY + 15);
+        if (def.healing) ctx.fillText(`HEAL: +${def.healing}`, px + pw - 15, itemY + 15);
+        if (def.armorValue) ctx.fillText(`DEF: ${def.armorValue}`, px + pw - 15, itemY + 15);
+        ctx.fillText(`${def.value} caps`, px + pw - 15, itemY + 30);
         ctx.textAlign = "left";
 
         yOff += this.itemH;
@@ -121,7 +125,7 @@ export class InventoryUI {
       ctx.fillStyle = "#6e6e5e";
       ctx.font = "12px monospace";
       ctx.textAlign = "center";
-      ctx.fillText("Inventory is empty.", px + this.panelW / 2, py + this.panelH / 2);
+      ctx.fillText("Inventory is empty.", px + pw / 2, py + ph / 2);
     }
 
     // Footer hint
@@ -129,9 +133,9 @@ export class InventoryUI {
     ctx.font = "10px monospace";
     ctx.textAlign = "center";
     ctx.fillText(
-      "[Click] Use/Equip  [TAB] Close",
-      px + this.panelW / 2,
-      py + this.panelH - 12,
+      "Tap item to Use/Equip",
+      px + pw / 2,
+      py + ph - 12,
     );
 
     this.ensureClickHandler(game);
@@ -144,6 +148,50 @@ export class InventoryUI {
       InventoryUI._mouseY = e.clientY;
       InventoryUI._mouseX = e.clientX;
     });
+    window.addEventListener("touchstart", (e) => {
+      if (e.touches.length > 0) {
+        InventoryUI._mouseY = e.touches[0].clientY;
+        InventoryUI._mouseX = e.touches[0].clientX;
+      }
+    }, { passive: true });
+  }
+
+  private findItemAtY(clientX: number, clientY: number): string | null {
+    const state = this.lastState;
+    if (!state) return null;
+
+    const screenW = window.innerWidth;
+    const screenH = window.innerHeight;
+    const pw = Math.min(this.panelW, screenW - 20);
+    const ph = Math.min(this.panelH, screenH - 40);
+    const px = (screenW - pw) / 2;
+    const py = (screenH - ph) / 2;
+
+    // Check if inside panel
+    if (clientX < px || clientX > px + pw || clientY < py || clientY > py + ph) {
+      return null;
+    }
+
+    const categories = ["weapon", "armor", "consumable", "misc"] as const;
+    let yOff = py + this.headerH + 10;
+
+    for (const cat of categories) {
+      const items = state.player.inventory.filter((i) => {
+        const def = ITEM_DB[i.itemId];
+        return def && def.category === cat;
+      });
+
+      if (items.length === 0) continue;
+      yOff += 20; // category header
+
+      for (const item of items) {
+        if (clientY >= yOff && clientY < yOff + this.itemH) {
+          return item.itemId;
+        }
+        yOff += this.itemH;
+      }
+    }
+    return null;
   }
 
   private ensureClickHandler(game: Game) {
@@ -153,44 +201,26 @@ export class InventoryUI {
       const state = this.lastState;
       if (!state || state.phase !== "inventory") return;
 
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
-      const px = (screenW - this.panelW) / 2;
-      const py = (screenH - this.panelH) / 2;
-
-      // Check if click is inside panel
-      if (
-        e.clientX < px ||
-        e.clientX > px + this.panelW ||
-        e.clientY < py ||
-        e.clientY > py + this.panelH
-      ) {
-        return;
-      }
-
-      // Find which item was clicked
-      const categories = ["weapon", "armor", "consumable", "misc"] as const;
-      let yOff = py + this.headerH + 10;
-
-      for (const cat of categories) {
-        const items = state.player.inventory.filter((i) => {
-          const def = ITEM_DB[i.itemId];
-          return def && def.category === cat;
-        });
-
-        if (items.length === 0) continue;
-        yOff += 20; // category header
-
-        for (const item of items) {
-          if (e.clientY >= yOff && e.clientY < yOff + this.itemH) {
-            game.useItem(item.itemId);
-            return;
-          }
-          yOff += this.itemH;
-        }
+      const itemId = this.findItemAtY(e.clientX, e.clientY);
+      if (itemId) {
+        game.useItem(itemId);
       }
     };
-
     window.addEventListener("click", this.boundClick);
+
+    // Touch support
+    this.boundTouch = (e: TouchEvent) => {
+      const state = this.lastState;
+      if (!state || state.phase !== "inventory") return;
+      if (e.changedTouches.length === 0) return;
+
+      const touch = e.changedTouches[0];
+      const itemId = this.findItemAtY(touch.clientX, touch.clientY);
+      if (itemId) {
+        e.preventDefault();
+        game.useItem(itemId);
+      }
+    };
+    window.addEventListener("touchend", this.boundTouch, { passive: false });
   }
 }
