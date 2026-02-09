@@ -136,6 +136,14 @@ def deploy(source: Path, target: Path) -> dict:
                                 manifest["sprites"][sprite_key][direction] = path
 
                     print(f"  Anim: {sprite_key}/{anim_name} ({len(directions)} dirs)")
+
+                # Also deploy the original sheet for reference
+                sheet_file = char_dir / f"{sprite_key}-sheet.png"
+                if sheet_file.exists():
+                    dest = target / "sprites" / f"{sprite_key}-sheet.png"
+                    shutil.copy2(sheet_file, dest)
+                    deployed += 1
+                    print(f"  Sheet: {sprite_key}-sheet.png (kept)")
             else:
                 # Legacy: individual direction images without animations
                 for png in sorted(char_dir.glob("*.png")):
