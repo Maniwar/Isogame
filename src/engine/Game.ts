@@ -728,11 +728,13 @@ export class Game {
     const { state } = this;
     if (state.combatExecuting) return false;
     const w = this.canvas.width;
-    const queueW = Math.min(300, w - 20);
-    const queueX = (w - queueW) / 2;
-    const lineH = 22;
-    const headerH = 24;
-    const queueY = 60;
+    const isMobile = Input.isTouchDevice();
+    const maxW = isMobile ? w - 100 : w - 20;
+    const queueW = Math.min(280, maxW);
+    const queueX = isMobile ? 10 : (w - queueW) / 2;
+    const lineH = 20;
+    const headerH = 22;
+    const queueY = 42;
 
     if (screenX < queueX || screenX > queueX + queueW) return false;
 
@@ -747,7 +749,7 @@ export class Game {
 
     // Check GO button
     const goY = queueY + headerH + state.combatActionQueue.length * lineH + 4;
-    if (screenY >= goY && screenY <= goY + 30) {
+    if (screenY >= goY && screenY <= goY + 26) {
       this.executeActionQueue();
       return true;
     }
@@ -785,14 +787,16 @@ export class Game {
     const { state } = this;
     const w = this.canvas.width;
     const h = this.canvas.height;
+    const isTouchDev = Input.isTouchDevice();
 
-    // Top bar
+    // Top bar — narrower on mobile to avoid minimap overlap
+    const topBarW = isTouchDev ? w - 90 : w;
     ctx.fillStyle = "rgba(184, 48, 48, 0.15)";
-    ctx.fillRect(0, 0, w, 36);
+    ctx.fillRect(0, 0, topBarW, 36);
     ctx.fillStyle = "#b83030";
     ctx.font = "bold 14px monospace";
     ctx.textAlign = "center";
-    ctx.fillText("[ COMBAT MODE ]", w / 2, 14);
+    ctx.fillText("[ COMBAT MODE ]", topBarW / 2, 14);
 
     const weapon = state.player.inventory.find((i) => i.equipped);
     const weaponDef = weapon ? ITEM_DB[weapon.itemId] : null;
@@ -804,18 +808,17 @@ export class Game {
     const queuedAP = state.combatActionQueue.reduce((s, a) => s + a.apCost, 0);
     const apLeft = state.player.stats.ap - queuedAP;
 
-    const isTouchDev = Input.isTouchDevice();
     const hint = isTouchDev
-      ? `AP: ${apLeft}/${state.player.stats.maxAp}  |  ${weaponName} (${apCost}AP, rng:${range})  |  ${partLabel}`
+      ? `AP:${apLeft}/${state.player.stats.maxAp} | ${weaponName} (${apCost}AP) | ${partLabel}`
       : `AP: ${apLeft}/${state.player.stats.maxAp}  |  ${weaponName} (${apCost}AP, rng:${range})  |  ${partLabel}  |  [1-6] aim  [G] GO  [Bksp] undo`;
 
-    ctx.font = "12px monospace";
+    ctx.font = isTouchDev ? "10px monospace" : "12px monospace";
     ctx.fillStyle = "#d4c4a0";
-    ctx.fillText(hint, w / 2, 30);
+    ctx.fillText(hint, topBarW / 2, 30);
 
-    // Action queue panel (center, below top bar)
+    // Action queue panel (left-aligned on mobile to avoid touch buttons, centered on desktop)
     if (state.combatActionQueue.length > 0) {
-      this.drawActionQueue(ctx, w);
+      this.drawActionQueue(ctx, w, isTouchDev);
     }
 
     // Body part selector — desktop: horizontal bar, mobile: hidden (use AIM button)
@@ -829,18 +832,20 @@ export class Game {
     }
 
     // Combat log
-    this.drawCombatLog(ctx, h);
+    this.drawCombatLog(ctx, w, h, isTouchDev);
   }
 
-  private drawActionQueue(ctx: CanvasRenderingContext2D, w: number) {
+  private drawActionQueue(ctx: CanvasRenderingContext2D, w: number, isMobile: boolean) {
     const { state } = this;
-    const queueW = Math.min(300, w - 20);
-    const queueX = (w - queueW) / 2;
-    const lineH = 22;
-    const headerH = 24;
-    const queueY = 60;
+    // On mobile, leave 80px right margin for touch buttons
+    const maxW = isMobile ? w - 100 : w - 20;
+    const queueW = Math.min(280, maxW);
+    const queueX = isMobile ? 10 : (w - queueW) / 2;
+    const lineH = 20;
+    const headerH = 22;
+    const queueY = 42;
     const totalAP = state.combatActionQueue.reduce((s, a) => s + a.apCost, 0);
-    const queueH = headerH + state.combatActionQueue.length * lineH + 40;
+    const queueH = headerH + state.combatActionQueue.length * lineH + 36;
 
     ctx.fillStyle = "rgba(20, 20, 16, 0.9)";
     ctx.fillRect(queueX, queueY, queueW, queueH);
@@ -852,15 +857,16 @@ export class Game {
     ctx.fillStyle = "#c4703a";
     ctx.font = "bold 10px monospace";
     ctx.textAlign = "left";
-    ctx.fillText(`ACTION QUEUE (${totalAP} AP total)`, queueX + 8, queueY + 15);
+    ctx.fillText(`QUEUE (${totalAP} AP)`, queueX + 8, queueY + 14);
 
     // Actions
     ctx.font = "9px monospace";
+    const maxLabelLen = isMobile ? 28 : 36;
     for (let i = 0; i < state.combatActionQueue.length; i++) {
       const action = state.combatActionQueue[i];
       const iy = queueY + headerH + i * lineH;
 
-      // Hover
+      // Hover highlight
       const mx = InventoryUI._mouseX;
       const my = InventoryUI._mouseY;
       if (mx >= queueX && mx <= queueX + queueW && my >= iy && my < iy + lineH) {
@@ -870,17 +876,17 @@ export class Game {
 
       // Number
       ctx.fillStyle = "#b83030";
-      ctx.fillText(`${i + 1}.`, queueX + 8, iy + 14);
+      ctx.fillText(`${i + 1}.`, queueX + 8, iy + 13);
 
       // Label
       ctx.fillStyle = action.type === "attack" ? "#ff6644" : "#d4c4a0";
-      const label = action.label.length > 38 ? action.label.substring(0, 35) + "..." : action.label;
-      ctx.fillText(label, queueX + 24, iy + 14);
+      const label = action.label.length > maxLabelLen ? action.label.substring(0, maxLabelLen - 3) + "..." : action.label;
+      ctx.fillText(label, queueX + 24, iy + 13);
 
       // Remove hint
       ctx.fillStyle = "#6e6e5e";
       ctx.textAlign = "right";
-      ctx.fillText("[x]", queueX + queueW - 8, iy + 14);
+      ctx.fillText("[x]", queueX + queueW - 8, iy + 13);
       ctx.textAlign = "left";
     }
 
@@ -890,14 +896,14 @@ export class Game {
     const goX = queueX + (queueW - goW) / 2;
 
     ctx.fillStyle = state.combatExecuting ? "rgba(100, 100, 100, 0.5)" : "rgba(64, 192, 64, 0.3)";
-    ctx.fillRect(goX, goY, goW, 28);
+    ctx.fillRect(goX, goY, goW, 26);
     ctx.strokeStyle = "#40c040";
     ctx.lineWidth = 2;
-    ctx.strokeRect(goX, goY, goW, 28);
+    ctx.strokeRect(goX, goY, goW, 26);
     ctx.fillStyle = "#40c040";
-    ctx.font = "bold 12px monospace";
+    ctx.font = "bold 11px monospace";
     ctx.textAlign = "center";
-    ctx.fillText(state.combatExecuting ? "..." : "GO [G]", goX + goW / 2, goY + 18);
+    ctx.fillText(state.combatExecuting ? "..." : "GO [G]", goX + goW / 2, goY + 17);
   }
 
   private drawBodyPartSelector(ctx: CanvasRenderingContext2D, w: number, h: number) {
@@ -905,36 +911,39 @@ export class Game {
     const parts: BodyPart[] = ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"];
     const selected = state.targetBodyPart ?? "torso";
 
-    const btnW = 70;
-    const btnH = 24;
-    const gap = 4;
-    const totalW = parts.length * (btnW + gap) - gap;
+    // 2 rows x 3 columns for a more compact layout
+    const btnW = 80;
+    const btnH = 22;
+    const gapX = 4;
+    const gapY = 3;
+    const cols = 3;
+    const totalW = cols * (btnW + gapX) - gapX;
     const startX = (w - totalW) / 2;
-    const startY = h - 130;
+    const startY = h - 146;
 
     ctx.fillStyle = "#d4c4a0";
     ctx.font = "10px monospace";
     ctx.textAlign = "center";
-    ctx.fillText("TARGET BODY PART [1-6]", w / 2, startY - 6);
+    ctx.fillText("TARGET [1-6]", w / 2, startY - 6);
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const mod = BODY_PARTS[part];
-      const bx = startX + i * (btnW + gap);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const bx = startX + col * (btnW + gapX);
+      const by = startY + row * (btnH + gapY);
       const isSelected = part === selected;
 
       ctx.fillStyle = isSelected ? "rgba(184, 48, 48, 0.4)" : "rgba(30, 30, 22, 0.85)";
-      ctx.fillRect(bx, startY, btnW, btnH);
+      ctx.fillRect(bx, by, btnW, btnH);
       ctx.strokeStyle = isSelected ? "#b83030" : "#6e6e5e";
       ctx.lineWidth = isSelected ? 2 : 1;
-      ctx.strokeRect(bx, startY, btnW, btnH);
+      ctx.strokeRect(bx, by, btnW, btnH);
       ctx.fillStyle = isSelected ? "#ff6644" : "#d4c4a0";
       ctx.font = "bold 9px monospace";
       ctx.textAlign = "center";
-      ctx.fillText(`${i + 1}:${mod.label}`, bx + btnW / 2, startY + 10);
-      ctx.fillStyle = "#8ec44a";
-      ctx.font = "8px monospace";
-      ctx.fillText(`${Math.round(mod.hitMod * 100)}%`, bx + btnW / 2, startY + 20);
+      ctx.fillText(`${i + 1}:${mod.label} ${Math.round(mod.hitMod * 100)}%`, bx + btnW / 2, by + 15);
     }
   }
 
@@ -998,20 +1007,22 @@ export class Game {
     }
   }
 
-  private drawCombatLog(ctx: CanvasRenderingContext2D, h: number) {
+  private drawCombatLog(ctx: CanvasRenderingContext2D, w: number, h: number, isMobile: boolean) {
     const { state } = this;
     const log = state.combatLog;
     if (log.length === 0) return;
 
     const logX = 10;
-    const logW = 320;
-    const lineH = 14;
-    const maxLines = 12;
+    const logW = isMobile ? Math.min(240, w - 100) : 300;
+    const lineH = isMobile ? 12 : 14;
+    const maxLines = isMobile ? 6 : 10;
+    const maxChars = isMobile ? 32 : 42;
     const visibleLog = log.slice(-maxLines);
     const logH = visibleLog.length * lineH + 20;
-    const logY = h - 160 - logH;
+    // Position above HP/AP bars (which start at h - 90), with a gap
+    const logY = h - 100 - logH;
 
-    ctx.fillStyle = "rgba(20, 20, 16, 0.8)";
+    ctx.fillStyle = "rgba(20, 20, 16, 0.75)";
     ctx.fillRect(logX, logY, logW, logH);
     ctx.strokeStyle = "rgba(64, 192, 64, 0.3)";
     ctx.lineWidth = 1;
@@ -1022,11 +1033,11 @@ export class Game {
     ctx.textAlign = "left";
     ctx.fillText("COMBAT LOG", logX + 5, logY + 11);
 
-    ctx.font = "9px monospace";
+    ctx.font = isMobile ? "8px monospace" : "9px monospace";
     for (let i = 0; i < visibleLog.length; i++) {
       const entry = visibleLog[i];
       ctx.fillStyle = entry.color;
-      const text = entry.text.length > 45 ? entry.text.substring(0, 42) + "..." : entry.text;
+      const text = entry.text.length > maxChars ? entry.text.substring(0, maxChars - 3) + "..." : entry.text;
       ctx.fillText(text, logX + 5, logY + 24 + i * lineH);
     }
   }
