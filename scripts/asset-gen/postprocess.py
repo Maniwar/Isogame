@@ -5,6 +5,7 @@ Isogame Asset Post-Processor.
 Applies post-processing to AI-generated assets:
   - Palette reduction to enforce visual consistency
   - Resize/crop to exact target dimensions
+  - Sprite sheet SLICING — cuts generated sheets into individual frames
   - Sprite sheet assembly from individual frames
   - Edge cleanup for tile seamlessness
   - Transparency cleanup
@@ -17,14 +18,15 @@ Usage:
     python postprocess.py --category tiles
     python postprocess.py --category sprites
 
-    # Only run palette reduction
-    python postprocess.py --step palette
+    # Only slice sprite sheets into frames
+    python postprocess.py --category sprites --step slice
 
     # Assemble sprite sheets from individual frames
     python postprocess.py --step spritesheet
 """
 
 import argparse
+import json
 import math
 from pathlib import Path
 
@@ -211,6 +213,97 @@ def assemble_spritesheet(
 
 
 # ---------------------------------------------------------------------------
+# Sprite Sheet Slicer — cuts AI-generated sheets into individual frames
+# ---------------------------------------------------------------------------
+
+def slice_spritesheet(
+    sheet: Image.Image,
+    cell_w: int,
+    cell_h: int,
+    rows: int,
+    cols: int,
+) -> list[list[Image.Image]]:
+    """
+    Slice a sprite sheet into a 2D grid of individual frames.
+
+    Args:
+        sheet: The full sprite sheet image.
+        cell_w: Width of each cell in pixels.
+        cell_h: Height of each cell in pixels.
+        rows: Number of rows (animations).
+        cols: Number of columns (directions).
+
+    Returns:
+        2D list: result[row][col] = individual frame Image.
+    """
+    sheet_w, sheet_h = sheet.size
+
+    # If the sheet isn't exactly the expected size, resize it
+    expected_w = cell_w * cols
+    expected_h = cell_h * rows
+    if sheet_w != expected_w or sheet_h != expected_h:
+        sheet = sheet.resize((expected_w, expected_h), Image.Resampling.NEAREST)
+
+    frames = []
+    for r in range(rows):
+        row_frames = []
+        for c in range(cols):
+            x = c * cell_w
+            y = r * cell_h
+            frame = sheet.crop((x, y, x + cell_w, y + cell_h))
+            row_frames.append(frame)
+        frames.append(row_frames)
+
+    return frames
+
+
+def slice_and_save_character_sheet(
+    sheet_path: Path,
+    sprite_key: str,
+    config: dict,
+    dst_dir: Path,
+    apply_palette: bool = True,
+) -> dict:
+    """
+    Slice a character sprite sheet and save individual frames.
+
+    Expected layout: 4 rows (idle, walk_1, walk_2, attack) x 8 cols (S,SW,W,NW,N,NE,E,SE).
+
+    Returns a frame metadata dict for the manifest.
+    """
+    from prompts.characters import DIRECTIONS, ANIMATIONS
+
+    cell_w = config["sprites"]["base_width"]
+    cell_h = config["sprites"]["base_height"]
+    num_cols = len(DIRECTIONS)
+    num_rows = len(ANIMATIONS)
+
+    sheet = Image.open(sheet_path).convert("RGBA")
+    frames = slice_spritesheet(sheet, cell_w, cell_h, num_rows, num_cols)
+
+    frame_meta = {}
+
+    for row_idx, anim_name in enumerate(ANIMATIONS):
+        frame_meta[anim_name] = {}
+        for col_idx, direction in enumerate(DIRECTIONS):
+            frame = frames[row_idx][col_idx]
+
+            # Post-process each frame
+            frame = cleanup_transparency(frame)
+            if apply_palette:
+                palette_img = build_palette_image(config)
+                frame = reduce_palette(frame, palette_img)
+
+            # Save individual frame
+            filename = f"{sprite_key}-{anim_name}-{direction.lower()}.png"
+            frame.save(dst_dir / filename, "PNG")
+            frame_meta[anim_name][direction] = filename
+
+    print(f"    Sliced {num_rows * num_cols} frames from {sheet_path.name}")
+    return frame_meta
+
+
+# ---------------------------------------------------------------------------
 # Processing pipelines
 # ---------------------------------------------------------------------------
 
@@ -253,7 +346,7 @@ def process_tiles(config: dict, apply_palette: bool = True) -> int:
 
 
 def process_sprites(config: dict, apply_palette: bool = True) -> int:
-    """Process character sprites and assemble sprite sheets."""
+    """Process character sprites — slice sheets or process individual frames."""
     sprite_w = config["sprites"]["base_width"]
     sprite_h = config["sprites"]["base_height"]
     processed = 0
@@ -262,34 +355,56 @@ def process_sprites(config: dict, apply_palette: bool = True) -> int:
     if not sprites_dir.exists():
         return 0
 
+    # Metadata for all sliced sprite sheets
+    all_frame_meta = {}
+
     for char_dir in sorted(sprites_dir.iterdir()):
         if not char_dir.is_dir():
             continue
 
-        print(f"  Processing character: {char_dir.name}")
-        dst_dir = PROCESSED_DIR / "sprites" / char_dir.name
+        sprite_key = char_dir.name
+        print(f"  Processing character: {sprite_key}")
+        dst_dir = PROCESSED_DIR / "sprites" / sprite_key
         dst_dir.mkdir(parents=True, exist_ok=True)
 
-        frames = []
-        for img_path in sorted(char_dir.glob("*.png")):
-            img = Image.open(img_path).convert("RGBA")
-            img = resize_to_target(img, sprite_w, sprite_h)
-            img = cleanup_transparency(img)
+        # Check for a sprite sheet first (generated by the sheet prompt)
+        sheet_files = list(char_dir.glob("*-sheet.png")) + list(char_dir.glob("*-spritesheet.png"))
+        if sheet_files:
+            for sheet_path in sheet_files:
+                frame_meta = slice_and_save_character_sheet(
+                    sheet_path, sprite_key, config, dst_dir, apply_palette
+                )
+                all_frame_meta[sprite_key] = frame_meta
+                processed += sum(len(dirs) for dirs in frame_meta.values())
+        else:
+            # Fallback: process individual direction images
+            frames = []
+            for img_path in sorted(char_dir.glob("*.png")):
+                img = Image.open(img_path).convert("RGBA")
+                img = resize_to_target(img, sprite_w, sprite_h)
+                img = cleanup_transparency(img)
 
-            if apply_palette:
-                palette_img = build_palette_image(config)
-                img = reduce_palette(img, palette_img)
+                if apply_palette:
+                    palette_img = build_palette_image(config)
+                    img = reduce_palette(img, palette_img)
 
-            img.save(dst_dir / img_path.name, "PNG")
-            frames.append(img)
-            processed += 1
+                img.save(dst_dir / img_path.name, "PNG")
+                frames.append(img)
+                processed += 1
 
-        # Assemble sprite sheet (8 directions in a row)
-        if frames:
-            sheet = assemble_spritesheet(frames, columns=len(frames))
-            sheet_path = dst_dir / f"{char_dir.name}-spritesheet.png"
-            sheet.save(sheet_path, "PNG")
-            print(f"    Sprite sheet: {sheet_path.name}")
+            # Assemble sprite sheet (8 directions in a row)
+            if frames:
+                sheet = assemble_spritesheet(frames, columns=len(frames))
+                sheet_path = dst_dir / f"{sprite_key}-spritesheet.png"
+                sheet.save(sheet_path, "PNG")
+                print(f"    Sprite sheet: {sheet_path.name}")
+
+    # Save frame metadata for deploy step
+    if all_frame_meta:
+        meta_path = PROCESSED_DIR / "sprites" / "_frame_meta.json"
+        with open(meta_path, "w") as f:
+            json.dump(all_frame_meta, f, indent=2)
+        print(f"\n  Frame metadata: {meta_path}")
 
     return processed
 

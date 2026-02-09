@@ -50,9 +50,16 @@ except ImportError:
     print("Run: pip install Pillow")
     sys.exit(1)
 
-from prompts.tiles import build_ground_prompt, build_wall_prompt, build_terrain_prompt
+from prompts.tiles import (
+    build_ground_prompt,
+    build_wall_prompt,
+    build_terrain_prompt,
+    build_tileset_prompt,
+    build_itemset_prompt,
+)
 from prompts.characters import (
     build_character_prompt,
+    build_spritesheet_prompt,
     CHARACTER_ARCHETYPES,
     DIRECTIONS,
 )
@@ -213,42 +220,72 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_characters(client: genai.Client, config: dict, dry_run: bool,
-                        reference_images: list) -> int:
-    """Generate character sprites for all archetypes and directions."""
+                        reference_images: list, use_sheets: bool = True) -> int:
+    """Generate character sprites — either as full sprite sheets or individual images.
+
+    When use_sheets=True (default), generates one sprite sheet per character containing
+    all animation frames (4 rows) x all directions (8 columns) = 32 frames per sheet.
+    The postprocess.py slicer then cuts these into individual frame PNGs.
+    """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
     generated = 0
 
-    print(f"\n--- Generating character sprites ---")
+    print(f"\n--- Generating character sprites ({'sheet mode' if use_sheets else 'individual mode'}) ---")
 
     for char in CHARACTER_ARCHETYPES:
         sprite_key = char.get("sprite_key", char["name"].lower().replace(" ", "-"))
         char_dir = OUTPUT_DIR / "sprites" / sprite_key
         print(f"\n  Character: {char['name']} (sprite_key: {sprite_key})")
 
-        for direction in DIRECTIONS:
-            filename = f"{sprite_key}-{direction.lower()}.png"
+        if use_sheets:
+            # Generate full sprite sheet (all anims + directions in one image)
+            filename = f"{sprite_key}-sheet.png"
             output_path = char_dir / filename
 
-            prompt = build_character_prompt(
+            prompt = build_spritesheet_prompt(
                 name=char["name"],
                 description=char["description"],
-                pose=char["pose"],
-                direction=direction,
                 config=config,
             )
 
             if dry_run:
-                print(f"    [DRY RUN] {filename}")
+                print(f"    [DRY RUN] {filename} (4 anims x 8 dirs = 32 frames)")
+                print(f"    Prompt: {prompt[:200]}...")
                 generated += 1
                 continue
 
-            print(f"    Generating: {filename} ({direction})")
+            print(f"    Generating sprite sheet: {filename}")
             image = generate_image(client, prompt, model, reference_images)
             if image:
                 save_image(image, output_path)
                 generated += 1
             rate_limit(rpm)
+        else:
+            # Legacy: generate each direction separately (idle only)
+            for direction in DIRECTIONS:
+                filename = f"{sprite_key}-{direction.lower()}.png"
+                output_path = char_dir / filename
+
+                prompt = build_character_prompt(
+                    name=char["name"],
+                    description=char["description"],
+                    pose=char["pose"],
+                    direction=direction,
+                    config=config,
+                )
+
+                if dry_run:
+                    print(f"    [DRY RUN] {filename}")
+                    generated += 1
+                    continue
+
+                print(f"    Generating: {filename} ({direction})")
+                image = generate_image(client, prompt, model, reference_images)
+                if image:
+                    save_image(image, output_path)
+                    generated += 1
+                rate_limit(rpm)
 
     return generated
 
@@ -359,6 +396,11 @@ def main():
         default=None,
         help="Path to config.yaml (default: same directory as this script)",
     )
+    parser.add_argument(
+        "--no-sheets",
+        action="store_true",
+        help="Generate individual sprites instead of sprite sheets (legacy mode)",
+    )
     args = parser.parse_args()
 
     # Load config
@@ -396,7 +438,13 @@ def main():
     print(f"Output: {OUTPUT_DIR}")
 
     for cat in categories:
-        count = CATEGORY_MAP[cat](client, config, args.dry_run, reference_images)
+        if cat == "characters":
+            count = generate_characters(
+                client, config, args.dry_run, reference_images,
+                use_sheets=not args.no_sheets,
+            )
+        else:
+            count = CATEGORY_MAP[cat](client, config, args.dry_run, reference_images)
         total += count
 
     print(f"\n=== Done! Generated {total} assets ===")

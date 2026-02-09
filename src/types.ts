@@ -70,6 +70,17 @@ export interface Stats {
   luck: number;
 }
 
+/** Animation state names */
+export type AnimationName = "idle" | "walk" | "attack";
+
+/** Animation playback state for an entity */
+export interface AnimState {
+  current: AnimationName;
+  frame: number;              // current frame index within animation
+  elapsed: number;            // ms elapsed in current frame
+  speed: number;              // ms per frame
+}
+
 /** An entity in the world */
 export interface Entity {
   id: string;
@@ -86,6 +97,7 @@ export interface Entity {
   dialogueId?: string;
   moveProgress: number;      // 0..1 interpolation between tiles
   dead: boolean;
+  anim: AnimState;
 }
 
 /** Item definition */

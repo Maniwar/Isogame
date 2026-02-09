@@ -16,6 +16,7 @@ This script:
 1. Scans the processed/ directory for all generated PNGs
 2. Copies them into public/assets/ with game-compatible paths
 3. Generates public/assets/manifest.json mapping sprite keys to file paths
+4. Includes animation frame metadata for sprite sheet-sliced characters
 """
 
 import argparse
@@ -43,7 +44,10 @@ TERRAIN_OBJECT_MAP = {
     "water-puddle": "Water",
 }
 
-DIRECTIONS = ["n", "ne", "e", "se", "s", "sw", "w", "nw"]
+DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
+
+# Animation names matching the sprite sheet layout
+ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
 
 
 def deploy(source: Path, target: Path) -> dict:
@@ -51,6 +55,7 @@ def deploy(source: Path, target: Path) -> dict:
     manifest: dict = {
         "tiles": {},
         "sprites": {},
+        "animations": {},
         "objects": {},
         "items": {},
         "portraits": {},
@@ -93,31 +98,61 @@ def deploy(source: Path, target: Path) -> dict:
                         manifest["objects"][obj_key] = f"/assets/objects/{png.name}"
                         deployed += 1
 
-    # --- Sprites ---
+    # --- Sprites (with animation support) ---
     sprites_dir = source / "sprites"
     if sprites_dir.exists():
+        # Check for frame metadata from the slicer
+        frame_meta_path = sprites_dir / "_frame_meta.json"
+        frame_meta = {}
+        if frame_meta_path.exists():
+            with open(frame_meta_path) as f:
+                frame_meta = json.load(f)
+
         for char_dir in sorted(sprites_dir.iterdir()):
             if not char_dir.is_dir():
                 continue
-            sprite_key = char_dir.name  # e.g., "player", "npc_sheriff"
+            sprite_key = char_dir.name
             manifest["sprites"][sprite_key] = {}
 
-            for png in sorted(char_dir.glob("*.png")):
-                if "spritesheet" in png.name:
-                    continue  # Skip sprite sheets, load individual frames
+            if sprite_key in frame_meta:
+                # Deploy animation frames from sliced sprite sheets
+                anim_data = frame_meta[sprite_key]
+                manifest["animations"][sprite_key] = {}
 
-                # Extract direction from filename: "player-s.png" -> "S"
-                stem = png.stem
-                for d in DIRECTIONS:
-                    if stem.endswith(f"-{d}"):
-                        direction = d.upper()
-                        dest_name = f"{sprite_key}-{d}.png"
-                        dest = target / "sprites" / dest_name
-                        shutil.copy2(png, dest)
-                        manifest["sprites"][sprite_key][direction] = f"/assets/sprites/{dest_name}"
-                        deployed += 1
-                        print(f"  Sprite: {png.name} -> {sprite_key}/{direction}")
-                        break
+                for anim_name, directions in anim_data.items():
+                    manifest["animations"][sprite_key][anim_name] = {}
+                    for direction, filename in directions.items():
+                        src_file = char_dir / filename
+                        if src_file.exists():
+                            dest_name = f"{sprite_key}-{anim_name}-{direction.lower()}.png"
+                            dest = target / "sprites" / dest_name
+                            shutil.copy2(src_file, dest)
+                            path = f"/assets/sprites/{dest_name}"
+                            manifest["animations"][sprite_key][anim_name][direction] = path
+                            deployed += 1
+
+                            # Also populate the main sprites map with idle frames
+                            if anim_name == "idle":
+                                manifest["sprites"][sprite_key][direction] = path
+
+                    print(f"  Anim: {sprite_key}/{anim_name} ({len(directions)} dirs)")
+            else:
+                # Legacy: individual direction images without animations
+                for png in sorted(char_dir.glob("*.png")):
+                    if "spritesheet" in png.name:
+                        continue
+
+                    stem = png.stem
+                    for d in DIRECTIONS:
+                        if stem.endswith(f"-{d}"):
+                            direction = d.upper()
+                            dest_name = f"{sprite_key}-{d}.png"
+                            dest = target / "sprites" / dest_name
+                            shutil.copy2(png, dest)
+                            manifest["sprites"][sprite_key][direction] = f"/assets/sprites/{dest_name}"
+                            deployed += 1
+                            print(f"  Sprite: {png.name} -> {sprite_key}/{direction}")
+                            break
 
     # --- Items ---
     items_dir = source / "items"
@@ -185,15 +220,20 @@ def main():
 
     manifest = deploy(args.source, args.target)
 
-    total = sum(len(v) if isinstance(v, dict) else 0 for v in manifest.values())
-    # Count sprite directions
+    # Count deployed assets
     sprite_count = sum(
         len(dirs) for dirs in manifest.get("sprites", {}).values()
     )
-    other_count = sum(
-        len(v) for k, v in manifest.items() if k != "sprites"
+    anim_count = sum(
+        sum(len(dirs) for dirs in anims.values())
+        for anims in manifest.get("animations", {}).values()
     )
-    print(f"\n=== Deployed {sprite_count + other_count} assets ===")
+    other_count = sum(
+        len(v) for k, v in manifest.items() if k not in ("sprites", "animations")
+    )
+    print(f"\n=== Deployed {sprite_count + anim_count + other_count} assets ===")
+    if anim_count > 0:
+        print(f"  Animation frames: {anim_count}")
     print("The game will automatically load these on next refresh.")
 
 

@@ -1,15 +1,18 @@
 import { Terrain, Direction, TILE_W, TILE_H, TILE_HALF_W, TILE_HALF_H } from "../types";
 
 /**
- * Asset manager with two-tier loading:
+ * Asset manager with two-tier loading and animation support:
  *
  * 1. **AI-generated art** — PNGs in public/assets/ produced by the Gemini
  *    pipeline (scripts/asset-gen/) and deployed via deploy-assets.py.
  * 2. **Procedural fallbacks** — Canvas 2D-drawn placeholders generated at
  *    startup for any asset that doesn't have a PNG on disk.
  *
- * The game always works. If you've generated art, it loads it. If not,
- * procedural placeholders are used automatically.
+ * Animation frames are stored per-sprite, per-animation, per-direction.
+ * The manifest.json "animations" section maps:
+ *   spriteKey -> animName -> direction -> image path
+ *
+ * Frame keys: "idle", "walk_1", "walk_2", "attack"
  */
 
 type DrawTarget = HTMLCanvasElement | HTMLImageElement;
@@ -17,6 +20,7 @@ type DrawTarget = HTMLCanvasElement | HTMLImageElement;
 interface AssetManifest {
   tiles?: Record<string, string>;
   sprites?: Record<string, Record<string, string>>;
+  animations?: Record<string, Record<string, Record<string, string>>>;
   objects?: Record<string, string>;
   items?: Record<string, string>;
   portraits?: Record<string, string>;
@@ -29,12 +33,20 @@ export class AssetManager {
   private items = new Map<string, DrawTarget>();
   private portraits = new Map<string, HTMLImageElement>();
 
+  /**
+   * Animation frames: spriteKey -> animFrameKey -> direction -> image
+   * animFrameKey is "idle" | "walk_1" | "walk_2" | "attack"
+   */
+  private animFrames = new Map<string, Map<string, Map<Direction, DrawTarget>>>();
+
+  /** Whether animation data has been loaded from manifest */
+  private hasAnimations = false;
+
   private loadedCount = 0;
   private totalToLoad = 0;
 
   /**
    * Initialize: generate procedural fallbacks, then try to load AI art on top.
-   * Call this instead of generateAll().
    */
   async init() {
     // Step 1: Generate procedural placeholders for everything
@@ -49,6 +61,9 @@ export class AssetManager {
         console.log(
           `[AssetManager] Loaded ${this.loadedCount}/${this.totalToLoad} AI-generated assets`,
         );
+        if (this.hasAnimations) {
+          console.log("[AssetManager] Animation frames loaded");
+        }
       } else {
         console.log("[AssetManager] No manifest found — using procedural art");
       }
@@ -68,6 +83,38 @@ export class AssetManager {
 
   getSprite(key: string, dir: Direction): DrawTarget | undefined {
     return this.sprites.get(key)?.get(dir);
+  }
+
+  /**
+   * Get an animation frame for an entity.
+   * Falls back to the static sprite if no animation data exists.
+   *
+   * @param spriteKey - entity sprite key (e.g., "player")
+   * @param frameKey - animation frame key (e.g., "walk_1") from AnimationSystem.getFrameKey()
+   * @param dir - facing direction
+   */
+  getAnimFrame(spriteKey: string, frameKey: string, dir: Direction): DrawTarget | undefined {
+    const animData = this.animFrames.get(spriteKey);
+    if (animData) {
+      const frameDir = animData.get(frameKey);
+      if (frameDir) {
+        const img = frameDir.get(dir);
+        if (img) return img;
+      }
+      // Fall back to idle for this direction if specific frame missing
+      const idleDir = animData.get("idle");
+      if (idleDir) {
+        const img = idleDir.get(dir);
+        if (img) return img;
+      }
+    }
+    // Final fallback: static sprite
+    return this.getSprite(spriteKey, dir);
+  }
+
+  /** Check if animation frames have been loaded for a sprite key */
+  hasAnimData(spriteKey: string): boolean {
+    return this.animFrames.has(spriteKey);
   }
 
   getObject(key: string): DrawTarget | undefined {
@@ -120,6 +167,36 @@ export class AssetManager {
               }
             }),
           );
+        }
+      }
+    }
+
+    // Animations — spriteKey -> animName -> direction -> path
+    if (manifest.animations) {
+      this.hasAnimations = true;
+      for (const [spriteKey, anims] of Object.entries(manifest.animations)) {
+        if (!this.animFrames.has(spriteKey)) {
+          this.animFrames.set(spriteKey, new Map());
+        }
+        const spriteAnims = this.animFrames.get(spriteKey)!;
+
+        for (const [animName, directions] of Object.entries(anims)) {
+          if (!spriteAnims.has(animName)) {
+            spriteAnims.set(animName, new Map());
+          }
+          const dirMap = spriteAnims.get(animName)!;
+
+          for (const [dir, path] of Object.entries(directions)) {
+            this.totalToLoad++;
+            promises.push(
+              this.loadImage(path).then((img) => {
+                if (img) {
+                  dirMap.set(dir as Direction, img);
+                  this.loadedCount++;
+                }
+              }),
+            );
+          }
         }
       }
     }

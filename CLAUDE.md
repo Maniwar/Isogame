@@ -28,6 +28,7 @@ Isogame/
 │   │   ├── EntitySystem.ts    # Entity factory (player + NPCs)
 │   │   ├── MovementSystem.ts  # A* pathfinding + smooth movement interpolation
 │   │   ├── CombatSystem.ts    # Turn-based combat (initiative, attack, AI)
+│   │   ├── AnimationSystem.ts # Sprite animation (idle, walk, attack frame cycling)
 │   │   ├── DialogueSystem.ts  # Dialogue trees with branching + item rewards
 │   │   └── InventorySystem.ts # Item database, add/remove/use/equip
 │   ├── ui/
@@ -109,10 +110,19 @@ npx tsc --noEmit     # Type-check without emitting
 ### Asset Conventions
 
 - Tile sprites: 64x32 isometric diamonds with transparent backgrounds
-- Character sprites: 24x36, generated for 8 directions (N, NE, E, SE, S, SW, W, NW)
-- Item icons: 20x20
+- Character sprites: 24x36 (procedural) / 64x96 (AI-generated), 8 directions (N, NE, E, SE, S, SW, W, NW)
+- Sprite sheets: 4 rows (idle, walk_1, walk_2, attack) x 8 columns (directions) = 32 frames per character
+- Item icons: 20x20 (procedural) / 64x64 (AI-generated)
 - All placeholder art is procedurally generated in `AssetManager.ts`
 - File names: lowercase, underscore-separated for sprite keys (e.g., `npc_sheriff`)
+
+### Animation System
+
+- Entity animations: `idle`, `walk`, `attack` (defined in `AnimState` in types.ts)
+- Walk cycle: alternates between `walk_1` and `walk_2` frames at 250ms per frame
+- Attack animation: holds for 400ms then returns to idle
+- `AnimationSystem.ts` manages frame state; `Renderer.ts` queries `AnimationSystem.getFrameKey()` for the current frame
+- `AssetManager.getAnimFrame()` falls back to static sprites if no animation data is loaded
 
 ### Map System
 
@@ -153,16 +163,18 @@ pip install -r requirements.txt
 export GEMINI_API_KEY="your-key"
 
 # Step 1: Generate raw art via Gemini API
-python generate.py --category tiles       # Start with tiles to validate style
-python generate.py                        # Or generate everything
+python generate.py --category tiles       # Generate tile assets
+python generate.py --category characters  # Full sprite sheets (4 anims x 8 dirs)
+python generate.py --category characters --no-sheets  # Legacy: one image per direction
+python generate.py                        # Generate everything (sheets by default)
 
-# Step 2: Post-process (palette, resize, sprite sheets)
-python postprocess.py
+# Step 2: Post-process (palette, resize, sprite sheet slicing)
+python postprocess.py                     # Slices sheets into individual frames
 
 # Step 3: Deploy into game's public/ directory + generate manifest.json
 python deploy-assets.py
 
-# Step 4: Play — game auto-loads AI art, falls back to procedural
+# Step 4: Play — game auto-loads AI art + animations, falls back to procedural
 cd ../..
 npm run dev
 ```
@@ -170,16 +182,23 @@ npm run dev
 ### Pipeline Overview
 
 1. **generate.py** — Calls Gemini API with crafted prompts to produce raw PNGs in `output/`
-2. **postprocess.py** — Palette reduction, resize to game dimensions, transparency cleanup → `processed/`
+   - Character sprites default to sprite sheet mode (one image = all 32 frames)
+   - Use `--no-sheets` for legacy individual-image mode
+2. **postprocess.py** — Palette reduction, resize, transparency cleanup, **sprite sheet slicing** → `processed/`
+   - Detects `*-sheet.png` files and slices them into individual `{key}-{anim}-{dir}.png` frames
+   - Writes `_frame_meta.json` for the deploy step
 3. **deploy-assets.py** — Copies processed assets into `public/assets/` and generates `manifest.json`
-4. **AssetManager.ts** — At runtime, loads `manifest.json`, fetches PNGs, falls back to procedural for any missing assets
-4. **prompts/** — Modular prompt templates for tiles, characters, items, and portraits
+   - Manifest includes both `sprites` (static) and `animations` (per-frame) sections
+4. **AssetManager.ts** — At runtime, loads `manifest.json`, fetches PNGs + animation frames, falls back to procedural
+5. **prompts/** — Modular prompt templates for tiles, characters, items, and portraits
+   - `characters.py` — `build_spritesheet_prompt()` for full sheets, `build_character_prompt()` for singles
+   - `tiles.py` — `build_tileset_prompt()` for tile variant sheets, `build_itemset_prompt()` for icon sheets
 
 ### Style Consistency
 
 - Feed reference images via `--reference-dir` (up to 14 images) for multi-reference style guidance
 - Post-processor maps all colors to the defined Fallout 2 palette
-- Character sprites are generated per-direction with consistent prompt phrasing
+- Sprite sheet approach ensures character consistency across all animations and directions
 
 See `scripts/asset-gen/README.md` for full documentation.
 

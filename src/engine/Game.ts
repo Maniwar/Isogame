@@ -6,6 +6,7 @@ import { MapSystem } from "../systems/MapSystem";
 import { EntitySystem } from "../systems/EntitySystem";
 import { MovementSystem } from "../systems/MovementSystem";
 import { CombatSystem } from "../systems/CombatSystem";
+import { AnimationSystem } from "../systems/AnimationSystem";
 import { DialogueSystem } from "../systems/DialogueSystem";
 import { InventorySystem } from "../systems/InventorySystem";
 import { HUD } from "../ui/HUD";
@@ -25,6 +26,7 @@ export class Game {
   private entitySystem: EntitySystem;
   private movementSystem: MovementSystem;
   private combatSystem: CombatSystem;
+  private animationSystem: AnimationSystem;
   private dialogueSystem: DialogueSystem;
   private inventorySystem: InventorySystem;
 
@@ -50,6 +52,7 @@ export class Game {
     this.entitySystem = new EntitySystem();
     this.movementSystem = new MovementSystem();
     this.combatSystem = new CombatSystem();
+    this.animationSystem = new AnimationSystem();
     this.dialogueSystem = new DialogueSystem();
     this.inventorySystem = new InventorySystem();
 
@@ -170,6 +173,9 @@ export class Game {
     // Movement (always runs for smooth animation)
     this.movementSystem.update(state, dt);
 
+    // Animation frame cycling
+    this.animationSystem.update(state, dt);
+
     // Camera follow player
     camera.follow(state.player.pos);
     camera.update();
@@ -283,6 +289,7 @@ export class Game {
         );
 
         if (target) {
+          this.animationSystem.triggerAttack(current);
           const result = this.combatSystem.attack(state, current, target);
           this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
 

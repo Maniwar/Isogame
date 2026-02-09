@@ -11,6 +11,7 @@ import {
   Notification,
 } from "../types";
 import { AssetManager } from "../assets/AssetManager";
+import { AnimationSystem } from "../systems/AnimationSystem";
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
@@ -157,7 +158,9 @@ export class Renderer {
       drawY = (entity.pos.x + entity.pos.y) * TILE_HALF_H;
     }
 
-    const sprite = assets.getSprite(entity.spriteKey, entity.direction);
+    // Use animation frame if available, otherwise static sprite
+    const frameKey = AnimationSystem.getFrameKey(entity);
+    const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
     if (sprite) {
       const sw = sprite.width;
       const sh = sprite.height;

@@ -1,4 +1,11 @@
-import { Entity, Stats, TilePos, NpcSpawn } from "../types";
+import { Entity, Stats, TilePos, NpcSpawn, AnimState } from "../types";
+
+const DEFAULT_ANIM: AnimState = {
+  current: "idle",
+  frame: 0,
+  elapsed: 0,
+  speed: 250,     // ms per frame for walk cycle
+};
 
 const DEFAULT_STATS: Stats = {
   hp: 40,
@@ -44,6 +51,7 @@ export class EntitySystem {
       isHostile: false,
       moveProgress: 0,
       dead: false,
+      anim: { ...DEFAULT_ANIM },
     };
   }
 
@@ -64,6 +72,7 @@ export class EntitySystem {
       dialogueId: spawn.dialogueId,
       moveProgress: 0,
       dead: false,
+      anim: { ...DEFAULT_ANIM },
     };
   }
 }
