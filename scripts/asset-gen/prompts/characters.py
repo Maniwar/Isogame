@@ -7,11 +7,14 @@ Instead of generating one direction at a time, we generate full sprite sheets:
 """
 
 CHAR_STYLE_PREAMBLE = (
-    "Create a character sprite sheet in the style of classic Fallout 2. "
-    "The characters should be viewed from a top-down 3/4 isometric perspective. "
-    "Use a muted, desaturated post-apocalyptic color palette. "
+    "Create a character sprite in the style of classic Fallout 2. "
+    "The character should be viewed from a top-down 3/4 isometric perspective. "
+    "Use a muted, desaturated post-apocalyptic color palette with earthy tones. "
     "The art style should be detailed pixel art. "
-    "Transparent background. "
+    "CRITICAL: Use a pure bright green (#00FF00) chroma key background "
+    "so the background can be removed in post-processing. "
+    "Draw ONLY the character on a flat bright green background — NO scenery, NO ground textures, "
+    "NO shadows on the ground, NO text, NO labels. "
 )
 
 # Direction labels for 8-directional sprites (column order in the sheet)
@@ -51,10 +54,11 @@ SPRITESHEET_TEMPLATE = (
     "COLUMNS (left to right — each column is one facing direction):\n"
     "{col_descriptions}\n\n"
     "CRITICAL RULES:\n"
-    "- Every cell must show the SAME character with identical outfit, proportions, and colors.\n"
+    "- Every cell must show the SAME character with identical outfit, weapons, proportions, and colors.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
     "- Keep the character centered in each cell.\n"
-    "- Transparent background in every cell.\n"
+    "- Use a pure bright green (#00FF00) chroma key background in every cell — NO scenery, NO ground shadows.\n"
+    "- Characters should have EMPTY HANDS — no weapons (weapons are rendered separately).\n"
     "- No text, no labels, no watermarks, no grid lines.\n"
     "- The grid should be precise — characters aligned in their cells.\n"
 )
@@ -63,13 +67,15 @@ SPRITESHEET_TEMPLATE = (
 
 SINGLE_DIRECTION_TEMPLATE = (
     "{preamble}"
-    "Character: {name} — {description}. "
-    "Pose: {pose}. "
-    "Direction: The character is {direction_desc}. "
-    "Sprite size: {width}x{height} pixels. "
-    "The proportions and outfit must be identical across all directional variants — "
-    "only the viewing angle changes. "
-    "No text, no labels, no watermarks."
+    "Character: {name} — {description}\n"
+    "Pose: {pose}.\n"
+    "Direction: The character is {direction_desc}.\n"
+    "Target sprite size: {width}x{height} pixels.\n"
+    "The proportions, outfit, weapon, and colors must be identical across all "
+    "directional variants — only the viewing angle changes.\n"
+    "IMPORTANT: Use a pure bright green (#00FF00) chroma key background. "
+    "No ground, no shadow, no text, no labels, no watermarks. "
+    "Just the character on a flat bright green background."
 )
 
 REFERENCE_FOLLOW_UP = (
@@ -83,55 +89,61 @@ REFERENCE_FOLLOW_UP = (
 
 
 # Character archetypes — sprite_key must match the game's entity spriteKey values
+# Characters are generated UNARMED — weapons are separate overlays
 CHARACTER_ARCHETYPES = [
     {
         "sprite_key": "player",
         "name": "Wanderer",
         "description": (
-            "A rugged wasteland survivor wearing patched leather armor, "
-            "a dusty duster coat, and a gas mask hanging around the neck. "
-            "Carries a makeshift rifle on the back. Green-tinted goggles on forehead."
+            "A rugged wasteland survivor wearing patched leather armor and "
+            "a dusty duster coat. Green-tinted goggles on forehead. "
+            "Empty hands at sides, relaxed but alert stance. "
+            "Full body visible from head to boots."
         ),
-        "pose": "standing idle",
+        "pose": "standing idle, hands empty at sides",
     },
     {
         "sprite_key": "npc_sheriff",
         "name": "Sheriff Morgan",
         "description": (
             "A grizzled older woman with short gray hair, a sheriff's star pinned "
-            "to a leather duster, a scar across her left cheek, and a holstered "
-            "revolver on her hip. Sturdy boots, weathered but authoritative."
+            "to a leather duster, a scar across her left cheek. "
+            "Hands on belt, no weapon drawn. Sturdy boots. "
+            "Full body visible from head to boots."
         ),
-        "pose": "standing idle, hands near belt",
+        "pose": "standing alert, hands on belt",
     },
     {
         "sprite_key": "npc_merchant",
         "name": "Scrapper Joe",
         "description": (
             "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
-            "full of goods, and a worn but clean outfit. Friendly posture. "
-            "Belts with pouches and trinkets hanging off them."
+            "full of goods, and a worn outfit. Belts with pouches and trinkets. "
+            "Hands empty, friendly open posture. "
+            "Full body visible from head to boots."
         ),
-        "pose": "standing idle",
+        "pose": "standing idle, friendly posture",
     },
     {
         "sprite_key": "npc_doc",
         "name": "Doc Hendricks",
         "description": (
             "A middle-aged man with round glasses, thinning hair, a stained lab coat "
-            "over a sweater vest, and ink-stained fingers. Carries a medical bag."
+            "over a sweater vest. Carrying a medical bag in one hand. "
+            "No weapons. Full body visible from head to shoes."
         ),
-        "pose": "standing idle",
+        "pose": "standing idle, holding medical bag",
     },
     {
         "sprite_key": "npc_raider",
         "name": "Raider",
         "description": (
             "An aggressive raider with spiked shoulder pads, torn clothing, "
-            "face paint, and a mohawk. Carries a lead pipe. "
-            "Red cloth armband, menacing posture."
+            "face paint, and a mohawk. Red cloth armband. "
+            "Empty hands, fists clenched, menacing stance. "
+            "Full body visible from head to boots."
         ),
-        "pose": "standing idle, menacing stance",
+        "pose": "standing menacing, fists clenched",
     },
 ]
 

@@ -216,6 +216,113 @@ def assemble_spritesheet(
 # Sprite Sheet Slicer — cuts AI-generated sheets into individual frames
 # ---------------------------------------------------------------------------
 
+def find_content_bbox(image: Image.Image, threshold: int = 10) -> tuple[int, int, int, int] | None:
+    """Find the bounding box of non-transparent content in an RGBA image.
+    Returns (left, top, right, bottom) or None if empty."""
+    if image.mode != "RGBA":
+        return image.getbbox()
+    arr = np.array(image)
+    alpha = arr[:, :, 3]
+    mask = alpha > threshold
+    if not mask.any():
+        return None
+    rows_any = np.any(mask, axis=1)
+    cols_any = np.any(mask, axis=0)
+    top = int(np.argmax(rows_any))
+    bottom = int(len(rows_any) - np.argmax(rows_any[::-1]))
+    left = int(np.argmax(cols_any))
+    right = int(len(cols_any) - np.argmax(cols_any[::-1]))
+    return (left, top, right, bottom)
+
+
+def extract_and_center(region: Image.Image, target_w: int, target_h: int) -> Image.Image:
+    """Extract content from a region and center it in a target-size canvas."""
+    bbox = find_content_bbox(region)
+    if bbox is None:
+        return Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+
+    # Crop to content
+    content = region.crop(bbox)
+    cw, ch = content.size
+
+    # Scale down if content is larger than target
+    if cw > target_w or ch > target_h:
+        scale = min(target_w / cw, target_h / ch)
+        new_w = max(1, int(cw * scale))
+        new_h = max(1, int(ch * scale))
+        content = content.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        cw, ch = content.size
+
+    # Center on transparent canvas
+    canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    offset_x = (target_w - cw) // 2
+    offset_y = (target_h - ch) // 2
+    canvas.paste(content, (offset_x, offset_y), content)
+    return canvas
+
+
+def detect_grid(sheet: Image.Image, expected_rows: int, expected_cols: int) -> list[list[tuple[int, int, int, int]]]:
+    """Detect the grid cell boundaries in a sprite sheet.
+
+    Uses alpha channel analysis to find natural dividers, then falls back
+    to uniform grid division if no clear gutters are found.
+
+    Returns a 2D list of (x, y, w, h) cell regions.
+    """
+    sheet_w, sheet_h = sheet.size
+    arr = np.array(sheet.convert("RGBA"))
+    alpha = arr[:, :, 3]
+
+    # Try to find horizontal gutters (rows of mostly-transparent pixels)
+    row_density = np.mean(alpha > 10, axis=1)  # fraction of opaque pixels per row
+    col_density = np.mean(alpha > 10, axis=0)  # fraction of opaque pixels per col
+
+    def find_splits(density: np.ndarray, expected_parts: int, total_size: int) -> list[int]:
+        """Find split points in a density profile."""
+        # Look for valleys (low-density regions) that divide the image
+        chunk_size = total_size // expected_parts
+        splits = [0]
+
+        for i in range(1, expected_parts):
+            # Search around the expected split point for a low-density region
+            expected_pos = int(i * chunk_size)
+            search_start = max(0, expected_pos - chunk_size // 4)
+            search_end = min(total_size, expected_pos + chunk_size // 4)
+
+            if search_start < search_end:
+                window = density[search_start:search_end]
+                # Find the position with lowest density in the search window
+                best_offset = int(np.argmin(window))
+                best_pos = search_start + best_offset
+
+                # Only use the detected split if it's in a low-density area
+                if density[best_pos] < 0.3:
+                    splits.append(best_pos)
+                else:
+                    splits.append(expected_pos)
+            else:
+                splits.append(expected_pos)
+
+        splits.append(total_size)
+        return splits
+
+    row_splits = find_splits(row_density, expected_rows, sheet_h)
+    col_splits = find_splits(col_density, expected_cols, sheet_w)
+
+    cells = []
+    for r in range(expected_rows):
+        row_cells = []
+        for c in range(expected_cols):
+            x = col_splits[c]
+            y = row_splits[r]
+            w = col_splits[c + 1] - x
+            h = row_splits[r + 1] - y
+            row_cells.append((x, y, w, h))
+        cells.append(row_cells)
+
+    return cells
+
+
 def slice_spritesheet(
     sheet: Image.Image,
     cell_w: int,
@@ -224,37 +331,47 @@ def slice_spritesheet(
     cols: int,
 ) -> list[list[Image.Image]]:
     """
-    Slice a sprite sheet into a 2D grid of individual frames.
+    Content-aware sprite sheet slicer.
 
-    Args:
-        sheet: The full sprite sheet image.
-        cell_w: Width of each cell in pixels.
-        cell_h: Height of each cell in pixels.
-        rows: Number of rows (animations).
-        cols: Number of columns (directions).
+    Instead of blindly cutting a grid, this:
+    1. Detects natural grid boundaries using alpha channel analysis
+    2. Extracts each cell region
+    3. Finds the actual character content within each cell
+    4. Centers the content in the target cell size
 
     Returns:
-        2D list: result[row][col] = individual frame Image.
+        2D list: result[row][col] = individual frame Image (target size).
     """
-    sheet_w, sheet_h = sheet.size
+    sheet = sheet.convert("RGBA")
 
-    # If the sheet isn't exactly the expected size, resize it
-    expected_w = cell_w * cols
-    expected_h = cell_h * rows
-    if sheet_w != expected_w or sheet_h != expected_h:
-        sheet = sheet.resize((expected_w, expected_h), Image.Resampling.NEAREST)
+    # Detect the grid structure
+    grid = detect_grid(sheet, rows, cols)
 
     frames = []
     for r in range(rows):
         row_frames = []
         for c in range(cols):
-            x = c * cell_w
-            y = r * cell_h
-            frame = sheet.crop((x, y, x + cell_w, y + cell_h))
+            x, y, w, h = grid[r][c]
+            # Extract the raw region from the sheet
+            region = sheet.crop((x, y, x + w, y + h))
+            # Find content and center it in target cell
+            frame = extract_and_center(region, cell_w, cell_h)
             row_frames.append(frame)
         frames.append(row_frames)
 
     return frames
+
+
+def force_transparent_bg(image: Image.Image) -> Image.Image:
+    """Remove chroma key green (#00FF00) background pixels.
+    All prompts request bright green backgrounds for reliable extraction.
+    White stripping was removed to avoid damaging light-colored character details."""
+    arr = np.array(image.convert("RGBA"))
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    # Chroma key green: G channel dominant, R and B low
+    is_green = (g > 200) & (r < 80) & (b < 80)
+    arr[is_green, 3] = 0
+    return Image.fromarray(arr, "RGBA")
 
 
 def slice_and_save_character_sheet(
@@ -265,9 +382,12 @@ def slice_and_save_character_sheet(
     apply_palette: bool = True,
 ) -> dict:
     """
-    Slice a character sprite sheet and save individual frames.
+    Content-aware sprite sheet slicer.
 
-    Expected layout: 4 rows (idle, walk_1, walk_2, attack) x 8 cols (S,SW,W,NW,N,NE,E,SE).
+    1. Opens the sheet and forces transparent background
+    2. Uses smart grid detection to find cell boundaries
+    3. Extracts and centers each character in the target cell size
+    4. Saves individual frames AND keeps the original sheet
 
     Returns a frame metadata dict for the manifest.
     """
@@ -279,14 +399,37 @@ def slice_and_save_character_sheet(
     num_rows = len(ANIMATIONS)
 
     sheet = Image.open(sheet_path).convert("RGBA")
+
+    # Force white backgrounds to transparent (Gemini often ignores alpha requests)
+    sheet = force_transparent_bg(sheet)
+
+    print(f"    Sheet size: {sheet.size[0]}x{sheet.size[1]}, target grid: {num_cols}x{num_rows} cells of {cell_w}x{cell_h}")
+
+    # Keep the original sheet (cleaned up)
+    sheet_copy_name = f"{sprite_key}-sheet.png"
+    sheet.save(dst_dir / sheet_copy_name, "PNG")
+    print(f"    Kept original sheet: {sheet_copy_name}")
+
+    # Smart slice
     frames = slice_spritesheet(sheet, cell_w, cell_h, num_rows, num_cols)
 
     frame_meta = {}
+    empty_cells = 0
 
     for row_idx, anim_name in enumerate(ANIMATIONS):
         frame_meta[anim_name] = {}
         for col_idx, direction in enumerate(DIRECTIONS):
             frame = frames[row_idx][col_idx]
+
+            # Check if cell has any content
+            bbox = find_content_bbox(frame)
+            if bbox is None:
+                empty_cells += 1
+                # Try to reuse idle frame for empty cells
+                if anim_name != "idle" and "idle" in frame_meta:
+                    if direction in frame_meta["idle"]:
+                        frame_meta[anim_name][direction] = frame_meta["idle"][direction]
+                        continue
 
             # Post-process each frame
             frame = cleanup_transparency(frame)
@@ -299,7 +442,8 @@ def slice_and_save_character_sheet(
             frame.save(dst_dir / filename, "PNG")
             frame_meta[anim_name][direction] = filename
 
-    print(f"    Sliced {num_rows * num_cols} frames from {sheet_path.name}")
+    total = num_rows * num_cols
+    print(f"    Sliced {total - empty_cells}/{total} frames ({empty_cells} empty, using fallbacks)")
     return frame_meta
 
 
@@ -409,6 +553,44 @@ def process_sprites(config: dict, apply_palette: bool = True) -> int:
     return processed
 
 
+def process_weapons(config: dict, apply_palette: bool = True) -> int:
+    """Process weapon overlay sprites — same sheet slicing as characters."""
+    processed = 0
+
+    weapons_dir = OUTPUT_DIR / "weapons"
+    if not weapons_dir.exists():
+        return 0
+
+    # Metadata for all sliced weapon sheets
+    all_frame_meta = {}
+
+    for weapon_dir in sorted(weapons_dir.iterdir()):
+        if not weapon_dir.is_dir():
+            continue
+
+        sprite_key = weapon_dir.name
+        print(f"  Processing weapon: {sprite_key}")
+        dst_dir = PROCESSED_DIR / "weapons" / sprite_key
+        dst_dir.mkdir(parents=True, exist_ok=True)
+
+        sheet_files = list(weapon_dir.glob("*-sheet.png"))
+        for sheet_path in sheet_files:
+            frame_meta = slice_and_save_character_sheet(
+                sheet_path, sprite_key, config, dst_dir, apply_palette
+            )
+            all_frame_meta[sprite_key] = frame_meta
+            processed += sum(len(dirs) for dirs in frame_meta.values())
+
+    # Save frame metadata for deploy step
+    if all_frame_meta:
+        meta_path = PROCESSED_DIR / "weapons" / "_frame_meta.json"
+        with open(meta_path, "w") as f:
+            json.dump(all_frame_meta, f, indent=2)
+        print(f"\n  Weapon frame metadata: {meta_path}")
+
+    return processed
+
+
 def process_items(config: dict, apply_palette: bool = True) -> int:
     """Process item icons."""
     icon_size = config["items"]["icon_size"]
@@ -476,6 +658,7 @@ def process_portraits(config: dict, apply_palette: bool = True) -> int:
 STEP_MAP = {
     "tiles": process_tiles,
     "sprites": process_sprites,
+    "weapons": process_weapons,
     "items": process_items,
     "portraits": process_portraits,
 }
