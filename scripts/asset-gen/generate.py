@@ -112,27 +112,48 @@ def generate_image(
 
     contents.append(prompt)
 
-    try:
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
-        )
+    config = load_config()
+    retry_attempts = config.get("api", {}).get("retry_attempts", 3)
+    retry_delay = config.get("api", {}).get("retry_delay_seconds", 5)
 
-        # Extract image from response
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                    return Image.open(io.BytesIO(part.inline_data.data))
+    for attempt in range(1, retry_attempts + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                ),
+            )
 
-        print("  WARNING: No image in response")
-        return None
+            # Extract image from response parts
+            if response.candidates:
+                for part in response.candidates[0].content.parts:
+                    if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                        return Image.open(io.BytesIO(part.inline_data.data))
 
-    except Exception as e:
-        print(f"  ERROR: API call failed — {e}")
-        return None
+            # Check for blocked content
+            if response.candidates and response.candidates[0].finish_reason:
+                reason = response.candidates[0].finish_reason
+                print(f"  WARNING: No image — finish_reason={reason}")
+            else:
+                print("  WARNING: No image in response (no candidates)")
+
+            if attempt < retry_attempts:
+                print(f"  Retrying ({attempt}/{retry_attempts}) in {retry_delay}s...")
+                time.sleep(retry_delay)
+                continue
+            return None
+
+        except Exception as e:
+            print(f"  ERROR (attempt {attempt}/{retry_attempts}): {e}")
+            if attempt < retry_attempts:
+                print(f"  Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                return None
+
+    return None
 
 
 def save_image(image: Image.Image, output_path: Path) -> None:
@@ -463,7 +484,13 @@ def main():
             count = CATEGORY_MAP[cat](client, config, args.dry_run, reference_images)
         total += count
 
-    print(f"\n=== Done! Generated {total} assets ===")
+    # Check output directory for actual files
+    png_count = len(list(OUTPUT_DIR.rglob("*.png")))
+    print(f"\n=== Done! Generated {total} assets ({png_count} PNG files on disk) ===")
+    if total == 0 and not args.dry_run:
+        print("WARNING: No assets were generated!")
+        print("Check your API key and model access above for errors.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
