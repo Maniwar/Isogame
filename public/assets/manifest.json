@@ -14,5 +14,460 @@
     "concrete-wall": "/assets/objects/concrete-wall-01.png",
     "corrugated-metal": "/assets/objects/corrugated-metal-01.png",
     "sandbag": "/assets/objects/sandbag-01.png"
+  },
+  "sprites": {
+    "npc_doc": {
+      "S": "/assets/sprites/npc_doc-idle-s.png",
+      "SW": "/assets/sprites/npc_doc-idle-sw.png",
+      "W": "/assets/sprites/npc_doc-idle-w.png",
+      "NW": "/assets/sprites/npc_doc-idle-nw.png",
+      "N": "/assets/sprites/npc_doc-idle-n.png",
+      "NE": "/assets/sprites/npc_doc-idle-ne.png",
+      "E": "/assets/sprites/npc_doc-idle-e.png",
+      "SE": "/assets/sprites/npc_doc-idle-se.png"
+    },
+    "npc_merchant": {
+      "S": "/assets/sprites/npc_merchant-idle-s.png",
+      "SW": "/assets/sprites/npc_merchant-idle-sw.png",
+      "W": "/assets/sprites/npc_merchant-idle-w.png",
+      "NW": "/assets/sprites/npc_merchant-idle-nw.png",
+      "N": "/assets/sprites/npc_merchant-idle-n.png",
+      "NE": "/assets/sprites/npc_merchant-idle-ne.png",
+      "E": "/assets/sprites/npc_merchant-idle-e.png",
+      "SE": "/assets/sprites/npc_merchant-idle-se.png"
+    },
+    "npc_raider": {
+      "S": "/assets/sprites/npc_raider-idle-s.png",
+      "SW": "/assets/sprites/npc_raider-idle-sw.png",
+      "W": "/assets/sprites/npc_raider-idle-w.png",
+      "NW": "/assets/sprites/npc_raider-idle-nw.png",
+      "N": "/assets/sprites/npc_raider-idle-n.png",
+      "NE": "/assets/sprites/npc_raider-idle-ne.png",
+      "E": "/assets/sprites/npc_raider-idle-e.png",
+      "SE": "/assets/sprites/npc_raider-idle-se.png"
+    },
+    "npc_sheriff": {
+      "S": "/assets/sprites/npc_sheriff-idle-s.png",
+      "SW": "/assets/sprites/npc_sheriff-idle-sw.png",
+      "W": "/assets/sprites/npc_sheriff-idle-w.png",
+      "NW": "/assets/sprites/npc_sheriff-idle-nw.png",
+      "N": "/assets/sprites/npc_sheriff-idle-n.png",
+      "NE": "/assets/sprites/npc_sheriff-idle-ne.png",
+      "E": "/assets/sprites/npc_sheriff-idle-e.png",
+      "SE": "/assets/sprites/npc_sheriff-idle-se.png"
+    },
+    "player": {
+      "S": "/assets/sprites/player-idle-s.png",
+      "SW": "/assets/sprites/player-idle-sw.png",
+      "W": "/assets/sprites/player-idle-w.png",
+      "NW": "/assets/sprites/player-idle-nw.png",
+      "N": "/assets/sprites/player-idle-n.png",
+      "NE": "/assets/sprites/player-idle-ne.png",
+      "E": "/assets/sprites/player-idle-e.png",
+      "SE": "/assets/sprites/player-idle-se.png"
+    }
+  },
+  "animations": {
+    "npc_doc": {
+      "idle": {
+        "S": "/assets/sprites/npc_doc-idle-s.png",
+        "SW": "/assets/sprites/npc_doc-idle-sw.png",
+        "W": "/assets/sprites/npc_doc-idle-w.png",
+        "NW": "/assets/sprites/npc_doc-idle-nw.png",
+        "N": "/assets/sprites/npc_doc-idle-n.png",
+        "NE": "/assets/sprites/npc_doc-idle-ne.png",
+        "E": "/assets/sprites/npc_doc-idle-e.png",
+        "SE": "/assets/sprites/npc_doc-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_doc-walk_1-s.png",
+        "SW": "/assets/sprites/npc_doc-walk_1-sw.png",
+        "W": "/assets/sprites/npc_doc-walk_1-w.png",
+        "NW": "/assets/sprites/npc_doc-walk_1-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_1-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_1-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_1-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_doc-walk_2-s.png",
+        "SW": "/assets/sprites/npc_doc-walk_2-sw.png",
+        "W": "/assets/sprites/npc_doc-walk_2-w.png",
+        "NW": "/assets/sprites/npc_doc-walk_2-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_2-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_2-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_2-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/sprites/npc_doc-attack-s.png",
+        "SW": "/assets/sprites/npc_doc-attack-sw.png",
+        "W": "/assets/sprites/npc_doc-attack-w.png",
+        "NW": "/assets/sprites/npc_doc-attack-nw.png",
+        "N": "/assets/sprites/npc_doc-attack-n.png",
+        "NE": "/assets/sprites/npc_doc-attack-ne.png",
+        "E": "/assets/sprites/npc_doc-attack-e.png",
+        "SE": "/assets/sprites/npc_doc-attack-se.png"
+      }
+    },
+    "npc_merchant": {
+      "idle": {
+        "S": "/assets/sprites/npc_merchant-idle-s.png",
+        "SW": "/assets/sprites/npc_merchant-idle-sw.png",
+        "W": "/assets/sprites/npc_merchant-idle-w.png",
+        "NW": "/assets/sprites/npc_merchant-idle-nw.png",
+        "N": "/assets/sprites/npc_merchant-idle-n.png",
+        "NE": "/assets/sprites/npc_merchant-idle-ne.png",
+        "E": "/assets/sprites/npc_merchant-idle-e.png",
+        "SE": "/assets/sprites/npc_merchant-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_merchant-walk_1-s.png",
+        "SW": "/assets/sprites/npc_merchant-walk_1-sw.png",
+        "W": "/assets/sprites/npc_merchant-walk_1-w.png",
+        "NW": "/assets/sprites/npc_merchant-walk_1-nw.png",
+        "N": "/assets/sprites/npc_merchant-walk_1-n.png",
+        "NE": "/assets/sprites/npc_merchant-walk_1-ne.png",
+        "E": "/assets/sprites/npc_merchant-walk_1-e.png",
+        "SE": "/assets/sprites/npc_merchant-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_merchant-walk_2-s.png",
+        "SW": "/assets/sprites/npc_merchant-walk_2-sw.png",
+        "W": "/assets/sprites/npc_merchant-walk_2-w.png",
+        "NW": "/assets/sprites/npc_merchant-walk_2-nw.png",
+        "N": "/assets/sprites/npc_merchant-walk_2-n.png",
+        "NE": "/assets/sprites/npc_merchant-walk_2-ne.png",
+        "E": "/assets/sprites/npc_merchant-walk_2-e.png",
+        "SE": "/assets/sprites/npc_merchant-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/sprites/npc_merchant-attack-s.png",
+        "SW": "/assets/sprites/npc_merchant-attack-sw.png",
+        "W": "/assets/sprites/npc_merchant-attack-w.png",
+        "NW": "/assets/sprites/npc_merchant-attack-nw.png",
+        "N": "/assets/sprites/npc_merchant-attack-n.png",
+        "NE": "/assets/sprites/npc_merchant-attack-ne.png",
+        "E": "/assets/sprites/npc_merchant-attack-e.png",
+        "SE": "/assets/sprites/npc_merchant-attack-se.png"
+      }
+    },
+    "npc_raider": {
+      "idle": {
+        "S": "/assets/sprites/npc_raider-idle-s.png",
+        "SW": "/assets/sprites/npc_raider-idle-sw.png",
+        "W": "/assets/sprites/npc_raider-idle-w.png",
+        "NW": "/assets/sprites/npc_raider-idle-nw.png",
+        "N": "/assets/sprites/npc_raider-idle-n.png",
+        "NE": "/assets/sprites/npc_raider-idle-ne.png",
+        "E": "/assets/sprites/npc_raider-idle-e.png",
+        "SE": "/assets/sprites/npc_raider-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_raider-walk_1-s.png",
+        "SW": "/assets/sprites/npc_raider-walk_1-sw.png",
+        "W": "/assets/sprites/npc_raider-walk_1-w.png",
+        "NW": "/assets/sprites/npc_raider-walk_1-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_1-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_1-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_1-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_raider-walk_2-s.png",
+        "SW": "/assets/sprites/npc_raider-walk_2-sw.png",
+        "W": "/assets/sprites/npc_raider-walk_2-w.png",
+        "NW": "/assets/sprites/npc_raider-walk_2-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_2-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_2-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_2-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/sprites/npc_raider-attack-s.png",
+        "SW": "/assets/sprites/npc_raider-attack-sw.png",
+        "W": "/assets/sprites/npc_raider-attack-w.png",
+        "NW": "/assets/sprites/npc_raider-attack-nw.png",
+        "N": "/assets/sprites/npc_raider-attack-n.png",
+        "NE": "/assets/sprites/npc_raider-attack-ne.png",
+        "E": "/assets/sprites/npc_raider-attack-e.png",
+        "SE": "/assets/sprites/npc_raider-attack-se.png"
+      }
+    },
+    "npc_sheriff": {
+      "idle": {
+        "S": "/assets/sprites/npc_sheriff-idle-s.png",
+        "SW": "/assets/sprites/npc_sheriff-idle-sw.png",
+        "W": "/assets/sprites/npc_sheriff-idle-w.png",
+        "NW": "/assets/sprites/npc_sheriff-idle-nw.png",
+        "N": "/assets/sprites/npc_sheriff-idle-n.png",
+        "NE": "/assets/sprites/npc_sheriff-idle-ne.png",
+        "E": "/assets/sprites/npc_sheriff-idle-e.png",
+        "SE": "/assets/sprites/npc_sheriff-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_sheriff-walk_1-s.png",
+        "SW": "/assets/sprites/npc_sheriff-walk_1-sw.png",
+        "W": "/assets/sprites/npc_sheriff-walk_1-w.png",
+        "NW": "/assets/sprites/npc_sheriff-walk_1-nw.png",
+        "N": "/assets/sprites/npc_sheriff-walk_1-n.png",
+        "NE": "/assets/sprites/npc_sheriff-walk_1-ne.png",
+        "E": "/assets/sprites/npc_sheriff-walk_1-e.png",
+        "SE": "/assets/sprites/npc_sheriff-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_sheriff-walk_2-s.png",
+        "SW": "/assets/sprites/npc_sheriff-walk_2-sw.png",
+        "W": "/assets/sprites/npc_sheriff-walk_2-w.png",
+        "NW": "/assets/sprites/npc_sheriff-walk_2-nw.png",
+        "N": "/assets/sprites/npc_sheriff-walk_2-n.png",
+        "NE": "/assets/sprites/npc_sheriff-walk_2-ne.png",
+        "E": "/assets/sprites/npc_sheriff-walk_2-e.png",
+        "SE": "/assets/sprites/npc_sheriff-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/sprites/npc_sheriff-attack-s.png",
+        "SW": "/assets/sprites/npc_sheriff-attack-sw.png",
+        "W": "/assets/sprites/npc_sheriff-attack-w.png",
+        "NW": "/assets/sprites/npc_sheriff-attack-nw.png",
+        "N": "/assets/sprites/npc_sheriff-attack-n.png",
+        "NE": "/assets/sprites/npc_sheriff-attack-ne.png",
+        "E": "/assets/sprites/npc_sheriff-attack-e.png",
+        "SE": "/assets/sprites/npc_sheriff-attack-se.png"
+      }
+    },
+    "player": {
+      "idle": {
+        "S": "/assets/sprites/player-idle-s.png",
+        "SW": "/assets/sprites/player-idle-sw.png",
+        "W": "/assets/sprites/player-idle-w.png",
+        "NW": "/assets/sprites/player-idle-nw.png",
+        "N": "/assets/sprites/player-idle-n.png",
+        "NE": "/assets/sprites/player-idle-ne.png",
+        "E": "/assets/sprites/player-idle-e.png",
+        "SE": "/assets/sprites/player-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/player-walk_1-s.png",
+        "SW": "/assets/sprites/player-walk_1-sw.png",
+        "W": "/assets/sprites/player-walk_1-w.png",
+        "NW": "/assets/sprites/player-walk_1-nw.png",
+        "N": "/assets/sprites/player-walk_1-n.png",
+        "NE": "/assets/sprites/player-walk_1-ne.png",
+        "E": "/assets/sprites/player-walk_1-e.png",
+        "SE": "/assets/sprites/player-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/player-walk_2-s.png",
+        "SW": "/assets/sprites/player-walk_2-sw.png",
+        "W": "/assets/sprites/player-walk_2-w.png",
+        "NW": "/assets/sprites/player-walk_2-nw.png",
+        "N": "/assets/sprites/player-walk_2-n.png",
+        "NE": "/assets/sprites/player-walk_2-ne.png",
+        "E": "/assets/sprites/player-walk_2-e.png",
+        "SE": "/assets/sprites/player-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/sprites/player-attack-s.png",
+        "SW": "/assets/sprites/player-attack-sw.png",
+        "W": "/assets/sprites/player-attack-w.png",
+        "NW": "/assets/sprites/player-attack-nw.png",
+        "N": "/assets/sprites/player-attack-n.png",
+        "NE": "/assets/sprites/player-attack-ne.png",
+        "E": "/assets/sprites/player-attack-e.png",
+        "SE": "/assets/sprites/player-attack-se.png"
+      }
+    }
+  },
+  "weapons": {
+    "weapon_bat": {
+      "idle": {
+        "S": "/assets/weapons/weapon_bat-idle-s.png",
+        "SW": "/assets/weapons/weapon_bat-idle-sw.png",
+        "W": "/assets/weapons/weapon_bat-idle-w.png",
+        "NW": "/assets/weapons/weapon_bat-idle-nw.png",
+        "N": "/assets/weapons/weapon_bat-idle-n.png",
+        "NE": "/assets/weapons/weapon_bat-idle-ne.png",
+        "E": "/assets/weapons/weapon_bat-idle-e.png",
+        "SE": "/assets/weapons/weapon_bat-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/weapons/weapon_bat-walk_1-s.png",
+        "SW": "/assets/weapons/weapon_bat-walk_1-sw.png",
+        "W": "/assets/weapons/weapon_bat-walk_1-w.png",
+        "NW": "/assets/weapons/weapon_bat-walk_1-nw.png",
+        "N": "/assets/weapons/weapon_bat-walk_1-n.png",
+        "NE": "/assets/weapons/weapon_bat-walk_1-ne.png",
+        "E": "/assets/weapons/weapon_bat-walk_1-e.png",
+        "SE": "/assets/weapons/weapon_bat-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/weapons/weapon_bat-walk_2-s.png",
+        "SW": "/assets/weapons/weapon_bat-walk_2-sw.png",
+        "W": "/assets/weapons/weapon_bat-walk_2-w.png",
+        "NW": "/assets/weapons/weapon_bat-walk_2-nw.png",
+        "N": "/assets/weapons/weapon_bat-walk_2-n.png",
+        "NE": "/assets/weapons/weapon_bat-walk_2-ne.png",
+        "E": "/assets/weapons/weapon_bat-walk_2-e.png",
+        "SE": "/assets/weapons/weapon_bat-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/weapons/weapon_bat-attack-s.png",
+        "SW": "/assets/weapons/weapon_bat-attack-sw.png",
+        "W": "/assets/weapons/weapon_bat-attack-w.png",
+        "NW": "/assets/weapons/weapon_bat-attack-nw.png",
+        "N": "/assets/weapons/weapon_bat-attack-n.png",
+        "NE": "/assets/weapons/weapon_bat-attack-ne.png",
+        "E": "/assets/weapons/weapon_bat-attack-e.png",
+        "SE": "/assets/weapons/weapon_bat-attack-se.png"
+      }
+    },
+    "weapon_knife": {
+      "idle": {
+        "S": "/assets/weapons/weapon_knife-idle-s.png",
+        "SW": "/assets/weapons/weapon_knife-idle-sw.png",
+        "W": "/assets/weapons/weapon_knife-idle-w.png",
+        "NW": "/assets/weapons/weapon_knife-idle-nw.png",
+        "N": "/assets/weapons/weapon_knife-idle-n.png",
+        "NE": "/assets/weapons/weapon_knife-idle-ne.png",
+        "E": "/assets/weapons/weapon_knife-idle-e.png",
+        "SE": "/assets/weapons/weapon_knife-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/weapons/weapon_knife-walk_1-s.png",
+        "SW": "/assets/weapons/weapon_knife-walk_1-sw.png",
+        "W": "/assets/weapons/weapon_knife-walk_1-w.png",
+        "NW": "/assets/weapons/weapon_knife-walk_1-nw.png",
+        "N": "/assets/weapons/weapon_knife-walk_1-n.png",
+        "NE": "/assets/weapons/weapon_knife-walk_1-ne.png",
+        "E": "/assets/weapons/weapon_knife-walk_1-e.png",
+        "SE": "/assets/weapons/weapon_knife-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/weapons/weapon_knife-walk_2-s.png",
+        "SW": "/assets/weapons/weapon_knife-walk_2-sw.png",
+        "W": "/assets/weapons/weapon_knife-walk_2-w.png",
+        "NW": "/assets/weapons/weapon_knife-walk_2-nw.png",
+        "N": "/assets/weapons/weapon_knife-walk_2-n.png",
+        "NE": "/assets/weapons/weapon_knife-walk_2-ne.png",
+        "E": "/assets/weapons/weapon_knife-walk_2-e.png",
+        "SE": "/assets/weapons/weapon_knife-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/weapons/weapon_knife-attack-s.png",
+        "SW": "/assets/weapons/weapon_knife-attack-sw.png",
+        "W": "/assets/weapons/weapon_knife-attack-w.png",
+        "NW": "/assets/weapons/weapon_knife-attack-nw.png",
+        "N": "/assets/weapons/weapon_knife-attack-n.png",
+        "NE": "/assets/weapons/weapon_knife-attack-ne.png",
+        "E": "/assets/weapons/weapon_knife-attack-e.png",
+        "SE": "/assets/weapons/weapon_knife-attack-se.png"
+      }
+    },
+    "weapon_pistol": {
+      "idle": {
+        "S": "/assets/weapons/weapon_pistol-idle-s.png",
+        "SW": "/assets/weapons/weapon_pistol-idle-sw.png",
+        "W": "/assets/weapons/weapon_pistol-idle-w.png",
+        "NW": "/assets/weapons/weapon_pistol-idle-nw.png",
+        "N": "/assets/weapons/weapon_pistol-idle-n.png",
+        "NE": "/assets/weapons/weapon_pistol-idle-ne.png",
+        "E": "/assets/weapons/weapon_pistol-idle-e.png",
+        "SE": "/assets/weapons/weapon_pistol-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/weapons/weapon_pistol-walk_1-s.png",
+        "SW": "/assets/weapons/weapon_pistol-walk_1-sw.png",
+        "W": "/assets/weapons/weapon_pistol-walk_1-w.png",
+        "NW": "/assets/weapons/weapon_pistol-walk_1-nw.png",
+        "N": "/assets/weapons/weapon_pistol-walk_1-n.png",
+        "NE": "/assets/weapons/weapon_pistol-walk_1-ne.png",
+        "E": "/assets/weapons/weapon_pistol-walk_1-e.png",
+        "SE": "/assets/weapons/weapon_pistol-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/weapons/weapon_pistol-walk_2-s.png",
+        "SW": "/assets/weapons/weapon_pistol-walk_2-sw.png",
+        "W": "/assets/weapons/weapon_pistol-walk_2-w.png",
+        "NW": "/assets/weapons/weapon_pistol-walk_2-nw.png",
+        "N": "/assets/weapons/weapon_pistol-walk_2-n.png",
+        "NE": "/assets/weapons/weapon_pistol-walk_2-ne.png",
+        "E": "/assets/weapons/weapon_pistol-walk_2-e.png",
+        "SE": "/assets/weapons/weapon_pistol-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/weapons/weapon_pistol-attack-s.png",
+        "SW": "/assets/weapons/weapon_pistol-attack-sw.png",
+        "W": "/assets/weapons/weapon_pistol-attack-w.png",
+        "NW": "/assets/weapons/weapon_pistol-attack-nw.png",
+        "N": "/assets/weapons/weapon_pistol-attack-n.png",
+        "NE": "/assets/weapons/weapon_pistol-attack-ne.png",
+        "E": "/assets/weapons/weapon_pistol-attack-e.png",
+        "SE": "/assets/weapons/weapon_pistol-attack-se.png"
+      }
+    },
+    "weapon_rifle": {
+      "idle": {
+        "S": "/assets/weapons/weapon_rifle-idle-s.png",
+        "SW": "/assets/weapons/weapon_rifle-idle-sw.png",
+        "W": "/assets/weapons/weapon_rifle-idle-w.png",
+        "NW": "/assets/weapons/weapon_rifle-idle-nw.png",
+        "N": "/assets/weapons/weapon_rifle-idle-n.png",
+        "NE": "/assets/weapons/weapon_rifle-idle-ne.png",
+        "E": "/assets/weapons/weapon_rifle-idle-e.png",
+        "SE": "/assets/weapons/weapon_rifle-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/weapons/weapon_rifle-walk_1-s.png",
+        "SW": "/assets/weapons/weapon_rifle-walk_1-sw.png",
+        "W": "/assets/weapons/weapon_rifle-walk_1-w.png",
+        "NW": "/assets/weapons/weapon_rifle-walk_1-nw.png",
+        "N": "/assets/weapons/weapon_rifle-walk_1-n.png",
+        "NE": "/assets/weapons/weapon_rifle-walk_1-ne.png",
+        "E": "/assets/weapons/weapon_rifle-walk_1-e.png",
+        "SE": "/assets/weapons/weapon_rifle-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/weapons/weapon_rifle-walk_2-s.png",
+        "SW": "/assets/weapons/weapon_rifle-walk_2-sw.png",
+        "W": "/assets/weapons/weapon_rifle-walk_2-w.png",
+        "NW": "/assets/weapons/weapon_rifle-walk_2-nw.png",
+        "N": "/assets/weapons/weapon_rifle-walk_2-n.png",
+        "NE": "/assets/weapons/weapon_rifle-walk_2-ne.png",
+        "E": "/assets/weapons/weapon_rifle-walk_2-e.png",
+        "SE": "/assets/weapons/weapon_rifle-walk_2-se.png"
+      },
+      "attack": {
+        "S": "/assets/weapons/weapon_rifle-attack-s.png",
+        "SW": "/assets/weapons/weapon_rifle-attack-sw.png",
+        "W": "/assets/weapons/weapon_rifle-attack-w.png",
+        "NW": "/assets/weapons/weapon_rifle-attack-nw.png",
+        "N": "/assets/weapons/weapon_rifle-attack-n.png",
+        "NE": "/assets/weapons/weapon_rifle-attack-ne.png",
+        "E": "/assets/weapons/weapon_rifle-attack-e.png",
+        "SE": "/assets/weapons/weapon_rifle-attack-se.png"
+      }
+    }
+  },
+  "items": {
+    "item_armor": "/assets/items/item_armor.png",
+    "item_food": "/assets/items/item_food.png",
+    "item_nuka": "/assets/items/item_nuka.png",
+    "item_radaway": "/assets/items/item_radaway.png",
+    "item_stimpak": "/assets/items/item_stimpak.png",
+    "item_caps": "/assets/items/item_caps.png",
+    "item_holotape": "/assets/items/item_holotape.png",
+    "item_pin": "/assets/items/item_pin.png",
+    "item_bat": "/assets/items/item_bat.png",
+    "item_knife": "/assets/items/item_knife.png",
+    "item_pistol": "/assets/items/item_pistol.png",
+    "item_rifle": "/assets/items/item_rifle.png"
+  },
+  "portraits": {
+    "doc-hendricks": "/assets/portraits/doc-hendricks.png",
+    "rattlesnake": "/assets/portraits/rattlesnake.png",
+    "scrap": "/assets/portraits/scrap.png",
+    "sheriff-morgan": "/assets/portraits/sheriff-morgan.png",
+    "the-overseer": "/assets/portraits/the-overseer.png"
   }
 }
