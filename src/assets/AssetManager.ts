@@ -35,6 +35,19 @@ export class AssetManager {
   private portraits = new Map<string, HTMLImageElement>();
 
   /**
+   * Maps AI-generated object keys (from manifest) to game object keys.
+   * The game uses "wall", "barrel", "rock" but the pipeline generates
+   * descriptive names like "brick-wall", "concrete-wall", etc.
+   */
+  private static readonly OBJECT_ALIAS: Record<string, string> = {
+    "brick-wall": "wall",
+    "concrete-wall": "wall",
+    "corrugated-metal": "wall",
+    "chain-link-fence": "wall",
+    "sandbag": "wall",
+  };
+
+  /**
    * Animation frames: spriteKey -> animFrameKey -> direction -> image
    * animFrameKey is "idle" | "walk_1" | "walk_2" | "attack"
    */
@@ -187,6 +200,7 @@ export class AssetManager {
     const promises: Promise<void>[] = [];
 
     // Tiles — keys are Terrain enum names: "Sand", "Dirt", etc.
+    // Diamond-mask each loaded tile to clip away rectangular backgrounds.
     if (manifest.tiles) {
       for (const [terrainName, path] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
@@ -194,7 +208,10 @@ export class AssetManager {
           this.totalToLoad++;
           promises.push(
             this.loadImage(path).then((img) => {
-              if (img) { this.tiles.set(terrain, img); this.loadedCount++; }
+              if (img) {
+                this.tiles.set(terrain, this.maskTileToDiamond(img));
+                this.loadedCount++;
+              }
             }),
           );
         }
@@ -280,13 +297,20 @@ export class AssetManager {
       }
     }
 
-    // Objects
+    // Objects — register under both the manifest key and the game alias
     if (manifest.objects) {
       for (const [key, path] of Object.entries(manifest.objects)) {
         this.totalToLoad++;
         promises.push(
           this.loadImage(path).then((img) => {
-            if (img) { this.objects.set(key, img); this.loadedCount++; }
+            if (img) {
+              this.objects.set(key, img);
+              const alias = AssetManager.OBJECT_ALIAS[key];
+              if (alias && !this.objects.has(alias)) {
+                this.objects.set(alias, img);
+              }
+              this.loadedCount++;
+            }
           }),
         );
       }
@@ -317,6 +341,25 @@ export class AssetManager {
     }
 
     await Promise.all(promises);
+  }
+
+  /**
+   * Mask an image to the isometric diamond shape (64x32) so that
+   * AI-generated tiles with non-transparent rectangular backgrounds
+   * only show within the diamond area.
+   */
+  private maskTileToDiamond(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = this.createCanvas(TILE_W, TILE_H);
+    const ctx = canvas.getContext("2d")!;
+    ctx.beginPath();
+    ctx.moveTo(TILE_HALF_W, 0);
+    ctx.lineTo(TILE_W, TILE_HALF_H);
+    ctx.lineTo(TILE_HALF_W, TILE_H);
+    ctx.lineTo(0, TILE_HALF_H);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
+    return canvas;
   }
 
   private loadImage(path: string): Promise<HTMLImageElement | null> {
