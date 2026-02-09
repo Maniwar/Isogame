@@ -110,9 +110,11 @@ jobs:
             ASSET_COUNT=$(git diff --staged --name-only | grep -c '\.png$' || true)
             git commit -m "assets: Generate ${{ inputs.category }} — ${ASSET_COUNT} images via Gemini"
 
-            # Retry push up to 4 times with exponential backoff (GitHub 500s are transient)
+            # Retry push up to 4 times with exponential backoff
+            # Pull --rebase first to incorporate any remote changes since checkout
             for attempt in 1 2 3 4; do
               echo "Push attempt $attempt..."
+              git pull --rebase origin main || true
               if git push; then
                 echo "Committed and pushed ${ASSET_COUNT} asset files"
                 exit 0
