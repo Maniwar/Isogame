@@ -107,13 +107,14 @@ export interface CombatLogEntry {
   turn: number;
 }
 
-/** Pending combat action awaiting confirmation */
-export interface CombatPendingAction {
+/** Queued combat action */
+export interface CombatAction {
   type: "attack" | "move";
   targetTile: { x: number; y: number };
   targetEntity?: Entity;
   apCost: number;
   bodyPart?: BodyPart;
+  label: string; // display text for queue UI
 }
 
 /** Animation state names */
@@ -231,9 +232,11 @@ export interface GameState {
   vfx: VFX[];
   combatLog: CombatLogEntry[];
   targetBodyPart: BodyPart | null;
-  combatPending: CombatPendingAction | null;
-  combatTurnDelay: number;   // ms remaining before next turn processes
-  lootTarget: Entity | null;  // dead entity being looted
+  combatActionQueue: CombatAction[];   // queued actions awaiting confirmation
+  combatExecuting: boolean;            // true while queue is being played out
+  combatTurnDelay: number;             // ms remaining before next turn processes
+  lootTarget: Entity | null;           // dead entity being looted
+  bodyPartPanelOpen: boolean;          // mobile body part selector toggle
 }
 
 export interface Notification {
