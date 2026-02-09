@@ -80,7 +80,7 @@ portraits:
 
 # Gemini API settings
 api:
-  model: "gemini-2.0-flash-exp"  # Model with image generation support
+  model: "gemini-2.5-flash-image"  # Native image generation model
   requests_per_minute: 10        # Rate limiting
   retry_attempts: 3
   retry_delay_seconds: 5
