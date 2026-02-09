@@ -11,8 +11,9 @@ CHAR_STYLE_PREAMBLE = (
     "The character should be viewed from a top-down 3/4 isometric perspective. "
     "Use a muted, desaturated post-apocalyptic color palette with earthy tones. "
     "The art style should be detailed pixel art. "
-    "CRITICAL: Use a pure white (#FFFFFF) background so it can be removed in post-processing. "
-    "Draw ONLY the character on a flat white background — NO scenery, NO ground textures, "
+    "CRITICAL: Use a pure bright green (#00FF00) chroma key background "
+    "so the background can be removed in post-processing. "
+    "Draw ONLY the character on a flat bright green background — NO scenery, NO ground textures, "
     "NO shadows on the ground, NO text, NO labels. "
 )
 
@@ -56,7 +57,7 @@ SPRITESHEET_TEMPLATE = (
     "- Every cell must show the SAME character with identical outfit, weapons, proportions, and colors.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
     "- Keep the character centered in each cell.\n"
-    "- Use a pure white (#FFFFFF) background in every cell — NO scenery, NO ground shadows.\n"
+    "- Use a pure bright green (#00FF00) chroma key background in every cell — NO scenery, NO ground shadows.\n"
     "- Characters should have EMPTY HANDS — no weapons (weapons are rendered separately).\n"
     "- No text, no labels, no watermarks, no grid lines.\n"
     "- The grid should be precise — characters aligned in their cells.\n"
@@ -72,9 +73,9 @@ SINGLE_DIRECTION_TEMPLATE = (
     "Target sprite size: {width}x{height} pixels.\n"
     "The proportions, outfit, weapon, and colors must be identical across all "
     "directional variants — only the viewing angle changes.\n"
-    "IMPORTANT: Transparent PNG background. No ground, no shadow, no text, "
-    "no labels, no watermarks. Just the character on a completely empty "
-    "transparent background."
+    "IMPORTANT: Use a pure bright green (#00FF00) chroma key background. "
+    "No ground, no shadow, no text, no labels, no watermarks. "
+    "Just the character on a flat bright green background."
 )
 
 REFERENCE_FOLLOW_UP = (

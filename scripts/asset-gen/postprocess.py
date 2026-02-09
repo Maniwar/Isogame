@@ -363,12 +363,16 @@ def slice_spritesheet(
 
 
 def force_transparent_bg(image: Image.Image, threshold: int = 240) -> Image.Image:
-    """Force white/near-white pixels to transparent.
-    Gemini often generates 'transparent' as white backgrounds."""
+    """Force white/near-white AND chroma key green backgrounds to transparent.
+    Gemini can't generate true alpha — we use white for characters and
+    green (#00FF00) for weapon overlays."""
     arr = np.array(image.convert("RGBA"))
-    # Pixels where R, G, B are all near-white
-    is_white = np.all(arr[:, :, :3] > threshold, axis=2)
-    arr[is_white, 3] = 0
+    r, g, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
+    # White/near-white pixels
+    is_white = (r > threshold) & (g > threshold) & (b > threshold)
+    # Chroma key green pixels (G dominant, R+B low)
+    is_green = (g > 200) & (r < 80) & (b < 80)
+    arr[is_white | is_green, 3] = 0
     return Image.fromarray(arr, "RGBA")
 
 
@@ -551,6 +555,44 @@ def process_sprites(config: dict, apply_palette: bool = True) -> int:
     return processed
 
 
+def process_weapons(config: dict, apply_palette: bool = True) -> int:
+    """Process weapon overlay sprites — same sheet slicing as characters."""
+    processed = 0
+
+    weapons_dir = OUTPUT_DIR / "weapons"
+    if not weapons_dir.exists():
+        return 0
+
+    # Metadata for all sliced weapon sheets
+    all_frame_meta = {}
+
+    for weapon_dir in sorted(weapons_dir.iterdir()):
+        if not weapon_dir.is_dir():
+            continue
+
+        sprite_key = weapon_dir.name
+        print(f"  Processing weapon: {sprite_key}")
+        dst_dir = PROCESSED_DIR / "weapons" / sprite_key
+        dst_dir.mkdir(parents=True, exist_ok=True)
+
+        sheet_files = list(weapon_dir.glob("*-sheet.png"))
+        for sheet_path in sheet_files:
+            frame_meta = slice_and_save_character_sheet(
+                sheet_path, sprite_key, config, dst_dir, apply_palette
+            )
+            all_frame_meta[sprite_key] = frame_meta
+            processed += sum(len(dirs) for dirs in frame_meta.values())
+
+    # Save frame metadata for deploy step
+    if all_frame_meta:
+        meta_path = PROCESSED_DIR / "weapons" / "_frame_meta.json"
+        with open(meta_path, "w") as f:
+            json.dump(all_frame_meta, f, indent=2)
+        print(f"\n  Weapon frame metadata: {meta_path}")
+
+    return processed
+
+
 def process_items(config: dict, apply_palette: bool = True) -> int:
     """Process item icons."""
     icon_size = config["items"]["icon_size"]
@@ -618,6 +660,7 @@ def process_portraits(config: dict, apply_palette: bool = True) -> int:
 STEP_MAP = {
     "tiles": process_tiles,
     "sprites": process_sprites,
+    "weapons": process_weapons,
     "items": process_items,
     "portraits": process_portraits,
 }

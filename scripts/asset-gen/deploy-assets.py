@@ -56,13 +56,14 @@ def deploy(source: Path, target: Path) -> dict:
         "tiles": {},
         "sprites": {},
         "animations": {},
+        "weapons": {},
         "objects": {},
         "items": {},
         "portraits": {},
     }
 
     # Ensure target directories exist
-    for subdir in ["tiles", "sprites", "objects", "items", "portraits"]:
+    for subdir in ["tiles", "sprites", "weapons", "objects", "items", "portraits"]:
         (target / subdir).mkdir(parents=True, exist_ok=True)
 
     deployed = 0
@@ -162,6 +163,46 @@ def deploy(source: Path, target: Path) -> dict:
                             print(f"  Sprite: {png.name} -> {sprite_key}/{direction}")
                             break
 
+    # --- Weapons (overlay sprite sheets with animations) ---
+    weapons_dir = source / "weapons"
+    if weapons_dir.exists():
+        weapon_meta_path = weapons_dir / "_frame_meta.json"
+        weapon_meta = {}
+        if weapon_meta_path.exists():
+            with open(weapon_meta_path) as f:
+                weapon_meta = json.load(f)
+
+        for weapon_dir in sorted(weapons_dir.iterdir()):
+            if not weapon_dir.is_dir():
+                continue
+            weapon_key = weapon_dir.name
+
+            if weapon_key in weapon_meta:
+                anim_data = weapon_meta[weapon_key]
+                manifest["weapons"][weapon_key] = {}
+
+                for anim_name, directions in anim_data.items():
+                    manifest["weapons"][weapon_key][anim_name] = {}
+                    for direction, filename in directions.items():
+                        src_file = weapon_dir / filename
+                        if src_file.exists():
+                            dest_name = f"{weapon_key}-{anim_name}-{direction.lower()}.png"
+                            dest = target / "weapons" / dest_name
+                            shutil.copy2(src_file, dest)
+                            path = f"/assets/weapons/{dest_name}"
+                            manifest["weapons"][weapon_key][anim_name][direction] = path
+                            deployed += 1
+
+                    print(f"  Weapon: {weapon_key}/{anim_name} ({len(directions)} dirs)")
+
+                # Keep original sheet
+                sheet_file = weapon_dir / f"{weapon_key}-sheet.png"
+                if sheet_file.exists():
+                    dest = target / "weapons" / f"{weapon_key}-sheet.png"
+                    shutil.copy2(sheet_file, dest)
+                    deployed += 1
+                    print(f"  Sheet: {weapon_key}-sheet.png (kept)")
+
     # --- Items ---
     items_dir = source / "items"
     if items_dir.exists():
@@ -236,12 +277,19 @@ def main():
         sum(len(dirs) for dirs in anims.values())
         for anims in manifest.get("animations", {}).values()
     )
-    other_count = sum(
-        len(v) for k, v in manifest.items() if k not in ("sprites", "animations")
+    weapon_count = sum(
+        sum(len(dirs) for dirs in anims.values())
+        for anims in manifest.get("weapons", {}).values()
     )
-    print(f"\n=== Deployed {sprite_count + anim_count + other_count} assets ===")
+    other_count = sum(
+        len(v) for k, v in manifest.items() if k not in ("sprites", "animations", "weapons")
+    )
+    total = sprite_count + anim_count + weapon_count + other_count
+    print(f"\n=== Deployed {total} assets ===")
     if anim_count > 0:
-        print(f"  Animation frames: {anim_count}")
+        print(f"  Character animation frames: {anim_count}")
+    if weapon_count > 0:
+        print(f"  Weapon overlay frames: {weapon_count}")
     print("The game will automatically load these on next refresh.")
 
 

@@ -13,6 +13,14 @@ import {
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
 
+/** Maps item IDs to weapon sprite keys used in the asset manifest */
+const WEAPON_SPRITE_MAP: Record<string, string> = {
+  "10mm_pistol": "weapon_pistol",
+  "pipe_rifle": "weapon_rifle",
+  "combat_knife": "weapon_knife",
+  "baseball_bat": "weapon_bat",
+};
+
 export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private camera: Camera;
@@ -245,6 +253,20 @@ export class Renderer {
       const sw = sprite.width;
       const sh = sprite.height;
       ctx.drawImage(sprite, drawX - sw / 2, drawY - sh + TILE_HALF_H, sw, sh);
+    }
+
+    // Draw equipped weapon overlay on top of character
+    const equippedItem = entity.inventory.find((i) => i.equipped);
+    if (equippedItem) {
+      const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
+      if (weaponSpriteKey) {
+        const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
+        if (weaponSprite) {
+          const ww = weaponSprite.width;
+          const wh = weaponSprite.height;
+          ctx.drawImage(weaponSprite, drawX - ww / 2, drawY - wh + TILE_HALF_H, ww, wh);
+        }
+      }
     }
 
     // Draw name tag

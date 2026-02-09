@@ -63,6 +63,10 @@ from prompts.characters import (
     CHARACTER_ARCHETYPES,
     DIRECTIONS,
 )
+from prompts.weapons import (
+    build_weapon_spritesheet_prompt,
+    WEAPON_ARCHETYPES,
+)
 from prompts.items import build_item_prompt, ITEM_CATALOG
 from prompts.portraits import build_portrait_prompt, NPC_PORTRAITS
 
@@ -311,6 +315,50 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
+def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
+                     reference_images: list) -> int:
+    """Generate weapon overlay sprite sheets.
+
+    Each weapon gets a 4x8 sprite sheet (same layout as character sheets)
+    showing only the weapon + hands, designed to overlay on character sprites.
+    """
+    model = config["api"]["model"]
+    rpm = config["api"]["requests_per_minute"]
+    generated = 0
+
+    print(f"\n--- Generating weapon overlay sprites ({len(WEAPON_ARCHETYPES)} weapons) ---")
+
+    for weapon in WEAPON_ARCHETYPES:
+        sprite_key = weapon["sprite_key"]
+        weapon_dir = OUTPUT_DIR / "weapons" / sprite_key
+        print(f"\n  Weapon: {weapon['name']} (sprite_key: {sprite_key})")
+
+        filename = f"{sprite_key}-sheet.png"
+        output_path = weapon_dir / filename
+
+        prompt = build_weapon_spritesheet_prompt(
+            name=weapon["name"],
+            description=weapon["description"],
+            attack_desc=weapon["attack_desc"],
+            config=config,
+        )
+
+        if dry_run:
+            print(f"    [DRY RUN] {filename} (4 anims x 8 dirs = 32 frames)")
+            print(f"    Prompt: {prompt[:200]}...")
+            generated += 1
+            continue
+
+        print(f"    Generating weapon sheet: {filename}")
+        image = generate_image(client, prompt, model, reference_images)
+        if image:
+            save_image(image, output_path)
+            generated += 1
+        rate_limit(rpm)
+
+    return generated
+
+
 def generate_items(client: genai.Client, config: dict, dry_run: bool,
                    reference_images: list) -> int:
     """Generate inventory item icons."""
@@ -385,6 +433,7 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 CATEGORY_MAP = {
     "tiles": generate_tiles,
     "characters": generate_characters,
+    "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
 }

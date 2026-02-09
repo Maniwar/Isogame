@@ -21,6 +21,7 @@ interface AssetManifest {
   tiles?: Record<string, string>;
   sprites?: Record<string, Record<string, string>>;
   animations?: Record<string, Record<string, Record<string, string>>>;
+  weapons?: Record<string, Record<string, Record<string, string>>>;
   objects?: Record<string, string>;
   items?: Record<string, string>;
   portraits?: Record<string, string>;
@@ -38,6 +39,12 @@ export class AssetManager {
    * animFrameKey is "idle" | "walk_1" | "walk_2" | "attack"
    */
   private animFrames = new Map<string, Map<string, Map<Direction, DrawTarget>>>();
+
+  /**
+   * Weapon overlay frames: weaponKey -> animFrameKey -> direction -> image
+   * Same layout as character animations but showing only the weapon + hands.
+   */
+  private weaponFrames = new Map<string, Map<string, Map<Direction, DrawTarget>>>();
 
   /** Whether animation data has been loaded from manifest */
   private hasAnimations = false;
@@ -62,21 +69,34 @@ export class AssetManager {
 
     // Step 2: Attempt to load manifest and override with real PNGs
     try {
-      const resp = await fetch(this.resolvePath("assets/manifest.json"));
+      const manifestUrl = this.resolvePath("assets/manifest.json");
+      console.log(`[AssetManager] Fetching manifest: ${manifestUrl}`);
+      const resp = await fetch(manifestUrl);
       if (resp.ok) {
         const manifest: AssetManifest = await resp.json();
+        console.log("[AssetManager] Manifest sections:", Object.keys(manifest).join(", "));
         await this.loadFromManifest(manifest);
         console.log(
           `[AssetManager] Loaded ${this.loadedCount}/${this.totalToLoad} AI-generated assets`,
         );
+        if (this.loadedCount < this.totalToLoad) {
+          console.warn(
+            `[AssetManager] ${this.totalToLoad - this.loadedCount} assets failed to load`,
+          );
+        }
         if (this.hasAnimations) {
-          console.log("[AssetManager] Animation frames loaded");
+          const animKeys = [...this.animFrames.keys()];
+          console.log(`[AssetManager] Animation frames loaded for: ${animKeys.join(", ")}`);
+        }
+        if (manifest.weapons) {
+          const weaponKeys = Object.keys(manifest.weapons);
+          console.log(`[AssetManager] Weapon sprites loaded for: ${weaponKeys.join(", ")}`);
         }
       } else {
-        console.log("[AssetManager] No manifest found — using procedural art");
+        console.log(`[AssetManager] No manifest found (${resp.status}) — using procedural art`);
       }
-    } catch {
-      console.log("[AssetManager] Could not load manifest — using procedural art");
+    } catch (err) {
+      console.log("[AssetManager] Could not load manifest — using procedural art", err);
     }
   }
 
@@ -123,6 +143,28 @@ export class AssetManager {
   /** Check if animation frames have been loaded for a sprite key */
   hasAnimData(spriteKey: string): boolean {
     return this.animFrames.has(spriteKey);
+  }
+
+  /**
+   * Get a weapon overlay frame to draw on top of a character.
+   * Returns the weapon sprite for the given animation frame and direction.
+   */
+  getWeaponFrame(weaponKey: string, frameKey: string, dir: Direction): DrawTarget | undefined {
+    const weaponData = this.weaponFrames.get(weaponKey);
+    if (!weaponData) return undefined;
+    const frameDir = weaponData.get(frameKey);
+    if (frameDir) {
+      const img = frameDir.get(dir);
+      if (img) return img;
+    }
+    // Fall back to idle if specific frame not found
+    const idleDir = weaponData.get("idle");
+    return idleDir?.get(dir);
+  }
+
+  /** Check if weapon overlay sprites have been loaded */
+  hasWeaponData(weaponKey: string): boolean {
+    return this.weaponFrames.has(weaponKey);
   }
 
   getObject(key: string): DrawTarget | undefined {
@@ -193,6 +235,35 @@ export class AssetManager {
             spriteAnims.set(animName, new Map());
           }
           const dirMap = spriteAnims.get(animName)!;
+
+          for (const [dir, path] of Object.entries(directions)) {
+            this.totalToLoad++;
+            promises.push(
+              this.loadImage(path).then((img) => {
+                if (img) {
+                  dirMap.set(dir as Direction, img);
+                  this.loadedCount++;
+                }
+              }),
+            );
+          }
+        }
+      }
+    }
+
+    // Weapons — weaponKey -> animName -> direction -> path
+    if (manifest.weapons) {
+      for (const [weaponKey, anims] of Object.entries(manifest.weapons)) {
+        if (!this.weaponFrames.has(weaponKey)) {
+          this.weaponFrames.set(weaponKey, new Map());
+        }
+        const weaponAnims = this.weaponFrames.get(weaponKey)!;
+
+        for (const [animName, directions] of Object.entries(anims)) {
+          if (!weaponAnims.has(animName)) {
+            weaponAnims.set(animName, new Map());
+          }
+          const dirMap = weaponAnims.get(animName)!;
 
           for (const [dir, path] of Object.entries(directions)) {
             this.totalToLoad++;
