@@ -451,6 +451,9 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 # CLI
 # ---------------------------------------------------------------------------
 
+# Categories available for generation.
+# NOTE: "weapons" is kept for backwards compatibility but is deprecated.
+# Weapons are now generated as part of character sprite sheets (weapon variants).
 CATEGORY_MAP = {
     "tiles": generate_tiles,
     "characters": generate_characters,
@@ -458,6 +461,9 @@ CATEGORY_MAP = {
     "items": generate_items,
     "portraits": generate_portraits,
 }
+
+# Default categories when --category=all (excludes deprecated weapons)
+DEFAULT_CATEGORIES = ["tiles", "characters", "items", "portraits"]
 
 
 def main():
@@ -536,7 +542,7 @@ def main():
 
     # Run generation
     total = 0
-    categories = list(CATEGORY_MAP.keys()) if args.category == "all" else [args.category]
+    categories = DEFAULT_CATEGORIES if args.category == "all" else [args.category]
 
     print(f"=== Isogame Asset Generator ===")
     print(f"Model: {config['api']['model']}")
