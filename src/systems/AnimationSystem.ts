@@ -143,6 +143,11 @@ export class AnimationSystem {
    * Get the sprite sheet row key for the current animation frame.
    * This maps to the keys used in the manifest's animations section.
    *
+   * The AI generated 4 animation rows: idle, walk_1, walk_2, attack.
+   * Shoot maps to "attack" (for gun characters the attack pose IS shooting).
+   * Reload maps to "idle" (standing pose while reloading).
+   * The visual distinction comes from VFX (muzzle flash) and timing, not frames.
+   *
    * Returns: "idle" | "walk_1" | "walk_2" | "attack"
    */
   static getFrameKey(entity: Entity): string {
@@ -151,11 +156,10 @@ export class AnimationSystem {
       case "walk":
         return WALK_FRAMES[anim.frame] ?? "walk_1";
       case "attack":
-        return "attack";
       case "shoot":
-        return "shoot";
+        return "attack";
       case "reload":
-        return "reload";
+        return "idle";
       case "idle":
       default:
         return "idle";

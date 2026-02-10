@@ -45,8 +45,11 @@ SPRITE_H = 96
 
 # All 8 directions the game engine expects (column order in the sprite sheet prompt)
 ALL_DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
-# All 6 animations the game engine expects (row order in the sprite sheet prompt)
-ALL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
+# The 4 animation rows the AI actually generates (row order in the sprite sheet).
+# The prompt asks for 6 rows (+ shoot, reload) but the AI consistently produces
+# only 4.  The game's AnimationSystem maps shoot→attack and reload→idle at
+# runtime, so we only need to output these 4.
+REAL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
 
 # Mirror mapping: missing direction → source direction to horizontally flip.
 # The prompt asks S,SW,W,NW,N,NE,E,SE but AI typically generates only the
@@ -55,24 +58,6 @@ MIRROR_PAIRS = {
     "se": "sw",
     "e":  "w",
     "ne": "nw",
-}
-# Animation fallbacks when the AI doesn't generate shoot/reload rows
-ANIM_FALLBACKS = {
-    "shoot":  "attack",
-    "reload": "idle",
-}
-
-# Direction vectors for recoil/lean offsets (dx, dy in pixel space).
-# Positive x = right, positive y = down.
-DIR_VECTORS = {
-    "s":  ( 0,  1),
-    "sw": (-1,  1),
-    "w":  (-1,  0),
-    "nw": (-1, -1),
-    "n":  ( 0, -1),
-    "ne": ( 1, -1),
-    "e":  ( 1,  0),
-    "se": ( 1,  1),
 }
 
 # Fallout 2 palette for color mapping
@@ -431,97 +416,21 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         return canvas
 
 
-def synthesize_shoot_frame(attack_frame: Image.Image, direction: str) -> Image.Image:
-    """Create a shoot frame from an attack frame with recoil + muzzle flash.
-
-    Applies:
-      1. Slight backward shift (recoil — opposite to facing direction)
-      2. Brightness boost on the front-facing side (muzzle flash glow)
-    """
-    arr = np.array(attack_frame.copy()).astype(np.int16)
-    alpha = arr[:, :, 3].copy()
-    h, w = alpha.shape
-
-    # 1. Recoil: shift content 2px away from facing direction
-    dx, dy = DIR_VECTORS.get(direction, (0, 1))
-    shift_x = -dx * 2  # recoil is opposite to facing
-    shift_y = -dy * 1
-
-    shifted = np.zeros_like(arr)
-    # Compute source and destination slices for the shift
-    src_y0 = max(0, -shift_y)
-    src_y1 = min(h, h - shift_y)
-    dst_y0 = max(0, shift_y)
-    dst_y1 = min(h, h + shift_y)
-    src_x0 = max(0, -shift_x)
-    src_x1 = min(w, w - shift_x)
-    dst_x0 = max(0, shift_x)
-    dst_x1 = min(w, w + shift_x)
-
-    if dst_y1 > dst_y0 and dst_x1 > dst_x0:
-        shifted[dst_y0:dst_y1, dst_x0:dst_x1] = arr[src_y0:src_y1, src_x0:src_x1]
-    arr = shifted
-
-    # 2. Brightness boost on the forward side (muzzle flash glow)
-    # Create a gradient: brighter on the side the character faces
-    gradient = np.ones((h, w), dtype=np.float32)
-    if dx > 0:
-        gradient *= np.linspace(0.8, 1.0, w).reshape(1, w)
-    elif dx < 0:
-        gradient *= np.linspace(1.0, 0.8, w).reshape(1, w)
-    if dy > 0:
-        gradient *= np.linspace(0.85, 1.0, h).reshape(h, 1)
-    elif dy < 0:
-        gradient *= np.linspace(1.0, 0.85, h).reshape(h, 1)
-
-    # Boost brightness by 15-30% on the bright side
-    boost = 1.0 + (gradient - 0.8) * 1.5  # maps 0.8-1.0 → 1.0-1.3
-    for c in range(3):
-        arr[:, :, c] = np.clip(arr[:, :, c] * boost, 0, 255).astype(np.int16)
-
-    # Restore alpha from shifted version
-    result = np.clip(arr, 0, 255).astype(np.uint8)
-    return Image.fromarray(result, "RGBA")
-
-
-def synthesize_reload_frame(idle_frame: Image.Image, direction: str) -> Image.Image:
-    """Create a reload frame from an idle frame with downward lean + slight darken.
-
-    Applies:
-      1. Shift content down by 3px (looking down at weapon)
-      2. Slight darkening (character focused on weapon, not environment)
-    """
-    arr = np.array(idle_frame.copy()).astype(np.int16)
-    alpha = arr[:, :, 3].copy()
-    h, w = alpha.shape
-
-    # 1. Shift content down by 3px (looking down at weapon)
-    shift_down = 3
-    shifted = np.zeros_like(arr)
-    if h - shift_down > 0:
-        shifted[shift_down:, :] = arr[:h - shift_down, :]
-    arr = shifted
-
-    # 2. Slight darkening (focused on weapon, not environment)
-    for c in range(3):
-        arr[:, :, c] = np.clip(arr[:, :, c] * 0.85, 0, 255).astype(np.int16)
-
-    result = np.clip(arr, 0, 255).astype(np.uint8)
-    return Image.fromarray(result, "RGBA")
-
 
 def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                   center_content: bool = True,
                   apply_palette: bool = True) -> dict:
     """Re-slice a 1024x1024 sprite sheet into individual frames.
 
-    The AI typically generates 4-6 columns (directions) × 4 rows (animations)
-    instead of the requested 8×6.  This function:
+    The AI generates 4-6 columns (directions) × 4 rows (animations: idle,
+    walk_1, walk_2, attack).  This function:
       1. Auto-detects the actual grid layout
       2. Measures all content bboxes to compute uniform scale
       3. Extracts all cells with consistent sizing
       4. Mirrors missing directions (SW→SE, W→E, NW→NE)
-      5. Falls back for missing animations (shoot→attack, reload→idle)
+
+    Only outputs the 4 real animation rows.  The game's AnimationSystem maps
+    shoot→attack and reload→idle at runtime (no synthetic frames needed).
 
     Returns frame metadata dict for manifest.
     """
@@ -536,8 +445,8 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     # If the AI only generated N columns, take the first N from that list.
     detected_dirs = ALL_DIRECTIONS[:actual_cols]
 
-    # Map actual rows → animation names (first N of ALL_ANIMATIONS)
-    detected_anims = ALL_ANIMATIONS[:actual_rows]
+    # Map actual rows → animation names (first N of REAL_ANIMATIONS)
+    detected_anims = REAL_ANIMATIONS[:actual_rows]
 
     # ---- Pass 1: Measure all content bboxes to find uniform scale ----
     # This ensures the character stays the same size across ALL animation frames.
@@ -569,7 +478,7 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     # ---- Pass 2: Extract all actually-present cells ----
     # Store as {anim: {direction: Image}}
     extracted: dict[str, dict[str, Image.Image]] = {}
-    stats = {"total": 0, "empty": 0, "mirrored": 0, "fallback_anim": 0}
+    stats = {"total": 0, "empty": 0, "mirrored": 0}
 
     for row_idx, anim in enumerate(detected_anims):
         extracted[anim] = {}
@@ -609,30 +518,10 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                     extracted[anim]["n"] = extracted[anim][fallback]
                     break
 
-    # Phase 3: Fill missing animations via synthesis
-    # Instead of copying attack→shoot / idle→reload verbatim, apply visual
-    # transforms to create distinct frames.
-    for target_anim, source_anim in ANIM_FALLBACKS.items():
-        if target_anim not in extracted:
-            if source_anim in extracted:
-                extracted[target_anim] = {}
-                for direction, src_frame in extracted[source_anim].items():
-                    if target_anim == "shoot":
-                        extracted[target_anim][direction] = synthesize_shoot_frame(
-                            src_frame, direction
-                        )
-                    elif target_anim == "reload":
-                        extracted[target_anim][direction] = synthesize_reload_frame(
-                            src_frame, direction
-                        )
-                    else:
-                        extracted[target_anim][direction] = src_frame
-                stats["fallback_anim"] += 1
-
-    # Phase 4: Save all frames
+    # Phase 3: Save all frames (only the 4 real animations)
     frame_meta = {}
 
-    for anim in ALL_ANIMATIONS:
+    for anim in REAL_ANIMATIONS:
         frame_meta[anim] = {}
         anim_frames = extracted.get(anim, {})
 
@@ -666,8 +555,7 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             stats["total"] += 1
 
     print(f"    Saved {stats['total']} frames "
-          f"({stats['mirrored']} mirrored, {stats['fallback_anim']} fallback anims, "
-          f"{stats['empty']} empty cells)")
+          f"({stats['mirrored']} mirrored, {stats['empty']} empty cells)")
 
     return {"meta": frame_meta, "stats": stats}
 
