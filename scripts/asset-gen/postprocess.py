@@ -730,6 +730,9 @@ STEP_MAP = {
     "portraits": process_portraits,
 }
 
+# Default categories when --category=all (excludes deprecated weapons)
+DEFAULT_CATEGORIES = ["tiles", "sprites", "items", "portraits"]
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -751,7 +754,7 @@ def main():
     config = load_config()
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
-    categories = list(STEP_MAP.keys()) if args.category == "all" else [args.category]
+    categories = DEFAULT_CATEGORIES if args.category == "all" else [args.category]
     apply_palette = not args.no_palette
 
     print("=== Isogame Asset Post-Processor ===")
