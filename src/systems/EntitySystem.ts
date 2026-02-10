@@ -1,4 +1,22 @@
-import { Entity, Stats, TilePos, NpcSpawn, AnimState, CrippleState } from "../types";
+import { Entity, Stats, TilePos, NpcSpawn, AnimState, CrippleState, InventoryItem } from "../types";
+
+/** Maps item IDs to weapon sprite key suffixes */
+const WEAPON_SPRITE_SUFFIX: Record<string, string> = {
+  "10mm_pistol": "pistol",
+  "pipe_rifle": "rifle",
+  "combat_knife": "knife",
+  "baseball_bat": "bat",
+};
+
+/** Compute the weapon-specific spriteKey for an entity based on equipped weapon */
+export function getWeaponSpriteKey(baseSpriteKey: string, inventory: InventoryItem[]): string {
+  const equipped = inventory.find((i) => i.equipped);
+  if (equipped) {
+    const suffix = WEAPON_SPRITE_SUFFIX[equipped.itemId];
+    if (suffix) return `${baseSpriteKey}_${suffix}`;
+  }
+  return `${baseSpriteKey}_unarmed`;
+}
 
 const DEFAULT_CRIPPLE: CrippleState = {
   head: false,
@@ -33,6 +51,12 @@ export class EntitySystem {
   private nextId = 0;
 
   createPlayer(pos: TilePos): Entity {
+    const inventory: InventoryItem[] = [
+      { itemId: "10mm_pistol", count: 1, equipped: true },
+      { itemId: "stimpak", count: 2 },
+      { itemId: "bottle_caps", count: 50 },
+    ];
+    const baseSpriteKey = "player";
     return {
       id: `player_${this.nextId++}`,
       name: "Wanderer",
@@ -40,7 +64,8 @@ export class EntitySystem {
       targetPos: null,
       path: [],
       direction: "S",
-      spriteKey: "player",
+      spriteKey: getWeaponSpriteKey(baseSpriteKey, inventory),
+      baseSpriteKey,
       stats: {
         ...DEFAULT_STATS,
         hp: 50,
@@ -50,11 +75,7 @@ export class EntitySystem {
         agility: 7,
         perception: 6,
       },
-      inventory: [
-        { itemId: "10mm_pistol", count: 1, equipped: true },
-        { itemId: "stimpak", count: 2 },
-        { itemId: "bottle_caps", count: 50 },
-      ],
+      inventory,
       isPlayer: true,
       isHostile: false,
       moveProgress: 0,
@@ -66,6 +87,7 @@ export class EntitySystem {
 
   createNPC(spawn: NpcSpawn): Entity {
     const stats: Stats = { ...DEFAULT_STATS, ...spawn.stats };
+    const inventory = spawn.inventory ? [...spawn.inventory] : [];
     return {
       id: `npc_${spawn.id}_${this.nextId++}`,
       name: spawn.name,
@@ -74,8 +96,9 @@ export class EntitySystem {
       path: [],
       direction: "S",
       spriteKey: spawn.spriteKey,
+      baseSpriteKey: spawn.spriteKey,
       stats,
-      inventory: spawn.inventory ? [...spawn.inventory] : [],
+      inventory,
       isPlayer: false,
       isHostile: spawn.isHostile,
       dialogueId: spawn.dialogueId,

@@ -136,7 +136,8 @@ export interface Entity {
   targetPos: TilePos | null;
   path: TilePos[];
   direction: Direction;
-  spriteKey: string;
+  spriteKey: string;          // current sprite sheet (includes weapon variant)
+  baseSpriteKey: string;      // base character identity (e.g., "player", "npc_raider")
   stats: Stats;
   inventory: InventoryItem[];
   isPlayer: boolean;

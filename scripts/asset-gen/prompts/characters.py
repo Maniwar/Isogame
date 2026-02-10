@@ -2,8 +2,14 @@
 
 Instead of generating one direction at a time, we generate full sprite sheets:
 - One image contains ALL frames for a character
-- Layout: rows = animations (idle, walk_1, walk_2, attack), columns = 8 directions
+- Layout: rows = animations (idle, walk_1, walk_2, attack, shoot, reload),
+  columns = 8 directions
 - The post-processor slices this into individual frames for the game engine
+
+Weapon variant system:
+- Each character base can be combined with different weapons
+- This produces separate sprite sheets per weapon (e.g., player_pistol, player_rifle)
+- The game engine swaps spriteKey at runtime when weapons are equipped
 """
 
 CHAR_STYLE_PREAMBLE = (
@@ -63,6 +69,8 @@ SPRITESHEET_TEMPLATE = (
     "- Use a pure bright green (#00FF00) chroma key background in every cell — NO scenery, NO ground shadows.\n"
     "- No text, no labels, no watermarks, no grid lines.\n"
     "- The grid should be precise — characters aligned in their cells.\n"
+    "- If a reference image of this character is provided, match their face, hair, "
+    "body type, outfit, and colors EXACTLY — only the weapon changes.\n"
 )
 
 # --- Single-direction prompt (fallback for individual generation) ---
@@ -90,65 +98,140 @@ REFERENCE_FOLLOW_UP = (
 )
 
 
-# Character archetypes — sprite_key must match the game's entity spriteKey values
-# Characters are generated WITH their signature weapon in every frame
-CHARACTER_ARCHETYPES = [
-    {
-        "sprite_key": "player",
-        "name": "Wanderer (10mm Pistol)",
+# ---------------------------------------------------------------------------
+# Character base appearances (without weapon — combined with WEAPON_VARIANTS)
+# ---------------------------------------------------------------------------
+CHARACTER_BASES = {
+    "player": {
+        "name": "Wanderer",
         "description": (
             "A rugged wasteland survivor wearing patched leather armor and "
             "a dusty duster coat. Green-tinted goggles on forehead. "
-            "Holding a 10mm semi-automatic pistol in the right hand. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing idle, pistol held low at side",
     },
-    {
-        "sprite_key": "npc_sheriff",
-        "name": "Sheriff Morgan (Revolver)",
+    "npc_sheriff": {
+        "name": "Sheriff Morgan",
         "description": (
             "A grizzled older woman with short gray hair, a sheriff's star pinned "
-            "to a leather duster, a scar across her left cheek. "
-            "Holding a revolver in the right hand. Sturdy boots. "
+            "to a leather duster, a scar across her left cheek. Sturdy boots. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing alert, revolver held at side",
     },
-    {
-        "sprite_key": "npc_merchant",
-        "name": "Scrapper Joe (Shotgun)",
+    "npc_merchant": {
+        "name": "Scrapper Joe",
         "description": (
             "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
             "full of goods, and a worn outfit. Belts with pouches and trinkets. "
-            "Carrying a sawed-off shotgun in one hand. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing idle, shotgun held low",
     },
-    {
-        "sprite_key": "npc_doc",
-        "name": "Doc Hendricks (Medical Bag)",
+    "npc_doc": {
+        "name": "Doc Hendricks",
         "description": (
             "A middle-aged man with round glasses, thinning hair, a stained lab coat "
-            "over a sweater vest. Carrying a medical bag in one hand, "
-            "a small derringer pistol visible in belt holster. "
+            "over a sweater vest. Carrying a medical bag in one hand. "
             "Full body visible from head to shoes."
         ),
-        "pose": "standing idle, holding medical bag",
     },
-    {
-        "sprite_key": "npc_raider",
-        "name": "Raider (Pipe Rifle)",
+    "npc_raider": {
+        "name": "Raider",
         "description": (
             "An aggressive raider with spiked shoulder pads, torn clothing, "
             "face paint, and a mohawk. Red cloth armband. "
-            "Holding a crude pipe rifle in both hands. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing menacing, pipe rifle held across chest",
     },
-]
+}
+
+# ---------------------------------------------------------------------------
+# Weapon variants — visual descriptions for sprite generation
+# ---------------------------------------------------------------------------
+WEAPON_VARIANTS = {
+    "unarmed": {
+        "label": "Unarmed",
+        "held_desc": "Empty hands, fists clenched and ready",
+        "idle_pose": "standing with fists at sides",
+    },
+    "pistol": {
+        "label": "10mm Pistol",
+        "held_desc": "Holding a 10mm semi-automatic pistol in the right hand",
+        "idle_pose": "pistol held low at side",
+    },
+    "rifle": {
+        "label": "Pipe Rifle",
+        "held_desc": "Holding a crude pipe rifle in both hands",
+        "idle_pose": "rifle held across chest at ready",
+    },
+    "knife": {
+        "label": "Combat Knife",
+        "held_desc": "Gripping a military combat knife in the right hand",
+        "idle_pose": "knife held low at side, blade down",
+    },
+    "bat": {
+        "label": "Baseball Bat",
+        "held_desc": "Holding a nail-studded baseball bat over one shoulder",
+        "idle_pose": "bat resting on right shoulder",
+    },
+}
+
+# Maps game item IDs to weapon variant keys
+ITEM_TO_WEAPON_KEY = {
+    "10mm_pistol": "pistol",
+    "pipe_rifle": "rifle",
+    "combat_knife": "knife",
+    "baseball_bat": "bat",
+}
+
+# ---------------------------------------------------------------------------
+# Character+weapon combos to generate
+# Player gets all weapon variants; NPCs get their signature weapon only
+# ---------------------------------------------------------------------------
+CHARACTER_ARCHETYPES = []
+
+def _build_archetypes():
+    """Build CHARACTER_ARCHETYPES from base characters × weapon variants."""
+    archetypes = []
+
+    # Player gets every weapon variant
+    player_base = CHARACTER_BASES["player"]
+    for weapon_key, weapon in WEAPON_VARIANTS.items():
+        sprite_key = f"player_{weapon_key}"
+        archetypes.append({
+            "sprite_key": sprite_key,
+            "base_key": "player",       # groups variants of same character
+            "name": f"{player_base['name']} ({weapon['label']})",
+            "description": (
+                f"{player_base['description']} "
+                f"{weapon['held_desc']}."
+            ),
+            "pose": f"standing idle, {weapon['idle_pose']}",
+        })
+
+    # NPCs: one signature weapon each
+    npc_weapons = {
+        "npc_sheriff": "pistol",
+        "npc_merchant": "rifle",
+        "npc_doc": "unarmed",
+        "npc_raider": "rifle",
+    }
+    for npc_key, weapon_key in npc_weapons.items():
+        base = CHARACTER_BASES[npc_key]
+        weapon = WEAPON_VARIANTS[weapon_key]
+        archetypes.append({
+            "sprite_key": npc_key,
+            "base_key": npc_key,        # single-variant NPCs reference themselves
+            "name": f"{base['name']} ({weapon['label']})",
+            "description": (
+                f"{base['description']} "
+                f"{weapon['held_desc']}."
+            ),
+            "pose": f"standing idle, {weapon['idle_pose']}",
+        })
+
+    return archetypes
+
+CHARACTER_ARCHETYPES = _build_archetypes()
 
 
 def build_spritesheet_prompt(
@@ -158,7 +241,8 @@ def build_spritesheet_prompt(
 ) -> str:
     """Build a prompt for generating a full character sprite sheet.
 
-    The sheet has 4 rows (idle, walk_1, walk_2, attack) x 8 columns (directions).
+    The sheet has 6 rows (idle, walk_1, walk_2, attack, shoot, reload)
+    x 8 columns (directions) = 48 frames.
     """
     cell_w = config["sprites"]["base_width"]
     cell_h = config["sprites"]["base_height"]

@@ -249,19 +249,29 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     """Generate character sprites — either as full sprite sheets or individual images.
 
     When use_sheets=True (default), generates one sprite sheet per character containing
-    all animation frames (4 rows) x all directions (8 columns) = 32 frames per sheet.
+    all animation frames (6 rows) x all directions (8 columns) = 48 frames per sheet.
     The postprocess.py slicer then cuts these into individual frame PNGs.
+
+    For characters with multiple weapon variants (e.g., player_pistol, player_rifle),
+    the first variant's sheet is passed as a reference image to subsequent variants
+    to maintain visual consistency (same face, outfit, proportions).
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
     generated = 0
 
+    # Track generated sheets per base character for cross-referencing
+    base_reference_sheets: dict[str, Image.Image] = {}
+
+    num_anims = len(CHARACTER_ARCHETYPES[0].get("description", "").split()) if CHARACTER_ARCHETYPES else 6
+
     print(f"\n--- Generating character sprites ({'sheet mode' if use_sheets else 'individual mode'}) ---")
 
     for char in CHARACTER_ARCHETYPES:
         sprite_key = char.get("sprite_key", char["name"].lower().replace(" ", "-"))
+        base_key = char.get("base_key", sprite_key)
         char_dir = OUTPUT_DIR / "sprites" / sprite_key
-        print(f"\n  Character: {char['name']} (sprite_key: {sprite_key})")
+        print(f"\n  Character: {char['name']} (sprite_key: {sprite_key}, base: {base_key})")
 
         if use_sheets:
             # Generate full sprite sheet (all anims + directions in one image)
@@ -275,16 +285,27 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
             )
 
             if dry_run:
-                print(f"    [DRY RUN] {filename} (4 anims x 8 dirs = 32 frames)")
+                print(f"    [DRY RUN] {filename} (6 anims x 8 dirs = 48 frames)")
+                if base_key in base_reference_sheets:
+                    print(f"    + using {base_key} reference sheet for consistency")
                 print(f"    Prompt: {prompt[:200]}...")
                 generated += 1
                 continue
 
+            # Build references: global refs + base character sheet (if we have one)
+            char_refs = list(reference_images)
+            if base_key in base_reference_sheets:
+                print(f"    + using {base_key} reference sheet for character consistency")
+                char_refs.append(base_reference_sheets[base_key])
+
             print(f"    Generating sprite sheet: {filename}")
-            image = generate_image(client, prompt, model, reference_images)
+            image = generate_image(client, prompt, model, char_refs if char_refs else None)
             if image:
                 save_image(image, output_path)
                 generated += 1
+                # Store first generated sheet as reference for this base character
+                if base_key not in base_reference_sheets:
+                    base_reference_sheets[base_key] = image
             rate_limit(rpm)
         else:
             # Legacy: generate each direction separately (idle only)
