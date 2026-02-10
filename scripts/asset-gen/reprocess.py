@@ -62,6 +62,19 @@ ANIM_FALLBACKS = {
     "reload": "idle",
 }
 
+# Direction vectors for recoil/lean offsets (dx, dy in pixel space).
+# Positive x = right, positive y = down.
+DIR_VECTORS = {
+    "s":  ( 0,  1),
+    "sw": (-1,  1),
+    "w":  (-1,  0),
+    "nw": (-1, -1),
+    "n":  ( 0, -1),
+    "ne": ( 1, -1),
+    "e":  ( 1,  0),
+    "se": ( 1,  1),
+}
+
 # Fallout 2 palette for color mapping
 PALETTE_HEX = {
     "sand_light": "#D4C4A0", "sand_dark": "#B8A67C",
@@ -418,6 +431,85 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         return canvas
 
 
+def synthesize_shoot_frame(attack_frame: Image.Image, direction: str) -> Image.Image:
+    """Create a shoot frame from an attack frame with recoil + muzzle flash.
+
+    Applies:
+      1. Slight backward shift (recoil — opposite to facing direction)
+      2. Brightness boost on the front-facing side (muzzle flash glow)
+    """
+    arr = np.array(attack_frame.copy()).astype(np.int16)
+    alpha = arr[:, :, 3].copy()
+    h, w = alpha.shape
+
+    # 1. Recoil: shift content 2px away from facing direction
+    dx, dy = DIR_VECTORS.get(direction, (0, 1))
+    shift_x = -dx * 2  # recoil is opposite to facing
+    shift_y = -dy * 1
+
+    shifted = np.zeros_like(arr)
+    # Compute source and destination slices for the shift
+    src_y0 = max(0, -shift_y)
+    src_y1 = min(h, h - shift_y)
+    dst_y0 = max(0, shift_y)
+    dst_y1 = min(h, h + shift_y)
+    src_x0 = max(0, -shift_x)
+    src_x1 = min(w, w - shift_x)
+    dst_x0 = max(0, shift_x)
+    dst_x1 = min(w, w + shift_x)
+
+    if dst_y1 > dst_y0 and dst_x1 > dst_x0:
+        shifted[dst_y0:dst_y1, dst_x0:dst_x1] = arr[src_y0:src_y1, src_x0:src_x1]
+    arr = shifted
+
+    # 2. Brightness boost on the forward side (muzzle flash glow)
+    # Create a gradient: brighter on the side the character faces
+    gradient = np.ones((h, w), dtype=np.float32)
+    if dx > 0:
+        gradient *= np.linspace(0.8, 1.0, w).reshape(1, w)
+    elif dx < 0:
+        gradient *= np.linspace(1.0, 0.8, w).reshape(1, w)
+    if dy > 0:
+        gradient *= np.linspace(0.85, 1.0, h).reshape(h, 1)
+    elif dy < 0:
+        gradient *= np.linspace(1.0, 0.85, h).reshape(h, 1)
+
+    # Boost brightness by 15-30% on the bright side
+    boost = 1.0 + (gradient - 0.8) * 1.5  # maps 0.8-1.0 → 1.0-1.3
+    for c in range(3):
+        arr[:, :, c] = np.clip(arr[:, :, c] * boost, 0, 255).astype(np.int16)
+
+    # Restore alpha from shifted version
+    result = np.clip(arr, 0, 255).astype(np.uint8)
+    return Image.fromarray(result, "RGBA")
+
+
+def synthesize_reload_frame(idle_frame: Image.Image, direction: str) -> Image.Image:
+    """Create a reload frame from an idle frame with downward lean + slight darken.
+
+    Applies:
+      1. Shift content down by 3px (looking down at weapon)
+      2. Slight darkening (character focused on weapon, not environment)
+    """
+    arr = np.array(idle_frame.copy()).astype(np.int16)
+    alpha = arr[:, :, 3].copy()
+    h, w = alpha.shape
+
+    # 1. Shift content down by 3px (looking down at weapon)
+    shift_down = 3
+    shifted = np.zeros_like(arr)
+    if h - shift_down > 0:
+        shifted[shift_down:, :] = arr[:h - shift_down, :]
+    arr = shifted
+
+    # 2. Slight darkening (focused on weapon, not environment)
+    for c in range(3):
+        arr[:, :, c] = np.clip(arr[:, :, c] * 0.85, 0, 255).astype(np.int16)
+
+    result = np.clip(arr, 0, 255).astype(np.uint8)
+    return Image.fromarray(result, "RGBA")
+
+
 def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                   center_content: bool = True,
                   apply_palette: bool = True) -> dict:
@@ -517,11 +609,24 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                     extracted[anim]["n"] = extracted[anim][fallback]
                     break
 
-    # Phase 3: Fill missing animations via fallbacks
+    # Phase 3: Fill missing animations via synthesis
+    # Instead of copying attack→shoot / idle→reload verbatim, apply visual
+    # transforms to create distinct frames.
     for target_anim, source_anim in ANIM_FALLBACKS.items():
         if target_anim not in extracted:
             if source_anim in extracted:
-                extracted[target_anim] = dict(extracted[source_anim])
+                extracted[target_anim] = {}
+                for direction, src_frame in extracted[source_anim].items():
+                    if target_anim == "shoot":
+                        extracted[target_anim][direction] = synthesize_shoot_frame(
+                            src_frame, direction
+                        )
+                    elif target_anim == "reload":
+                        extracted[target_anim][direction] = synthesize_reload_frame(
+                            src_frame, direction
+                        )
+                    else:
+                        extracted[target_anim][direction] = src_frame
                 stats["fallback_anim"] += 1
 
     # Phase 4: Save all frames
