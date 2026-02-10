@@ -42,11 +42,25 @@ TILE_W = 64
 TILE_H = 32
 SPRITE_W = 64
 SPRITE_H = 96
-SHEET_ROWS = 4  # idle, walk_1, walk_2, attack
-SHEET_COLS = 8  # S, SW, W, NW, N, NE, E, SE
 
-ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
-DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
+# All 8 directions the game engine expects (column order in the sprite sheet prompt)
+ALL_DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
+# All 6 animations the game engine expects (row order in the sprite sheet prompt)
+ALL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
+
+# Mirror mapping: missing direction → source direction to horizontally flip.
+# The prompt asks S,SW,W,NW,N,NE,E,SE but AI typically generates only the
+# first 4–6 columns.  Mirroring exploits bilateral symmetry.
+MIRROR_PAIRS = {
+    "se": "sw",
+    "e":  "w",
+    "ne": "nw",
+}
+# Animation fallbacks when the AI doesn't generate shoot/reload rows
+ANIM_FALLBACKS = {
+    "shoot":  "attack",
+    "reload": "idle",
+}
 
 # Fallout 2 palette for color mapping
 PALETTE_HEX = {
@@ -223,12 +237,20 @@ def fix_tiles(dry_run: bool = False) -> list:
 # SPRITE SHEET RE-SLICING
 # ---------------------------------------------------------------------------
 
-def detect_grid(sheet: Image.Image, rows: int, cols: int) -> list:
-    """Detect grid cell boundaries in a sprite sheet using alpha/color analysis."""
+def detect_grid_auto(sheet: Image.Image) -> tuple:
+    """Auto-detect actual grid dimensions in a sprite sheet.
+
+    The AI generates variable grids (typically 4-6 cols × 4 rows) inside a
+    1024×1024 image.  Instead of assuming a fixed 8×6 layout, we find the
+    real cell boundaries by analysing content-density gaps.
+
+    Returns (cells, actual_rows, actual_cols) where cells is a 2D list of
+    (x, y, w, h) tuples.
+    """
     sw, sh = sheet.size
     arr = np.array(sheet.convert("RGBA"))
 
-    # For green-bg sheets, use green channel density instead of alpha
+    # Classify each pixel as content (True) or background (False)
     g = arr[:, :, 1].astype(int)
     r = arr[:, :, 0].astype(int)
     b = arr[:, :, 2].astype(int)
@@ -237,36 +259,67 @@ def detect_grid(sheet: Image.Image, rows: int, cols: int) -> list:
     row_density = np.mean(is_content, axis=1)
     col_density = np.mean(is_content, axis=0)
 
-    def find_splits(density, expected_parts, total_size):
-        chunk = total_size // expected_parts
-        splits = [0]
-        for i in range(1, expected_parts):
-            expected_pos = int(i * chunk)
-            search_start = max(0, expected_pos - chunk // 4)
-            search_end = min(total_size, expected_pos + chunk // 4)
-            if search_start < search_end:
-                window = density[search_start:search_end]
-                best = search_start + int(np.argmin(window))
-                splits.append(best if density[best] < 0.3 else expected_pos)
-            else:
-                splits.append(expected_pos)
-        splits.append(total_size)
-        return splits
+    def find_natural_splits(density, total_size, min_cell=120):
+        """Find actual cell boundaries by detecting runs of low-density pixels.
 
-    row_splits = find_splits(row_density, rows, sh)
-    col_splits = find_splits(col_density, cols, sw)
+        Uses a smoothed density profile to avoid splitting on noise within
+        large gaps (e.g., a few pixels of content between two empty regions).
+        min_cell=120 prevents splitting a real column (typically 170-256px in
+        a 4-6 column 1024px sheet) while still allowing up to ~8 real columns.
+        """
+        # Smooth with a wide kernel to merge small blips in gaps
+        kernel_size = 40
+        kernel = np.ones(kernel_size) / kernel_size
+        smoothed = np.convolve(density, kernel, mode="same")
+
+        threshold = 0.10  # smoothed density below this = gap
+        in_gap = smoothed < threshold
+        splits = [0]
+
+        i = 0
+        while i < total_size:
+            if in_gap[i]:
+                gap_start = i
+                while i < total_size and in_gap[i]:
+                    i += 1
+                gap_end = i
+                gap_mid = (gap_start + gap_end) // 2
+
+                # Only count as a split if the cell on either side is big enough
+                if gap_mid - splits[-1] >= min_cell:
+                    splits.append(gap_mid)
+            else:
+                i += 1
+
+        splits.append(total_size)
+
+        # Filter out tiny trailing cells
+        filtered = [splits[0]]
+        for s in splits[1:]:
+            if s - filtered[-1] >= min_cell:
+                filtered.append(s)
+            else:
+                filtered[-1] = s  # merge into previous
+        return filtered
+
+    row_splits = find_natural_splits(row_density, sh)
+    col_splits = find_natural_splits(col_density, sw)
+
+    actual_rows = len(row_splits) - 1
+    actual_cols = len(col_splits) - 1
 
     cells = []
-    for ri in range(rows):
+    for ri in range(actual_rows):
         row_cells = []
-        for ci in range(cols):
+        for ci in range(actual_cols):
             x = col_splits[ci]
             y = row_splits[ri]
             w = col_splits[ci + 1] - x
             h = row_splits[ri + 1] - y
             row_cells.append((x, y, w, h))
         cells.append(row_cells)
-    return cells
+
+    return cells, actual_rows, actual_cols
 
 
 def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
@@ -334,17 +387,37 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                   apply_palette: bool = True) -> dict:
     """Re-slice a 1024x1024 sprite sheet into individual frames.
 
+    The AI typically generates 4-6 columns (directions) × 4 rows (animations)
+    instead of the requested 8×6.  This function:
+      1. Auto-detects the actual grid layout
+      2. Extracts the cells that exist
+      3. Mirrors missing directions (SW→SE, W→E, NW→NE)
+      4. Falls back for missing animations (shoot→attack, reload→idle)
+
     Returns frame metadata dict for manifest.
     """
     sheet = Image.open(sheet_path).convert("RGBA")
-    grid = detect_grid(sheet, SHEET_ROWS, SHEET_COLS)
+    grid, actual_rows, actual_cols = detect_grid_auto(sheet)
 
-    frame_meta = {}
-    stats = {"total": 0, "empty": 0}
+    print(f"    Grid detected: {actual_cols} cols x {actual_rows} rows "
+          f"(expected 8x6, image {sheet.size[0]}x{sheet.size[1]})")
 
-    for row_idx, anim in enumerate(ANIMATIONS):
-        frame_meta[anim] = {}
-        for col_idx, direction in enumerate(DIRECTIONS):
+    # Map actual columns → direction names.
+    # The prompt orders columns as S, SW, W, NW, N, NE, E, SE.
+    # If the AI only generated N columns, take the first N from that list.
+    detected_dirs = ALL_DIRECTIONS[:actual_cols]
+
+    # Map actual rows → animation names (first N of ALL_ANIMATIONS)
+    detected_anims = ALL_ANIMATIONS[:actual_rows]
+
+    # Phase 1: Extract all actually-present cells
+    # Store as {anim: {direction: Image}}
+    extracted: dict[str, dict[str, Image.Image]] = {}
+    stats = {"total": 0, "empty": 0, "mirrored": 0, "fallback_anim": 0}
+
+    for row_idx, anim in enumerate(detected_anims):
+        extracted[anim] = {}
+        for col_idx, direction in enumerate(detected_dirs):
             x, y, w, h = grid[row_idx][col_idx]
             region = sheet.crop((x, y, x + w, y + h))
 
@@ -357,12 +430,55 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             frame_arr = np.array(frame)
             if np.sum(frame_arr[:, :, 3] > 10) < 50:
                 stats["empty"] += 1
-                # Fallback to idle
-                if anim != "idle" and "idle" in frame_meta and direction in frame_meta["idle"]:
-                    frame_meta[anim][direction] = frame_meta["idle"][direction]
-                    continue
-                # Use empty frame
-                frame = Image.new("RGBA", (SPRITE_W, SPRITE_H), (0, 0, 0, 0))
+                frame = None
+            else:
+                extracted[anim][direction] = frame
+
+    # Phase 2: Fill missing directions via mirroring
+    for anim in list(extracted.keys()):
+        for target_dir, source_dir in MIRROR_PAIRS.items():
+            if target_dir not in extracted[anim] and source_dir in extracted[anim]:
+                mirrored = extracted[anim][source_dir].transpose(
+                    Image.Transpose.FLIP_LEFT_RIGHT
+                )
+                extracted[anim][target_dir] = mirrored
+                stats["mirrored"] += 1
+
+    # If N direction is missing, try to derive it
+    for anim in list(extracted.keys()):
+        if "n" not in extracted[anim]:
+            # Use nw or ne if available
+            for fallback in ["nw", "ne"]:
+                if fallback in extracted[anim]:
+                    extracted[anim]["n"] = extracted[anim][fallback]
+                    break
+
+    # Phase 3: Fill missing animations via fallbacks
+    for target_anim, source_anim in ANIM_FALLBACKS.items():
+        if target_anim not in extracted:
+            if source_anim in extracted:
+                extracted[target_anim] = dict(extracted[source_anim])
+                stats["fallback_anim"] += 1
+
+    # Phase 4: Save all frames
+    frame_meta = {}
+
+    for anim in ALL_ANIMATIONS:
+        frame_meta[anim] = {}
+        anim_frames = extracted.get(anim, {})
+
+        for direction in ALL_DIRECTIONS:
+            frame = anim_frames.get(direction)
+
+            if frame is None:
+                # Last resort: use idle of any available direction
+                if "idle" in extracted:
+                    for d in ALL_DIRECTIONS:
+                        if d in extracted["idle"]:
+                            frame = extracted["idle"][d]
+                            break
+                if frame is None:
+                    frame = Image.new("RGBA", (SPRITE_W, SPRITE_H), (0, 0, 0, 0))
 
             # Palette reduction
             if apply_palette:
@@ -370,7 +486,9 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
 
             # Clean transparency
             frame_arr = np.array(frame)
-            frame_arr[:, :, 3] = np.where(frame_arr[:, :, 3] < 10, 0, 255).astype(np.uint8)
+            frame_arr[:, :, 3] = np.where(
+                frame_arr[:, :, 3] < 10, 0, 255
+            ).astype(np.uint8)
             frame = Image.fromarray(frame_arr, "RGBA")
 
             filename = f"{sprite_key}-{anim}-{direction}.png"
@@ -378,13 +496,19 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             frame_meta[anim][direction] = filename
             stats["total"] += 1
 
+    print(f"    Saved {stats['total']} frames "
+          f"({stats['mirrored']} mirrored, {stats['fallback_anim']} fallback anims, "
+          f"{stats['empty']} empty cells)")
+
     return {"meta": frame_meta, "stats": stats}
 
 
 def fix_sprites(dry_run: bool = False) -> list:
-    """Re-slice all character sprite sheets."""
+    """Re-slice all character sprite sheets and update the manifest."""
     sprite_dir = ASSETS_DIR / "sprites"
+    manifest_path = ASSETS_DIR / "manifest.json"
     results = []
+    all_meta: dict[str, dict] = {}
 
     for path in sorted(sprite_dir.glob("*-sheet.png")):
         sprite_key = path.stem.replace("-sheet", "")
@@ -399,12 +523,50 @@ def fix_sprites(dry_run: bool = False) -> list:
             center_content=True,
             apply_palette=True,
         )
+        all_meta[sprite_key] = result["meta"]
         results.append({
             "status": "ok",
             "file": path.name,
             "sprite_key": sprite_key,
             **result["stats"],
         })
+
+    # Update the manifest with new sprite/animation entries
+    if not dry_run and all_meta:
+        manifest = {}
+        if manifest_path.exists():
+            manifest = json.loads(manifest_path.read_text())
+
+        # Rebuild sprites and animations sections from frame metadata
+        sprites_section = manifest.get("sprites", {})
+        anims_section = manifest.get("animations", {})
+
+        for sprite_key, meta in all_meta.items():
+            # Static sprites = idle direction images
+            if "idle" in meta:
+                dir_map = {}
+                for d, filename in meta["idle"].items():
+                    dir_map[d.upper()] = f"/assets/sprites/{filename}"
+                sprites_section[sprite_key] = dir_map
+
+            # Animations = all anim/direction combos
+            anim_map = {}
+            for anim_name, dirs in meta.items():
+                dir_map = {}
+                for d, filename in dirs.items():
+                    dir_map[d.upper()] = f"/assets/sprites/{filename}"
+                anim_map[anim_name] = dir_map
+            anims_section[sprite_key] = anim_map
+
+        manifest["sprites"] = sprites_section
+        manifest["animations"] = anims_section
+
+        # Remove deprecated weapons section if present
+        manifest.pop("weapons", None)
+
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+        print(f"\n  Updated manifest: {len(all_meta)} sprite keys, "
+              f"{sum(len(a) for a in anims_section.values())} anim entries")
 
     return results
 

@@ -406,6 +406,26 @@
         "NE": "/assets/sprites/player-attack-ne.png",
         "E": "/assets/sprites/player-attack-e.png",
         "SE": "/assets/sprites/player-attack-se.png"
+      },
+      "shoot": {
+        "S": "/assets/sprites/player-shoot-s.png",
+        "SW": "/assets/sprites/player-shoot-sw.png",
+        "W": "/assets/sprites/player-shoot-w.png",
+        "NW": "/assets/sprites/player-shoot-nw.png",
+        "N": "/assets/sprites/player-shoot-n.png",
+        "NE": "/assets/sprites/player-shoot-ne.png",
+        "E": "/assets/sprites/player-shoot-e.png",
+        "SE": "/assets/sprites/player-shoot-se.png"
+      },
+      "reload": {
+        "S": "/assets/sprites/player-reload-s.png",
+        "SW": "/assets/sprites/player-reload-sw.png",
+        "W": "/assets/sprites/player-reload-w.png",
+        "NW": "/assets/sprites/player-reload-nw.png",
+        "N": "/assets/sprites/player-reload-n.png",
+        "NE": "/assets/sprites/player-reload-ne.png",
+        "E": "/assets/sprites/player-reload-e.png",
+        "SE": "/assets/sprites/player-reload-se.png"
       }
     },
     "player_bat": {
@@ -716,176 +736,6 @@
         "NE": "/assets/sprites/player_unarmed-reload-ne.png",
         "E": "/assets/sprites/player_unarmed-reload-e.png",
         "SE": "/assets/sprites/player_unarmed-reload-se.png"
-      }
-    }
-  },
-  "weapons": {
-    "weapon_bat": {
-      "idle": {
-        "S": "/assets/weapons/weapon_bat-idle-s.png",
-        "SW": "/assets/weapons/weapon_bat-idle-sw.png",
-        "W": "/assets/weapons/weapon_bat-idle-w.png",
-        "NW": "/assets/weapons/weapon_bat-idle-nw.png",
-        "N": "/assets/weapons/weapon_bat-idle-n.png",
-        "NE": "/assets/weapons/weapon_bat-idle-ne.png",
-        "E": "/assets/weapons/weapon_bat-idle-e.png",
-        "SE": "/assets/weapons/weapon_bat-idle-se.png"
-      },
-      "walk_1": {
-        "S": "/assets/weapons/weapon_bat-walk_1-s.png",
-        "SW": "/assets/weapons/weapon_bat-walk_1-sw.png",
-        "W": "/assets/weapons/weapon_bat-walk_1-w.png",
-        "NW": "/assets/weapons/weapon_bat-walk_1-nw.png",
-        "N": "/assets/weapons/weapon_bat-walk_1-n.png",
-        "NE": "/assets/weapons/weapon_bat-walk_1-ne.png",
-        "E": "/assets/weapons/weapon_bat-walk_1-e.png",
-        "SE": "/assets/weapons/weapon_bat-walk_1-se.png"
-      },
-      "walk_2": {
-        "S": "/assets/weapons/weapon_bat-walk_2-s.png",
-        "SW": "/assets/weapons/weapon_bat-walk_2-sw.png",
-        "W": "/assets/weapons/weapon_bat-walk_2-w.png",
-        "NW": "/assets/weapons/weapon_bat-walk_2-nw.png",
-        "N": "/assets/weapons/weapon_bat-walk_2-n.png",
-        "NE": "/assets/weapons/weapon_bat-walk_2-ne.png",
-        "E": "/assets/weapons/weapon_bat-walk_2-e.png",
-        "SE": "/assets/weapons/weapon_bat-walk_2-se.png"
-      },
-      "attack": {
-        "S": "/assets/weapons/weapon_bat-attack-s.png",
-        "SW": "/assets/weapons/weapon_bat-attack-sw.png",
-        "W": "/assets/weapons/weapon_bat-attack-w.png",
-        "NW": "/assets/weapons/weapon_bat-attack-nw.png",
-        "N": "/assets/weapons/weapon_bat-attack-n.png",
-        "NE": "/assets/weapons/weapon_bat-attack-ne.png",
-        "E": "/assets/weapons/weapon_bat-attack-e.png",
-        "SE": "/assets/weapons/weapon_bat-attack-se.png"
-      }
-    },
-    "weapon_knife": {
-      "idle": {
-        "S": "/assets/weapons/weapon_knife-idle-s.png",
-        "SW": "/assets/weapons/weapon_knife-idle-sw.png",
-        "W": "/assets/weapons/weapon_knife-idle-w.png",
-        "NW": "/assets/weapons/weapon_knife-idle-nw.png",
-        "N": "/assets/weapons/weapon_knife-idle-n.png",
-        "NE": "/assets/weapons/weapon_knife-idle-ne.png",
-        "E": "/assets/weapons/weapon_knife-idle-e.png",
-        "SE": "/assets/weapons/weapon_knife-idle-se.png"
-      },
-      "walk_1": {
-        "S": "/assets/weapons/weapon_knife-walk_1-s.png",
-        "SW": "/assets/weapons/weapon_knife-walk_1-sw.png",
-        "W": "/assets/weapons/weapon_knife-walk_1-w.png",
-        "NW": "/assets/weapons/weapon_knife-walk_1-nw.png",
-        "N": "/assets/weapons/weapon_knife-walk_1-n.png",
-        "NE": "/assets/weapons/weapon_knife-walk_1-ne.png",
-        "E": "/assets/weapons/weapon_knife-walk_1-e.png",
-        "SE": "/assets/weapons/weapon_knife-walk_1-se.png"
-      },
-      "walk_2": {
-        "S": "/assets/weapons/weapon_knife-walk_2-s.png",
-        "SW": "/assets/weapons/weapon_knife-walk_2-sw.png",
-        "W": "/assets/weapons/weapon_knife-walk_2-w.png",
-        "NW": "/assets/weapons/weapon_knife-walk_2-nw.png",
-        "N": "/assets/weapons/weapon_knife-walk_2-n.png",
-        "NE": "/assets/weapons/weapon_knife-walk_2-ne.png",
-        "E": "/assets/weapons/weapon_knife-walk_2-e.png",
-        "SE": "/assets/weapons/weapon_knife-walk_2-se.png"
-      },
-      "attack": {
-        "S": "/assets/weapons/weapon_knife-attack-s.png",
-        "SW": "/assets/weapons/weapon_knife-attack-sw.png",
-        "W": "/assets/weapons/weapon_knife-attack-w.png",
-        "NW": "/assets/weapons/weapon_knife-attack-nw.png",
-        "N": "/assets/weapons/weapon_knife-attack-n.png",
-        "NE": "/assets/weapons/weapon_knife-attack-ne.png",
-        "E": "/assets/weapons/weapon_knife-attack-e.png",
-        "SE": "/assets/weapons/weapon_knife-attack-se.png"
-      }
-    },
-    "weapon_pistol": {
-      "idle": {
-        "S": "/assets/weapons/weapon_pistol-idle-s.png",
-        "SW": "/assets/weapons/weapon_pistol-idle-sw.png",
-        "W": "/assets/weapons/weapon_pistol-idle-w.png",
-        "NW": "/assets/weapons/weapon_pistol-idle-nw.png",
-        "N": "/assets/weapons/weapon_pistol-idle-n.png",
-        "NE": "/assets/weapons/weapon_pistol-idle-ne.png",
-        "E": "/assets/weapons/weapon_pistol-idle-e.png",
-        "SE": "/assets/weapons/weapon_pistol-idle-se.png"
-      },
-      "walk_1": {
-        "S": "/assets/weapons/weapon_pistol-walk_1-s.png",
-        "SW": "/assets/weapons/weapon_pistol-walk_1-sw.png",
-        "W": "/assets/weapons/weapon_pistol-walk_1-w.png",
-        "NW": "/assets/weapons/weapon_pistol-walk_1-nw.png",
-        "N": "/assets/weapons/weapon_pistol-walk_1-n.png",
-        "NE": "/assets/weapons/weapon_pistol-walk_1-ne.png",
-        "E": "/assets/weapons/weapon_pistol-walk_1-e.png",
-        "SE": "/assets/weapons/weapon_pistol-walk_1-se.png"
-      },
-      "walk_2": {
-        "S": "/assets/weapons/weapon_pistol-walk_2-s.png",
-        "SW": "/assets/weapons/weapon_pistol-walk_2-sw.png",
-        "W": "/assets/weapons/weapon_pistol-walk_2-w.png",
-        "NW": "/assets/weapons/weapon_pistol-walk_2-nw.png",
-        "N": "/assets/weapons/weapon_pistol-walk_2-n.png",
-        "NE": "/assets/weapons/weapon_pistol-walk_2-ne.png",
-        "E": "/assets/weapons/weapon_pistol-walk_2-e.png",
-        "SE": "/assets/weapons/weapon_pistol-walk_2-se.png"
-      },
-      "attack": {
-        "S": "/assets/weapons/weapon_pistol-attack-s.png",
-        "SW": "/assets/weapons/weapon_pistol-attack-sw.png",
-        "W": "/assets/weapons/weapon_pistol-attack-w.png",
-        "NW": "/assets/weapons/weapon_pistol-attack-nw.png",
-        "N": "/assets/weapons/weapon_pistol-attack-n.png",
-        "NE": "/assets/weapons/weapon_pistol-attack-ne.png",
-        "E": "/assets/weapons/weapon_pistol-attack-e.png",
-        "SE": "/assets/weapons/weapon_pistol-attack-se.png"
-      }
-    },
-    "weapon_rifle": {
-      "idle": {
-        "S": "/assets/weapons/weapon_rifle-idle-s.png",
-        "SW": "/assets/weapons/weapon_rifle-idle-sw.png",
-        "W": "/assets/weapons/weapon_rifle-idle-w.png",
-        "NW": "/assets/weapons/weapon_rifle-idle-nw.png",
-        "N": "/assets/weapons/weapon_rifle-idle-n.png",
-        "NE": "/assets/weapons/weapon_rifle-idle-ne.png",
-        "E": "/assets/weapons/weapon_rifle-idle-e.png",
-        "SE": "/assets/weapons/weapon_rifle-idle-se.png"
-      },
-      "walk_1": {
-        "S": "/assets/weapons/weapon_rifle-walk_1-s.png",
-        "SW": "/assets/weapons/weapon_rifle-walk_1-sw.png",
-        "W": "/assets/weapons/weapon_rifle-walk_1-w.png",
-        "NW": "/assets/weapons/weapon_rifle-walk_1-nw.png",
-        "N": "/assets/weapons/weapon_rifle-walk_1-n.png",
-        "NE": "/assets/weapons/weapon_rifle-walk_1-ne.png",
-        "E": "/assets/weapons/weapon_rifle-walk_1-e.png",
-        "SE": "/assets/weapons/weapon_rifle-walk_1-se.png"
-      },
-      "walk_2": {
-        "S": "/assets/weapons/weapon_rifle-walk_2-s.png",
-        "SW": "/assets/weapons/weapon_rifle-walk_2-sw.png",
-        "W": "/assets/weapons/weapon_rifle-walk_2-w.png",
-        "NW": "/assets/weapons/weapon_rifle-walk_2-nw.png",
-        "N": "/assets/weapons/weapon_rifle-walk_2-n.png",
-        "NE": "/assets/weapons/weapon_rifle-walk_2-ne.png",
-        "E": "/assets/weapons/weapon_rifle-walk_2-e.png",
-        "SE": "/assets/weapons/weapon_rifle-walk_2-se.png"
-      },
-      "attack": {
-        "S": "/assets/weapons/weapon_rifle-attack-s.png",
-        "SW": "/assets/weapons/weapon_rifle-attack-sw.png",
-        "W": "/assets/weapons/weapon_rifle-attack-w.png",
-        "NW": "/assets/weapons/weapon_rifle-attack-nw.png",
-        "N": "/assets/weapons/weapon_rifle-attack-n.png",
-        "NE": "/assets/weapons/weapon_rifle-attack-ne.png",
-        "E": "/assets/weapons/weapon_rifle-attack-e.png",
-        "SE": "/assets/weapons/weapon_rifle-attack-se.png"
       }
     }
   },
