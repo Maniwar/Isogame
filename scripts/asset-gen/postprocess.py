@@ -424,12 +424,12 @@ def slice_and_save_character_sheet(
 
     Returns a frame metadata dict for the manifest.
     """
-    from prompts.characters import DIRECTIONS, ANIMATIONS
+    from prompts.characters import SHEET_DIRECTIONS, SHEET_ANIMATIONS
 
     cell_w = config["sprites"]["base_width"]
     cell_h = config["sprites"]["base_height"]
-    num_cols = len(DIRECTIONS)
-    num_rows = len(ANIMATIONS)
+    num_cols = len(SHEET_DIRECTIONS)
+    num_rows = len(SHEET_ANIMATIONS)
 
     sheet = Image.open(sheet_path).convert("RGBA")
 
@@ -449,9 +449,9 @@ def slice_and_save_character_sheet(
     frame_meta = {}
     empty_cells = 0
 
-    for row_idx, anim_name in enumerate(ANIMATIONS):
+    for row_idx, anim_name in enumerate(SHEET_ANIMATIONS):
         frame_meta[anim_name] = {}
-        for col_idx, direction in enumerate(DIRECTIONS):
+        for col_idx, direction in enumerate(SHEET_DIRECTIONS):
             frame = frames[row_idx][col_idx]
 
             # Check if cell has any content
