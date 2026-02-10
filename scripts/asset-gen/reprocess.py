@@ -45,8 +45,11 @@ SPRITE_H = 96
 
 # All 8 directions the game engine expects (column order in the sprite sheet prompt)
 ALL_DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
-# All 6 animations the game engine expects (row order in the sprite sheet prompt)
-ALL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
+# The 4 animation rows the AI actually generates (row order in the sprite sheet).
+# The prompt asks for 6 rows (+ shoot, reload) but the AI consistently produces
+# only 4.  The game's AnimationSystem maps shoot→attack and reload→idle at
+# runtime, so we only need to output these 4.
+REAL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
 
 # Mirror mapping: missing direction → source direction to horizontally flip.
 # The prompt asks S,SW,W,NW,N,NE,E,SE but AI typically generates only the
@@ -55,11 +58,6 @@ MIRROR_PAIRS = {
     "se": "sw",
     "e":  "w",
     "ne": "nw",
-}
-# Animation fallbacks when the AI doesn't generate shoot/reload rows
-ANIM_FALLBACKS = {
-    "shoot":  "attack",
-    "reload": "idle",
 }
 
 # Fallout 2 palette for color mapping
@@ -322,8 +320,31 @@ def detect_grid_auto(sheet: Image.Image) -> tuple:
     return cells, actual_rows, actual_cols
 
 
+def measure_content_bbox(region: Image.Image) -> tuple:
+    """Remove green bg from a cell and return (cleaned_image, content_w, content_h).
+
+    Returns (None, 0, 0) if the cell is empty after green removal.
+    """
+    clean = remove_green_bg(region)
+    arr = np.array(clean)
+    alpha = arr[:, :, 3]
+    mask = alpha > 10
+    if not mask.any():
+        return None, 0, 0
+
+    rows_any = np.any(mask, axis=1)
+    cols_any = np.any(mask, axis=0)
+    top = int(np.argmax(rows_any))
+    bottom = int(len(rows_any) - np.argmax(rows_any[::-1]))
+    left = int(np.argmax(cols_any))
+    right = int(len(cols_any) - np.argmax(cols_any[::-1]))
+
+    return clean, right - left, bottom - top
+
+
 def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
-                         center_content: bool = True) -> Image.Image:
+                         center_content: bool = True,
+                         uniform_scale: float | None = None) -> Image.Image:
     """Extract a sprite frame from a grid cell region.
 
     Args:
@@ -331,6 +352,9 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         target_w, target_h: Output dimensions
         center_content: If True, center on content bbox. If False, scale
                        uniformly preserving position (for weapon overlays).
+        uniform_scale: If provided, use this scale factor for ALL frames of a
+                      character instead of computing per-frame. This ensures
+                      the character stays the same size across animation frames.
     """
     # Remove green bg from this cell
     clean = remove_green_bg(region)
@@ -350,15 +374,25 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
     right = int(len(cols_any) - np.argmax(cols_any[::-1]))
 
     if center_content:
-        # Crop to content, scale to fit target, center
+        # Crop to content, scale to fit target, bottom-center anchor
         content = clean.crop((left, top, right, bottom))
         cw, ch = content.size
-        if cw > target_w or ch > target_h:
-            scale = min(target_w / cw, target_h / ch)
+
+        if uniform_scale is not None:
+            # Use the pre-computed uniform scale for consistent character sizing
+            scale = uniform_scale
+        else:
+            # Legacy per-frame scaling (only used if uniform_scale not provided)
+            scale = min(target_w / cw, target_h / ch, 1.0)
+
+        new_w = max(1, int(cw * scale))
+        new_h = max(1, int(ch * scale))
+        if (new_w, new_h) != (cw, ch):
             content = content.resize(
-                (max(1, int(cw * scale)), max(1, int(ch * scale))),
+                (new_w, new_h),
                 Image.Resampling.LANCZOS,
             )
+
         cw, ch = content.size
         canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
         # Anchor to bottom-center (feet on ground)
@@ -382,17 +416,80 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         return canvas
 
 
+
+def validate_sheet(sheet_path: Path) -> dict:
+    """Validate a sprite sheet before processing.
+
+    Checks:
+      1. Image loads and is RGBA
+      2. Grid detection finds ≥4 cols × ≥4 rows
+      3. Each cell has substantial content (not empty)
+      4. Content is character-sized (not tiny fragments)
+
+    Returns {"ok": True/False, "errors": [...], "grid": (rows, cols)}
+    """
+    errors = []
+
+    try:
+        sheet = Image.open(sheet_path).convert("RGBA")
+    except Exception as e:
+        return {"ok": False, "errors": [f"Cannot open: {e}"], "grid": (0, 0)}
+
+    sw, sh = sheet.size
+    if sw < 256 or sh < 256:
+        errors.append(f"Image too small: {sw}x{sh} (need ≥256x256)")
+
+    grid, actual_rows, actual_cols = detect_grid_auto(sheet)
+
+    if actual_rows < 4:
+        errors.append(f"Only {actual_rows} rows detected (need ≥4)")
+    if actual_cols < 4:
+        errors.append(f"Only {actual_cols} columns detected (need ≥4)")
+
+    # Check each cell has content
+    min_content_pixels = 200  # at least 200 opaque pixels per cell
+    empty_cells = 0
+    total_cells = 0
+
+    for ri in range(min(actual_rows, 4)):
+        for ci in range(min(actual_cols, 4)):
+            x, y, w, h = grid[ri][ci]
+            region = sheet.crop((x, y, x + w, y + h))
+            clean = remove_green_bg(region)
+            arr = np.array(clean)
+            opaque = int(np.sum(arr[:, :, 3] > 10))
+            total_cells += 1
+            if opaque < min_content_pixels:
+                empty_cells += 1
+
+    if empty_cells > 0:
+        errors.append(
+            f"{empty_cells}/{total_cells} cells have <{min_content_pixels} "
+            f"opaque pixels (may be empty or fragmented)"
+        )
+
+    return {
+        "ok": len(errors) == 0,
+        "errors": errors,
+        "grid": (actual_rows, actual_cols),
+        "size": (sw, sh),
+    }
+
+
 def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                   center_content: bool = True,
                   apply_palette: bool = True) -> dict:
     """Re-slice a 1024x1024 sprite sheet into individual frames.
 
-    The AI typically generates 4-6 columns (directions) × 4 rows (animations)
-    instead of the requested 8×6.  This function:
+    The AI generates 4-6 columns (directions) × 4 rows (animations: idle,
+    walk_1, walk_2, attack).  This function:
       1. Auto-detects the actual grid layout
-      2. Extracts the cells that exist
-      3. Mirrors missing directions (SW→SE, W→E, NW→NE)
-      4. Falls back for missing animations (shoot→attack, reload→idle)
+      2. Measures all content bboxes to compute uniform scale
+      3. Extracts all cells with consistent sizing
+      4. Mirrors missing directions (SW→SE, W→E, NW→NE)
+
+    Only outputs the 4 real animation rows.  The game's AnimationSystem maps
+    shoot→attack and reload→idle at runtime (no synthetic frames needed).
 
     Returns frame metadata dict for manifest.
     """
@@ -407,23 +504,50 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     # If the AI only generated N columns, take the first N from that list.
     detected_dirs = ALL_DIRECTIONS[:actual_cols]
 
-    # Map actual rows → animation names (first N of ALL_ANIMATIONS)
-    detected_anims = ALL_ANIMATIONS[:actual_rows]
+    # Map actual rows → animation names (first N of REAL_ANIMATIONS)
+    detected_anims = REAL_ANIMATIONS[:actual_rows]
 
-    # Phase 1: Extract all actually-present cells
+    # ---- Pass 1: Measure all content bboxes to find uniform scale ----
+    # This ensures the character stays the same size across ALL animation frames.
+    max_content_w = 0
+    max_content_h = 0
+    cell_regions = {}  # (row, col) -> cropped region Image
+
+    for row_idx, anim in enumerate(detected_anims):
+        for col_idx, direction in enumerate(detected_dirs):
+            x, y, w, h = grid[row_idx][col_idx]
+            region = sheet.crop((x, y, x + w, y + h))
+            cell_regions[(row_idx, col_idx)] = region
+
+            if center_content:
+                _, cw, ch = measure_content_bbox(region)
+                if cw > 0 and ch > 0:
+                    max_content_w = max(max_content_w, cw)
+                    max_content_h = max(max_content_h, ch)
+
+    # Compute uniform scale: fit the LARGEST content bbox into target frame
+    uniform_scale = None
+    if center_content and max_content_w > 0 and max_content_h > 0:
+        uniform_scale = min(SPRITE_W / max_content_w, SPRITE_H / max_content_h, 1.0)
+        print(f"    Uniform scale: {uniform_scale:.3f} "
+              f"(max content {max_content_w}x{max_content_h} → "
+              f"{int(max_content_w * uniform_scale)}x{int(max_content_h * uniform_scale)} "
+              f"in {SPRITE_W}x{SPRITE_H})")
+
+    # ---- Pass 2: Extract all actually-present cells ----
     # Store as {anim: {direction: Image}}
     extracted: dict[str, dict[str, Image.Image]] = {}
-    stats = {"total": 0, "empty": 0, "mirrored": 0, "fallback_anim": 0}
+    stats = {"total": 0, "empty": 0, "mirrored": 0}
 
     for row_idx, anim in enumerate(detected_anims):
         extracted[anim] = {}
         for col_idx, direction in enumerate(detected_dirs):
-            x, y, w, h = grid[row_idx][col_idx]
-            region = sheet.crop((x, y, x + w, y + h))
+            region = cell_regions[(row_idx, col_idx)]
 
             frame = extract_sprite_frame(
                 region, SPRITE_W, SPRITE_H,
                 center_content=center_content,
+                uniform_scale=uniform_scale,
             )
 
             # Check if empty
@@ -453,17 +577,10 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                     extracted[anim]["n"] = extracted[anim][fallback]
                     break
 
-    # Phase 3: Fill missing animations via fallbacks
-    for target_anim, source_anim in ANIM_FALLBACKS.items():
-        if target_anim not in extracted:
-            if source_anim in extracted:
-                extracted[target_anim] = dict(extracted[source_anim])
-                stats["fallback_anim"] += 1
-
-    # Phase 4: Save all frames
+    # Phase 3: Save all frames (only the 4 real animations)
     frame_meta = {}
 
-    for anim in ALL_ANIMATIONS:
+    for anim in REAL_ANIMATIONS:
         frame_meta[anim] = {}
         anim_frames = extracted.get(anim, {})
 
@@ -497,8 +614,7 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             stats["total"] += 1
 
     print(f"    Saved {stats['total']} frames "
-          f"({stats['mirrored']} mirrored, {stats['fallback_anim']} fallback anims, "
-          f"{stats['empty']} empty cells)")
+          f"({stats['mirrored']} mirrored, {stats['empty']} empty cells)")
 
     return {"meta": frame_meta, "stats": stats}
 
@@ -513,6 +629,23 @@ def fix_sprites(dry_run: bool = False) -> list:
     for path in sorted(sprite_dir.glob("*-sheet.png")):
         sprite_key = path.stem.replace("-sheet", "")
         print(f"  Re-slicing: {sprite_key}")
+
+        # QA gate: validate sheet before processing
+        validation = validate_sheet(path)
+        if not validation["ok"]:
+            print(f"    VALIDATION FAILED:")
+            for err in validation["errors"]:
+                print(f"      - {err}")
+            results.append({
+                "status": "validation_failed",
+                "file": path.name,
+                "sprite_key": sprite_key,
+                "errors": validation["errors"],
+            })
+            continue
+        else:
+            r, c = validation["grid"]
+            print(f"    Validation OK: {c} cols × {r} rows, {validation['size'][0]}x{validation['size'][1]}")
 
         if dry_run:
             results.append({"status": "audit", "file": path.name})

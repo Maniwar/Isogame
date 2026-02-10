@@ -46,6 +46,7 @@ export class DialogueUI {
     ctx.stroke();
 
     // Portrait (if available for the selected NPC)
+    // Falls back to idle-S animation frame when no dedicated portrait exists
     let textOffsetX = 0;
     if (assets && state.selectedEntity) {
       const portrait = assets.getPortrait(state.selectedEntity.spriteKey);
@@ -54,6 +55,8 @@ export class DialogueUI {
         const px = this.padding;
         const py = panelY + 10;
         // Draw portrait frame
+        ctx.fillStyle = "rgba(30, 30, 22, 0.9)";
+        ctx.fillRect(px - 1, py - 1, pSize + 2, pSize + 2);
         ctx.strokeStyle = "#40c040";
         ctx.lineWidth = 1;
         ctx.strokeRect(px - 1, py - 1, pSize + 2, pSize + 2);

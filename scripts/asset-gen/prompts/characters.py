@@ -2,9 +2,15 @@
 
 Instead of generating one direction at a time, we generate full sprite sheets:
 - One image contains ALL frames for a character
-- Layout: rows = animations (idle, walk_1, walk_2, attack, shoot, reload),
-  columns = 8 directions
-- The post-processor slices this into individual frames for the game engine
+- Layout: 4 rows (animations) × 4 columns (directions) = 16 frames
+- The reprocessor slices this into individual frames and mirrors for 8 directions
+
+Why 4×4 instead of 8×6:
+  The AI consistently produces 4 cols × 4 rows regardless of what we request.
+  Asking for 48 cells (8×6) in 1024×1024 gives ~128×170px per cell — too small
+  for detail. A 4×4 grid gives 256×256 per cell — plenty of room.
+  Missing directions (SE, E, NE) are mirrored from SW, W, NW.
+  The game's AnimationSystem maps shoot→attack and reload→idle at runtime.
 
 Weapon variant system:
 - Each character base can be combined with different weapons
@@ -23,7 +29,10 @@ CHAR_STYLE_PREAMBLE = (
     "NO shadows on the ground, NO text, NO labels. "
 )
 
-# Direction labels for 8-directional sprites (column order in the sheet)
+# The 4 directions we generate (columns). The other 4 are mirrored.
+SHEET_DIRECTIONS = ["S", "SW", "W", "NW"]
+
+# All 8 directions the game engine uses
 DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
 
 DIRECTION_LABELS = {
@@ -37,38 +46,42 @@ DIRECTION_LABELS = {
     "SE": "facing toward the bottom-left (southeast)",
 }
 
-# Animation types (row order in the sheet)
+# The 4 animation rows we generate. The game maps shoot→attack, reload→idle.
+SHEET_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
+
+# Legacy: full 6-animation list (kept for backwards compatibility)
 ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
 
 ANIMATION_LABELS = {
     "idle":    "standing idle, weapon held at ready (lowered or holstered)",
     "walk_1":  "mid-stride walking pose, left foot forward, weapon in hand",
     "walk_2":  "mid-stride walking pose, right foot forward, weapon in hand",
-    "attack":  "melee attack — swinging weapon or punching forward aggressively",
-    "shoot":   "firing ranged weapon — gun raised and aimed, muzzle flash visible",
-    "reload":  "reloading weapon — gun lowered, hands working the action/magazine",
+    "attack":  "attack pose — weapon swung/thrust forward (melee) or raised and aimed (ranged)",
 }
 
-# --- Full sprite sheet prompt (all frames in one image) ---
+# --- Full sprite sheet prompt (4×4 grid) ---
 
 SPRITESHEET_TEMPLATE = (
     "{preamble}"
     "Generate a COMPLETE CHARACTER SPRITE SHEET for: {name} — {description}.\n\n"
-    "LAYOUT: The sprite sheet is a grid with {num_rows} rows and {num_cols} columns.\n"
-    "Each cell is {cell_w}x{cell_h} pixels.\n"
-    "Total image size: {sheet_w}x{sheet_h} pixels.\n\n"
+    "LAYOUT: The sprite sheet is a grid with EXACTLY {num_rows} rows and {num_cols} columns.\n"
+    "The total image is {sheet_size}x{sheet_size} pixels.\n"
+    "Each cell is {cell_size}x{cell_size} pixels ({sheet_size}/{num_cols} = {cell_size}).\n\n"
     "ROWS (top to bottom — each row is one animation pose):\n"
     "{row_descriptions}\n\n"
     "COLUMNS (left to right — each column is one facing direction):\n"
     "{col_descriptions}\n\n"
     "CRITICAL RULES:\n"
+    "- The image MUST be exactly {sheet_size}x{sheet_size} pixels.\n"
+    "- The grid MUST be exactly {num_rows} rows × {num_cols} columns with equal-sized cells.\n"
     "- Every cell must show the SAME character with identical outfit, weapon, proportions, and colors.\n"
-    "- The character MUST be holding their weapon in EVERY frame (idle, walk, attack, shoot, reload).\n"
+    "- The character MUST be holding their weapon in EVERY frame.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
-    "- Keep the character centered in each cell.\n"
-    "- Use a pure bright green (#00FF00) chroma key background in every cell — NO scenery, NO ground shadows.\n"
-    "- No text, no labels, no watermarks, no grid lines.\n"
-    "- The grid should be precise — characters aligned in their cells.\n"
+    "- Keep the character CENTERED in each cell, filling most of the cell.\n"
+    "- Use a pure bright green (#00FF00) chroma key background in every cell.\n"
+    "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks, NO grid lines.\n"
+    "- The walk_1 and walk_2 rows must show DIFFERENT leg positions (alternating stride).\n"
+    "- The attack row must show a clearly different pose with the weapon extended.\n"
     "- If a reference image of this character is provided, match their face, hair, "
     "body type, outfit, and colors EXACTLY — only the weapon changes.\n"
 )
@@ -239,25 +252,24 @@ def build_spritesheet_prompt(
     description: str,
     config: dict,
 ) -> str:
-    """Build a prompt for generating a full character sprite sheet.
+    """Build a prompt for generating a 4×4 character sprite sheet.
 
-    The sheet has 6 rows (idle, walk_1, walk_2, attack, shoot, reload)
-    x 8 columns (directions) = 48 frames.
+    The sheet has 4 rows (idle, walk_1, walk_2, attack)
+    × 4 columns (S, SW, W, NW) = 16 frames.
+    Missing directions (SE, E, NE) are mirrored in post-processing.
     """
-    cell_w = config["sprites"]["base_width"]
-    cell_h = config["sprites"]["base_height"]
-    num_cols = len(DIRECTIONS)
-    num_rows = len(ANIMATIONS)
-    sheet_w = cell_w * num_cols
-    sheet_h = cell_h * num_rows
+    sheet_size = config["sprites"].get("sheet_size", 1024)
+    num_cols = len(SHEET_DIRECTIONS)
+    num_rows = len(SHEET_ANIMATIONS)
+    cell_size = sheet_size // max(num_cols, num_rows)
 
     row_descriptions = "\n".join(
         f"  Row {i + 1}: {ANIMATION_LABELS[anim]}"
-        for i, anim in enumerate(ANIMATIONS)
+        for i, anim in enumerate(SHEET_ANIMATIONS)
     )
     col_descriptions = "\n".join(
         f"  Column {i + 1}: {DIRECTION_LABELS[d]}"
-        for i, d in enumerate(DIRECTIONS)
+        for i, d in enumerate(SHEET_DIRECTIONS)
     )
 
     return SPRITESHEET_TEMPLATE.format(
@@ -266,10 +278,8 @@ def build_spritesheet_prompt(
         description=description,
         num_rows=num_rows,
         num_cols=num_cols,
-        cell_w=cell_w,
-        cell_h=cell_h,
-        sheet_w=sheet_w,
-        sheet_h=sheet_h,
+        cell_size=cell_size,
+        sheet_size=sheet_size,
         row_descriptions=row_descriptions,
         col_descriptions=col_descriptions,
     )

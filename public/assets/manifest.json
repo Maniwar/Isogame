@@ -158,26 +158,6 @@
         "NE": "/assets/sprites/npc_doc-attack-ne.png",
         "E": "/assets/sprites/npc_doc-attack-e.png",
         "SE": "/assets/sprites/npc_doc-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/npc_doc-shoot-s.png",
-        "SW": "/assets/sprites/npc_doc-shoot-sw.png",
-        "W": "/assets/sprites/npc_doc-shoot-w.png",
-        "NW": "/assets/sprites/npc_doc-shoot-nw.png",
-        "N": "/assets/sprites/npc_doc-shoot-n.png",
-        "NE": "/assets/sprites/npc_doc-shoot-ne.png",
-        "E": "/assets/sprites/npc_doc-shoot-e.png",
-        "SE": "/assets/sprites/npc_doc-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/npc_doc-reload-s.png",
-        "SW": "/assets/sprites/npc_doc-reload-sw.png",
-        "W": "/assets/sprites/npc_doc-reload-w.png",
-        "NW": "/assets/sprites/npc_doc-reload-nw.png",
-        "N": "/assets/sprites/npc_doc-reload-n.png",
-        "NE": "/assets/sprites/npc_doc-reload-ne.png",
-        "E": "/assets/sprites/npc_doc-reload-e.png",
-        "SE": "/assets/sprites/npc_doc-reload-se.png"
       }
     },
     "npc_merchant": {
@@ -220,26 +200,6 @@
         "NE": "/assets/sprites/npc_merchant-attack-ne.png",
         "E": "/assets/sprites/npc_merchant-attack-e.png",
         "SE": "/assets/sprites/npc_merchant-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/npc_merchant-shoot-s.png",
-        "SW": "/assets/sprites/npc_merchant-shoot-sw.png",
-        "W": "/assets/sprites/npc_merchant-shoot-w.png",
-        "NW": "/assets/sprites/npc_merchant-shoot-nw.png",
-        "N": "/assets/sprites/npc_merchant-shoot-n.png",
-        "NE": "/assets/sprites/npc_merchant-shoot-ne.png",
-        "E": "/assets/sprites/npc_merchant-shoot-e.png",
-        "SE": "/assets/sprites/npc_merchant-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/npc_merchant-reload-s.png",
-        "SW": "/assets/sprites/npc_merchant-reload-sw.png",
-        "W": "/assets/sprites/npc_merchant-reload-w.png",
-        "NW": "/assets/sprites/npc_merchant-reload-nw.png",
-        "N": "/assets/sprites/npc_merchant-reload-n.png",
-        "NE": "/assets/sprites/npc_merchant-reload-ne.png",
-        "E": "/assets/sprites/npc_merchant-reload-e.png",
-        "SE": "/assets/sprites/npc_merchant-reload-se.png"
       }
     },
     "npc_raider": {
@@ -282,26 +242,6 @@
         "NE": "/assets/sprites/npc_raider-attack-ne.png",
         "E": "/assets/sprites/npc_raider-attack-e.png",
         "SE": "/assets/sprites/npc_raider-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/npc_raider-shoot-s.png",
-        "SW": "/assets/sprites/npc_raider-shoot-sw.png",
-        "W": "/assets/sprites/npc_raider-shoot-w.png",
-        "NW": "/assets/sprites/npc_raider-shoot-nw.png",
-        "N": "/assets/sprites/npc_raider-shoot-n.png",
-        "NE": "/assets/sprites/npc_raider-shoot-ne.png",
-        "E": "/assets/sprites/npc_raider-shoot-e.png",
-        "SE": "/assets/sprites/npc_raider-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/npc_raider-reload-s.png",
-        "SW": "/assets/sprites/npc_raider-reload-sw.png",
-        "W": "/assets/sprites/npc_raider-reload-w.png",
-        "NW": "/assets/sprites/npc_raider-reload-nw.png",
-        "N": "/assets/sprites/npc_raider-reload-n.png",
-        "NE": "/assets/sprites/npc_raider-reload-ne.png",
-        "E": "/assets/sprites/npc_raider-reload-e.png",
-        "SE": "/assets/sprites/npc_raider-reload-se.png"
       }
     },
     "npc_sheriff": {
@@ -344,26 +284,6 @@
         "NE": "/assets/sprites/npc_sheriff-attack-ne.png",
         "E": "/assets/sprites/npc_sheriff-attack-e.png",
         "SE": "/assets/sprites/npc_sheriff-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/npc_sheriff-shoot-s.png",
-        "SW": "/assets/sprites/npc_sheriff-shoot-sw.png",
-        "W": "/assets/sprites/npc_sheriff-shoot-w.png",
-        "NW": "/assets/sprites/npc_sheriff-shoot-nw.png",
-        "N": "/assets/sprites/npc_sheriff-shoot-n.png",
-        "NE": "/assets/sprites/npc_sheriff-shoot-ne.png",
-        "E": "/assets/sprites/npc_sheriff-shoot-e.png",
-        "SE": "/assets/sprites/npc_sheriff-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/npc_sheriff-reload-s.png",
-        "SW": "/assets/sprites/npc_sheriff-reload-sw.png",
-        "W": "/assets/sprites/npc_sheriff-reload-w.png",
-        "NW": "/assets/sprites/npc_sheriff-reload-nw.png",
-        "N": "/assets/sprites/npc_sheriff-reload-n.png",
-        "NE": "/assets/sprites/npc_sheriff-reload-ne.png",
-        "E": "/assets/sprites/npc_sheriff-reload-e.png",
-        "SE": "/assets/sprites/npc_sheriff-reload-se.png"
       }
     },
     "player": {
@@ -406,26 +326,6 @@
         "NE": "/assets/sprites/player-attack-ne.png",
         "E": "/assets/sprites/player-attack-e.png",
         "SE": "/assets/sprites/player-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player-shoot-s.png",
-        "SW": "/assets/sprites/player-shoot-sw.png",
-        "W": "/assets/sprites/player-shoot-w.png",
-        "NW": "/assets/sprites/player-shoot-nw.png",
-        "N": "/assets/sprites/player-shoot-n.png",
-        "NE": "/assets/sprites/player-shoot-ne.png",
-        "E": "/assets/sprites/player-shoot-e.png",
-        "SE": "/assets/sprites/player-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player-reload-s.png",
-        "SW": "/assets/sprites/player-reload-sw.png",
-        "W": "/assets/sprites/player-reload-w.png",
-        "NW": "/assets/sprites/player-reload-nw.png",
-        "N": "/assets/sprites/player-reload-n.png",
-        "NE": "/assets/sprites/player-reload-ne.png",
-        "E": "/assets/sprites/player-reload-e.png",
-        "SE": "/assets/sprites/player-reload-se.png"
       }
     },
     "player_bat": {
@@ -468,26 +368,6 @@
         "NE": "/assets/sprites/player_bat-attack-ne.png",
         "E": "/assets/sprites/player_bat-attack-e.png",
         "SE": "/assets/sprites/player_bat-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player_bat-shoot-s.png",
-        "SW": "/assets/sprites/player_bat-shoot-sw.png",
-        "W": "/assets/sprites/player_bat-shoot-w.png",
-        "NW": "/assets/sprites/player_bat-shoot-nw.png",
-        "N": "/assets/sprites/player_bat-shoot-n.png",
-        "NE": "/assets/sprites/player_bat-shoot-ne.png",
-        "E": "/assets/sprites/player_bat-shoot-e.png",
-        "SE": "/assets/sprites/player_bat-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player_bat-reload-s.png",
-        "SW": "/assets/sprites/player_bat-reload-sw.png",
-        "W": "/assets/sprites/player_bat-reload-w.png",
-        "NW": "/assets/sprites/player_bat-reload-nw.png",
-        "N": "/assets/sprites/player_bat-reload-n.png",
-        "NE": "/assets/sprites/player_bat-reload-ne.png",
-        "E": "/assets/sprites/player_bat-reload-e.png",
-        "SE": "/assets/sprites/player_bat-reload-se.png"
       }
     },
     "player_knife": {
@@ -530,26 +410,6 @@
         "NE": "/assets/sprites/player_knife-attack-ne.png",
         "E": "/assets/sprites/player_knife-attack-e.png",
         "SE": "/assets/sprites/player_knife-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player_knife-shoot-s.png",
-        "SW": "/assets/sprites/player_knife-shoot-sw.png",
-        "W": "/assets/sprites/player_knife-shoot-w.png",
-        "NW": "/assets/sprites/player_knife-shoot-nw.png",
-        "N": "/assets/sprites/player_knife-shoot-n.png",
-        "NE": "/assets/sprites/player_knife-shoot-ne.png",
-        "E": "/assets/sprites/player_knife-shoot-e.png",
-        "SE": "/assets/sprites/player_knife-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player_knife-reload-s.png",
-        "SW": "/assets/sprites/player_knife-reload-sw.png",
-        "W": "/assets/sprites/player_knife-reload-w.png",
-        "NW": "/assets/sprites/player_knife-reload-nw.png",
-        "N": "/assets/sprites/player_knife-reload-n.png",
-        "NE": "/assets/sprites/player_knife-reload-ne.png",
-        "E": "/assets/sprites/player_knife-reload-e.png",
-        "SE": "/assets/sprites/player_knife-reload-se.png"
       }
     },
     "player_pistol": {
@@ -592,26 +452,6 @@
         "NE": "/assets/sprites/player_pistol-attack-ne.png",
         "E": "/assets/sprites/player_pistol-attack-e.png",
         "SE": "/assets/sprites/player_pistol-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player_pistol-shoot-s.png",
-        "SW": "/assets/sprites/player_pistol-shoot-sw.png",
-        "W": "/assets/sprites/player_pistol-shoot-w.png",
-        "NW": "/assets/sprites/player_pistol-shoot-nw.png",
-        "N": "/assets/sprites/player_pistol-shoot-n.png",
-        "NE": "/assets/sprites/player_pistol-shoot-ne.png",
-        "E": "/assets/sprites/player_pistol-shoot-e.png",
-        "SE": "/assets/sprites/player_pistol-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player_pistol-reload-s.png",
-        "SW": "/assets/sprites/player_pistol-reload-sw.png",
-        "W": "/assets/sprites/player_pistol-reload-w.png",
-        "NW": "/assets/sprites/player_pistol-reload-nw.png",
-        "N": "/assets/sprites/player_pistol-reload-n.png",
-        "NE": "/assets/sprites/player_pistol-reload-ne.png",
-        "E": "/assets/sprites/player_pistol-reload-e.png",
-        "SE": "/assets/sprites/player_pistol-reload-se.png"
       }
     },
     "player_rifle": {
@@ -654,26 +494,6 @@
         "NE": "/assets/sprites/player_rifle-attack-ne.png",
         "E": "/assets/sprites/player_rifle-attack-e.png",
         "SE": "/assets/sprites/player_rifle-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player_rifle-shoot-s.png",
-        "SW": "/assets/sprites/player_rifle-shoot-sw.png",
-        "W": "/assets/sprites/player_rifle-shoot-w.png",
-        "NW": "/assets/sprites/player_rifle-shoot-nw.png",
-        "N": "/assets/sprites/player_rifle-shoot-n.png",
-        "NE": "/assets/sprites/player_rifle-shoot-ne.png",
-        "E": "/assets/sprites/player_rifle-shoot-e.png",
-        "SE": "/assets/sprites/player_rifle-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player_rifle-reload-s.png",
-        "SW": "/assets/sprites/player_rifle-reload-sw.png",
-        "W": "/assets/sprites/player_rifle-reload-w.png",
-        "NW": "/assets/sprites/player_rifle-reload-nw.png",
-        "N": "/assets/sprites/player_rifle-reload-n.png",
-        "NE": "/assets/sprites/player_rifle-reload-ne.png",
-        "E": "/assets/sprites/player_rifle-reload-e.png",
-        "SE": "/assets/sprites/player_rifle-reload-se.png"
       }
     },
     "player_unarmed": {
@@ -716,26 +536,6 @@
         "NE": "/assets/sprites/player_unarmed-attack-ne.png",
         "E": "/assets/sprites/player_unarmed-attack-e.png",
         "SE": "/assets/sprites/player_unarmed-attack-se.png"
-      },
-      "shoot": {
-        "S": "/assets/sprites/player_unarmed-shoot-s.png",
-        "SW": "/assets/sprites/player_unarmed-shoot-sw.png",
-        "W": "/assets/sprites/player_unarmed-shoot-w.png",
-        "NW": "/assets/sprites/player_unarmed-shoot-nw.png",
-        "N": "/assets/sprites/player_unarmed-shoot-n.png",
-        "NE": "/assets/sprites/player_unarmed-shoot-ne.png",
-        "E": "/assets/sprites/player_unarmed-shoot-e.png",
-        "SE": "/assets/sprites/player_unarmed-shoot-se.png"
-      },
-      "reload": {
-        "S": "/assets/sprites/player_unarmed-reload-s.png",
-        "SW": "/assets/sprites/player_unarmed-reload-sw.png",
-        "W": "/assets/sprites/player_unarmed-reload-w.png",
-        "NW": "/assets/sprites/player_unarmed-reload-nw.png",
-        "N": "/assets/sprites/player_unarmed-reload-n.png",
-        "NE": "/assets/sprites/player_unarmed-reload-ne.png",
-        "E": "/assets/sprites/player_unarmed-reload-e.png",
-        "SE": "/assets/sprites/player_unarmed-reload-se.png"
       }
     }
   },

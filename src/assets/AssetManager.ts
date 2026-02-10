@@ -199,8 +199,11 @@ export class AssetManager {
     return this.items.get(key);
   }
 
-  getPortrait(key: string): HTMLImageElement | undefined {
-    return this.portraits.get(key);
+  getPortrait(key: string): DrawTarget | undefined {
+    // Try dedicated portrait first, then fall back to idle-S sprite frame
+    const portrait = this.portraits.get(key);
+    if (portrait) return portrait;
+    return this.getAnimFrame(key, "idle", "S");
   }
 
   // -----------------------------------------------------------------------
