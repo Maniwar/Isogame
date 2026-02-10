@@ -322,8 +322,31 @@ def detect_grid_auto(sheet: Image.Image) -> tuple:
     return cells, actual_rows, actual_cols
 
 
+def measure_content_bbox(region: Image.Image) -> tuple:
+    """Remove green bg from a cell and return (cleaned_image, content_w, content_h).
+
+    Returns (None, 0, 0) if the cell is empty after green removal.
+    """
+    clean = remove_green_bg(region)
+    arr = np.array(clean)
+    alpha = arr[:, :, 3]
+    mask = alpha > 10
+    if not mask.any():
+        return None, 0, 0
+
+    rows_any = np.any(mask, axis=1)
+    cols_any = np.any(mask, axis=0)
+    top = int(np.argmax(rows_any))
+    bottom = int(len(rows_any) - np.argmax(rows_any[::-1]))
+    left = int(np.argmax(cols_any))
+    right = int(len(cols_any) - np.argmax(cols_any[::-1]))
+
+    return clean, right - left, bottom - top
+
+
 def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
-                         center_content: bool = True) -> Image.Image:
+                         center_content: bool = True,
+                         uniform_scale: float | None = None) -> Image.Image:
     """Extract a sprite frame from a grid cell region.
 
     Args:
@@ -331,6 +354,9 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         target_w, target_h: Output dimensions
         center_content: If True, center on content bbox. If False, scale
                        uniformly preserving position (for weapon overlays).
+        uniform_scale: If provided, use this scale factor for ALL frames of a
+                      character instead of computing per-frame. This ensures
+                      the character stays the same size across animation frames.
     """
     # Remove green bg from this cell
     clean = remove_green_bg(region)
@@ -350,15 +376,25 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
     right = int(len(cols_any) - np.argmax(cols_any[::-1]))
 
     if center_content:
-        # Crop to content, scale to fit target, center
+        # Crop to content, scale to fit target, bottom-center anchor
         content = clean.crop((left, top, right, bottom))
         cw, ch = content.size
-        if cw > target_w or ch > target_h:
-            scale = min(target_w / cw, target_h / ch)
+
+        if uniform_scale is not None:
+            # Use the pre-computed uniform scale for consistent character sizing
+            scale = uniform_scale
+        else:
+            # Legacy per-frame scaling (only used if uniform_scale not provided)
+            scale = min(target_w / cw, target_h / ch, 1.0)
+
+        new_w = max(1, int(cw * scale))
+        new_h = max(1, int(ch * scale))
+        if (new_w, new_h) != (cw, ch):
             content = content.resize(
-                (max(1, int(cw * scale)), max(1, int(ch * scale))),
+                (new_w, new_h),
                 Image.Resampling.LANCZOS,
             )
+
         cw, ch = content.size
         canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
         # Anchor to bottom-center (feet on ground)
@@ -390,9 +426,10 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     The AI typically generates 4-6 columns (directions) × 4 rows (animations)
     instead of the requested 8×6.  This function:
       1. Auto-detects the actual grid layout
-      2. Extracts the cells that exist
-      3. Mirrors missing directions (SW→SE, W→E, NW→NE)
-      4. Falls back for missing animations (shoot→attack, reload→idle)
+      2. Measures all content bboxes to compute uniform scale
+      3. Extracts all cells with consistent sizing
+      4. Mirrors missing directions (SW→SE, W→E, NW→NE)
+      5. Falls back for missing animations (shoot→attack, reload→idle)
 
     Returns frame metadata dict for manifest.
     """
@@ -410,7 +447,34 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     # Map actual rows → animation names (first N of ALL_ANIMATIONS)
     detected_anims = ALL_ANIMATIONS[:actual_rows]
 
-    # Phase 1: Extract all actually-present cells
+    # ---- Pass 1: Measure all content bboxes to find uniform scale ----
+    # This ensures the character stays the same size across ALL animation frames.
+    max_content_w = 0
+    max_content_h = 0
+    cell_regions = {}  # (row, col) -> cropped region Image
+
+    for row_idx, anim in enumerate(detected_anims):
+        for col_idx, direction in enumerate(detected_dirs):
+            x, y, w, h = grid[row_idx][col_idx]
+            region = sheet.crop((x, y, x + w, y + h))
+            cell_regions[(row_idx, col_idx)] = region
+
+            if center_content:
+                _, cw, ch = measure_content_bbox(region)
+                if cw > 0 and ch > 0:
+                    max_content_w = max(max_content_w, cw)
+                    max_content_h = max(max_content_h, ch)
+
+    # Compute uniform scale: fit the LARGEST content bbox into target frame
+    uniform_scale = None
+    if center_content and max_content_w > 0 and max_content_h > 0:
+        uniform_scale = min(SPRITE_W / max_content_w, SPRITE_H / max_content_h, 1.0)
+        print(f"    Uniform scale: {uniform_scale:.3f} "
+              f"(max content {max_content_w}x{max_content_h} → "
+              f"{int(max_content_w * uniform_scale)}x{int(max_content_h * uniform_scale)} "
+              f"in {SPRITE_W}x{SPRITE_H})")
+
+    # ---- Pass 2: Extract all actually-present cells ----
     # Store as {anim: {direction: Image}}
     extracted: dict[str, dict[str, Image.Image]] = {}
     stats = {"total": 0, "empty": 0, "mirrored": 0, "fallback_anim": 0}
@@ -418,12 +482,12 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     for row_idx, anim in enumerate(detected_anims):
         extracted[anim] = {}
         for col_idx, direction in enumerate(detected_dirs):
-            x, y, w, h = grid[row_idx][col_idx]
-            region = sheet.crop((x, y, x + w, y + h))
+            region = cell_regions[(row_idx, col_idx)]
 
             frame = extract_sprite_frame(
                 region, SPRITE_W, SPRITE_H,
                 center_content=center_content,
+                uniform_scale=uniform_scale,
             )
 
             # Check if empty
