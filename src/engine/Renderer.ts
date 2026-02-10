@@ -13,14 +13,6 @@ import {
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
 
-/** Maps item IDs to weapon sprite keys used in the asset manifest */
-const WEAPON_SPRITE_MAP: Record<string, string> = {
-  "10mm_pistol": "weapon_pistol",
-  "pipe_rifle": "weapon_rifle",
-  "combat_knife": "weapon_knife",
-  "baseball_bat": "weapon_bat",
-};
-
 /**
  * Attack lean offsets per direction (pixels).
  * Shifts the sprite slightly forward during the attack animation
@@ -283,10 +275,10 @@ export class Renderer {
       bobY = Math.sin(phase) * -2;
     }
 
-    // Attack lean: slight forward shift during attack
+    // Attack/shoot lean: slight forward shift during attack or shooting
     let attackOffsetX = 0;
     let attackOffsetY = 0;
-    if (entity.anim.current === "attack") {
+    if (entity.anim.current === "attack" || entity.anim.current === "shoot") {
       const dirOff = ATTACK_LEAN[entity.direction];
       if (dirOff) {
         const progress = Math.min(1, entity.anim.elapsed / 200);
@@ -307,23 +299,8 @@ export class Renderer {
       ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
     }
 
-    // Weapon overlay: same 64x96 coordinate space as character sprites.
-    // Draw at identical position and scale so they naturally align.
-    const equippedItem = entity.inventory.find((i) => i.equipped);
-    if (equippedItem) {
-      const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
-      if (weaponSpriteKey) {
-        const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
-        if (weaponSprite) {
-          const ww = Math.round(weaponSprite.width * SPRITE_SCALE);
-          const wh = Math.round(weaponSprite.height * SPRITE_SCALE);
-          // Same position as character — weapon sprite is pre-aligned
-          const weaponLeft = finalDrawX - ww / 2;
-          const weaponTop = finalDrawY - wh + TILE_HALF_H;
-          ctx.drawImage(weaponSprite, weaponLeft, weaponTop, ww, wh);
-        }
-      }
-    }
+    // Characters are generated with weapons built into their sprite sheets.
+    // See scripts/asset-gen/prompts/characters.py for the generation prompts.
 
     // Draw name tag — position above sprite top
     const labelY = spriteTop - 4;

@@ -18,6 +18,12 @@ const WALK_FRAMES = ["walk_1", "walk_2"];
 /** How long attack pose is held before returning to idle (ms) */
 const ATTACK_HOLD_MS = 600;
 
+/** How long the shoot pose is held (ms) */
+const SHOOT_HOLD_MS = 400;
+
+/** How long the reload animation plays (ms) */
+const RELOAD_HOLD_MS = 1000;
+
 export class AnimationSystem {
   /**
    * Update animation state for all entities each frame.
@@ -67,6 +73,24 @@ export class AnimationSystem {
           anim.elapsed = 0;
         }
         break;
+
+      case "shoot":
+        // Hold shoot frame, then auto-return to idle
+        if (anim.elapsed >= SHOOT_HOLD_MS) {
+          anim.current = "idle";
+          anim.frame = 0;
+          anim.elapsed = 0;
+        }
+        break;
+
+      case "reload":
+        // Hold reload animation, then auto-return to idle
+        if (anim.elapsed >= RELOAD_HOLD_MS) {
+          anim.current = "idle";
+          anim.frame = 0;
+          anim.elapsed = 0;
+        }
+        break;
     }
   }
 
@@ -76,20 +100,41 @@ export class AnimationSystem {
       return "walk";
     }
 
-    // If currently in attack animation, let it finish
-    if (entity.anim.current === "attack") {
-      return "attack";
+    // If currently in attack/shoot/reload animation, let it finish
+    if (entity.anim.current === "attack" ||
+        entity.anim.current === "shoot" ||
+        entity.anim.current === "reload") {
+      return entity.anim.current;
     }
 
     return "idle";
   }
 
   /**
-   * Trigger an attack animation on an entity.
-   * Call this from CombatSystem when an entity attacks.
+   * Trigger a melee attack animation on an entity.
+   * Call this from CombatSystem when an entity does a melee attack.
    */
   triggerAttack(entity: Entity) {
     entity.anim.current = "attack";
+    entity.anim.frame = 0;
+    entity.anim.elapsed = 0;
+  }
+
+  /**
+   * Trigger a shooting animation on an entity.
+   * Call this from CombatSystem when an entity fires a ranged weapon.
+   */
+  triggerShoot(entity: Entity) {
+    entity.anim.current = "shoot";
+    entity.anim.frame = 0;
+    entity.anim.elapsed = 0;
+  }
+
+  /**
+   * Trigger a reload animation on an entity.
+   */
+  triggerReload(entity: Entity) {
+    entity.anim.current = "reload";
     entity.anim.frame = 0;
     entity.anim.elapsed = 0;
   }
@@ -107,6 +152,10 @@ export class AnimationSystem {
         return WALK_FRAMES[anim.frame] ?? "walk_1";
       case "attack":
         return "attack";
+      case "shoot":
+        return "shoot";
+      case "reload":
+        return "reload";
       case "idle":
       default:
         return "idle";

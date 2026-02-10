@@ -32,13 +32,15 @@ DIRECTION_LABELS = {
 }
 
 # Animation types (row order in the sheet)
-ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
+ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
 
 ANIMATION_LABELS = {
-    "idle":    "standing idle, relaxed posture",
-    "walk_1":  "mid-stride walking pose, left foot forward",
-    "walk_2":  "mid-stride walking pose, right foot forward",
-    "attack":  "attacking / swinging weapon forward aggressively",
+    "idle":    "standing idle, weapon held at ready (lowered or holstered)",
+    "walk_1":  "mid-stride walking pose, left foot forward, weapon in hand",
+    "walk_2":  "mid-stride walking pose, right foot forward, weapon in hand",
+    "attack":  "melee attack — swinging weapon or punching forward aggressively",
+    "shoot":   "firing ranged weapon — gun raised and aimed, muzzle flash visible",
+    "reload":  "reloading weapon — gun lowered, hands working the action/magazine",
 }
 
 # --- Full sprite sheet prompt (all frames in one image) ---
@@ -54,11 +56,11 @@ SPRITESHEET_TEMPLATE = (
     "COLUMNS (left to right — each column is one facing direction):\n"
     "{col_descriptions}\n\n"
     "CRITICAL RULES:\n"
-    "- Every cell must show the SAME character with identical outfit, weapons, proportions, and colors.\n"
+    "- Every cell must show the SAME character with identical outfit, weapon, proportions, and colors.\n"
+    "- The character MUST be holding their weapon in EVERY frame (idle, walk, attack, shoot, reload).\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
     "- Keep the character centered in each cell.\n"
     "- Use a pure bright green (#00FF00) chroma key background in every cell — NO scenery, NO ground shadows.\n"
-    "- Characters should have EMPTY HANDS — no weapons (weapons are rendered separately).\n"
     "- No text, no labels, no watermarks, no grid lines.\n"
     "- The grid should be precise — characters aligned in their cells.\n"
 )
@@ -89,61 +91,62 @@ REFERENCE_FOLLOW_UP = (
 
 
 # Character archetypes — sprite_key must match the game's entity spriteKey values
-# Characters are generated UNARMED — weapons are separate overlays
+# Characters are generated WITH their signature weapon in every frame
 CHARACTER_ARCHETYPES = [
     {
         "sprite_key": "player",
-        "name": "Wanderer",
+        "name": "Wanderer (10mm Pistol)",
         "description": (
             "A rugged wasteland survivor wearing patched leather armor and "
             "a dusty duster coat. Green-tinted goggles on forehead. "
-            "Empty hands at sides, relaxed but alert stance. "
+            "Holding a 10mm semi-automatic pistol in the right hand. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing idle, hands empty at sides",
+        "pose": "standing idle, pistol held low at side",
     },
     {
         "sprite_key": "npc_sheriff",
-        "name": "Sheriff Morgan",
+        "name": "Sheriff Morgan (Revolver)",
         "description": (
             "A grizzled older woman with short gray hair, a sheriff's star pinned "
             "to a leather duster, a scar across her left cheek. "
-            "Hands on belt, no weapon drawn. Sturdy boots. "
+            "Holding a revolver in the right hand. Sturdy boots. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing alert, hands on belt",
+        "pose": "standing alert, revolver held at side",
     },
     {
         "sprite_key": "npc_merchant",
-        "name": "Scrapper Joe",
+        "name": "Scrapper Joe (Shotgun)",
         "description": (
             "A traveling merchant wearing a wide-brimmed hat, heavy backpack "
             "full of goods, and a worn outfit. Belts with pouches and trinkets. "
-            "Hands empty, friendly open posture. "
+            "Carrying a sawed-off shotgun in one hand. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing idle, friendly posture",
+        "pose": "standing idle, shotgun held low",
     },
     {
         "sprite_key": "npc_doc",
-        "name": "Doc Hendricks",
+        "name": "Doc Hendricks (Medical Bag)",
         "description": (
             "A middle-aged man with round glasses, thinning hair, a stained lab coat "
-            "over a sweater vest. Carrying a medical bag in one hand. "
-            "No weapons. Full body visible from head to shoes."
+            "over a sweater vest. Carrying a medical bag in one hand, "
+            "a small derringer pistol visible in belt holster. "
+            "Full body visible from head to shoes."
         ),
         "pose": "standing idle, holding medical bag",
     },
     {
         "sprite_key": "npc_raider",
-        "name": "Raider",
+        "name": "Raider (Pipe Rifle)",
         "description": (
             "An aggressive raider with spiked shoulder pads, torn clothing, "
             "face paint, and a mohawk. Red cloth armband. "
-            "Empty hands, fists clenched, menacing stance. "
+            "Holding a crude pipe rifle in both hands. "
             "Full body visible from head to boots."
         ),
-        "pose": "standing menacing, fists clenched",
+        "pose": "standing menacing, pipe rifle held across chest",
     },
 ]
 

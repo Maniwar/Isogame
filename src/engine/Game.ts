@@ -511,7 +511,11 @@ export class Game {
   private executePlayerAttack(player: Entity, target: Entity, bodyPart: BodyPart) {
     const { state } = this;
 
-    this.animationSystem.triggerAttack(player);
+    if (this.combatSystem.isRangedWeapon(player)) {
+      this.animationSystem.triggerShoot(player);
+    } else {
+      this.animationSystem.triggerAttack(player);
+    }
     const result = this.combatSystem.attack(state, player, target, bodyPart);
     this.spawnAttackVFX(player, target, result);
     this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
@@ -575,7 +579,11 @@ export class Game {
     if (didAct) {
       const dmg = playerHpBefore - state.player.stats.hp;
       if (dmg > 0) {
-        this.animationSystem.triggerAttack(npc);
+        if (this.combatSystem.isRangedWeapon(npc)) {
+          this.animationSystem.triggerShoot(npc);
+        } else {
+          this.animationSystem.triggerAttack(npc);
+        }
         const lastLog = state.combatLog[state.combatLog.length - 1];
         const isCrit = lastLog?.text.includes("CRITICAL") ?? false;
         this.spawnAttackVFX(npc, state.player, {
