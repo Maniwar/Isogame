@@ -22,21 +22,6 @@ const WEAPON_SPRITE_MAP: Record<string, string> = {
 };
 
 /**
- * Hand offsets per direction, as fraction of sprite width/height.
- * [xFrac, yFrac] — positive x = right of center, yFrac from sprite top.
- */
-const HAND_OFFSET: Record<string, [number, number]> = {
-  S:  [ 0.20, 0.55],
-  N:  [-0.20, 0.55],
-  E:  [ 0.35, 0.50],
-  W:  [-0.35, 0.50],
-  SE: [ 0.30, 0.52],
-  SW: [-0.30, 0.52],
-  NE: [ 0.30, 0.52],
-  NW: [-0.30, 0.52],
-};
-
-/**
  * Attack lean offsets per direction (pixels).
  * Shifts the sprite slightly forward during the attack animation
  * to make the action more visible.
@@ -281,28 +266,24 @@ export class Renderer {
     const frameKey = AnimationSystem.getFrameKey(entity);
     const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
 
-    // Scale AI sprites to fit the isometric tile grid.
-    // Characters should be roughly half a tile wide and 1.5 tiles tall.
-    const MAX_W = 32;
-    const MAX_H = 56;
-    let sw = sprite ? sprite.width : 24;
-    let sh = sprite ? sprite.height : 36;
-    if (sw > MAX_W || sh > MAX_H) {
-      const scale = Math.min(MAX_W / sw, MAX_H / sh);
-      sw = Math.round(sw * scale);
-      sh = Math.round(sh * scale);
-    }
+    // Scale sprite to fit the isometric grid.
+    // AI sprites are 64x96, procedural are 24x36.  Both use the same
+    // uniform scale so that relative proportions stay consistent.
+    // Target: roughly half a tile wide (32px) and 1.5 tiles tall (48px).
+    const SPRITE_SCALE = 0.5;
+    const srcW = sprite ? sprite.width : 24;
+    const srcH = sprite ? sprite.height : 36;
+    const sw = Math.round(srcW * SPRITE_SCALE);
+    const sh = Math.round(srcH * SPRITE_SCALE);
 
-    // Walking bob: add a subtle vertical bounce during walk animation
-    // to reinforce movement even when walk frames are similar.
+    // Walking bob: subtle vertical bounce to reinforce movement
     let bobY = 0;
     if (entity.anim.current === "walk") {
-      // Sinusoidal bob based on walk elapsed time (period = anim speed)
       const phase = (entity.anim.elapsed / entity.anim.speed) * Math.PI * 2;
-      bobY = Math.sin(phase) * -2;  // ±2px vertical bounce
+      bobY = Math.sin(phase) * -2;
     }
 
-    // Attack lean: slight forward shift during attack animation
+    // Attack lean: slight forward shift during attack
     let attackOffsetX = 0;
     let attackOffsetY = 0;
     if (entity.anim.current === "attack") {
@@ -318,40 +299,34 @@ export class Renderer {
     const finalDrawX = drawX + attackOffsetX;
     const finalDrawY = drawY + bobY + attackOffsetY;
 
+    // Position: centered horizontally, feet at tile center
+    const spriteLeft = finalDrawX - sw / 2;
+    const spriteTop = finalDrawY - sh + TILE_HALF_H;
+
     if (sprite) {
-      ctx.drawImage(sprite, finalDrawX - sw / 2, finalDrawY - sh + TILE_HALF_H, sw, sh);
+      ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
     }
 
-    // Draw weapon overlay — weapon sprites share the same frame format
-    // as characters, so they're scaled proportionally and positioned
-    // at the hand area relative to the character sprite.
+    // Weapon overlay: same 64x96 coordinate space as character sprites.
+    // Draw at identical position and scale so they naturally align.
     const equippedItem = entity.inventory.find((i) => i.equipped);
     if (equippedItem) {
       const weaponSpriteKey = WEAPON_SPRITE_MAP[equippedItem.itemId];
       if (weaponSpriteKey) {
         const weaponSprite = assets.getWeaponFrame(weaponSpriteKey, frameKey, entity.direction);
         if (weaponSprite) {
-          // Scale weapon proportionally — roughly 60% of character dimensions
-          let ww = weaponSprite.width;
-          let wh = weaponSprite.height;
-          const maxWW = Math.round(sw * 0.65);
-          const maxWH = Math.round(sh * 0.45);
-          if (ww > maxWW || wh > maxWH) {
-            const wScale = Math.min(maxWW / ww, maxWH / wh);
-            ww = Math.round(ww * wScale);
-            wh = Math.round(wh * wScale);
-          }
-          const [xFrac, yFrac] = HAND_OFFSET[entity.direction] ?? [0.2, 0.55];
-          const spriteTop = finalDrawY - sh + TILE_HALF_H;
-          const handX = finalDrawX + sw * xFrac;
-          const handY = spriteTop + sh * yFrac;
-          ctx.drawImage(weaponSprite, handX - ww / 2, handY - wh / 2, ww, wh);
+          const ww = Math.round(weaponSprite.width * SPRITE_SCALE);
+          const wh = Math.round(weaponSprite.height * SPRITE_SCALE);
+          // Same position as character — weapon sprite is pre-aligned
+          const weaponLeft = finalDrawX - ww / 2;
+          const weaponTop = finalDrawY - wh + TILE_HALF_H;
+          ctx.drawImage(weaponSprite, weaponLeft, weaponTop, ww, wh);
         }
       }
     }
 
     // Draw name tag — position above sprite top
-    const labelY = finalDrawY - sh + TILE_HALF_H - 4;
+    const labelY = spriteTop - 4;
     ctx.fillStyle = entity.isPlayer
       ? "#40c040"
       : entity.isHostile
