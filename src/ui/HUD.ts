@@ -46,7 +46,7 @@ export class HUD {
         y: bottomY - (bh + gap) * 2,
         w: bw, h: bh,
         color: "#40c040",
-        phases: ["explore", "inventory"],
+        phases: ["explore", "inventory", "combat"],
       },
       {
         label: "FIGHT",

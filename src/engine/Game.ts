@@ -123,6 +123,7 @@ export class Game {
       combatTurnDelay: 0,
       lootTarget: null,
       bodyPartPanelOpen: false,
+      showInventory: false,
     };
 
     this.camera.centerOn(player.pos);
@@ -170,6 +171,9 @@ export class Game {
     if (input.pressed("Tab")) {
       if (state.lootTarget) {
         state.lootTarget = null;
+      } else if (state.phase === "combat" || state.phase === "dialogue") {
+        // Overlay inventory without leaving current phase
+        state.showInventory = !state.showInventory;
       } else {
         this.togglePhase("inventory");
       }
@@ -178,7 +182,9 @@ export class Game {
       this.togglePhase("combat");
     }
     if (input.pressed("Escape")) {
-      if (state.lootTarget) {
+      if (state.showInventory) {
+        state.showInventory = false;
+      } else if (state.lootTarget) {
         state.lootTarget = null;
       } else if (state.bodyPartPanelOpen) {
         state.bodyPartPanelOpen = false;
@@ -780,7 +786,7 @@ export class Game {
     if (this.state.phase === "dialogue") {
       this.dialogueUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this, this.assets);
     }
-    if (this.state.phase === "inventory") {
+    if (this.state.phase === "inventory" || this.state.showInventory) {
       this.inventoryUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this);
     }
     if (this.state.phase === "combat") {

@@ -238,6 +238,7 @@ export interface GameState {
   combatTurnDelay: number;             // ms remaining before next turn processes
   lootTarget: Entity | null;           // dead entity being looted
   bodyPartPanelOpen: boolean;          // mobile body part selector toggle
+  showInventory: boolean;              // inventory overlay (preserves current phase)
 }
 
 export interface Notification {

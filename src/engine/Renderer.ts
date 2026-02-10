@@ -3,6 +3,7 @@ import {
   GameState,
   Tile,
   TilePos,
+  Terrain,
   TILE_W,
   TILE_H,
   TILE_HALF_W,
@@ -12,6 +13,18 @@ import {
 } from "../types";
 import { AssetManager } from "../assets/AssetManager";
 import { AnimationSystem } from "../systems/AnimationSystem";
+
+/** Base terrain colors used to fill gaps between tile diamonds */
+const TERRAIN_BASE_COLOR: Record<number, string> = {
+  [Terrain.Sand]:        "#B8A67C",
+  [Terrain.Dirt]:        "#8B7355",
+  [Terrain.CrackedEarth]:"#6B5340",
+  [Terrain.Rubble]:      "#6E6E5E",
+  [Terrain.Road]:        "#5C5C50",
+  [Terrain.Concrete]:    "#7A7A6E",
+  [Terrain.Grass]:       "#4A5B3A",
+  [Terrain.Water]:       "#2A4A6A",
+};
 
 /**
  * Attack lean offsets per direction (pixels).
@@ -134,6 +147,20 @@ export class Renderer {
     const { ctx, assets } = this;
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
+
+    // Fill a base diamond so sub-pixel gaps between tiles don't show the
+    // dark background.  Slightly oversized (+1px) to guarantee overlap.
+    const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
+    if (baseColor) {
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
+      ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
+      ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
+      ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     const sprite = assets.getTile(tile.terrain);
     if (sprite) {
@@ -264,15 +291,10 @@ export class Renderer {
       sprite = assets.getAnimFrame(entity.baseSpriteKey, frameKey, entity.direction);
     }
 
-    // Scale sprite to fit the isometric grid.
-    // AI sprites are 64x96, procedural are 24x36.  Both use the same
-    // uniform scale so that relative proportions stay consistent.
-    // Target: roughly half a tile wide (32px) and 1.5 tiles tall (48px).
-    const SPRITE_SCALE = 0.5;
-    const srcW = sprite ? sprite.width : 24;
-    const srcH = sprite ? sprite.height : 36;
-    const sw = Math.round(srcW * SPRITE_SCALE);
-    const sh = Math.round(srcH * SPRITE_SCALE);
+    // Fixed display size for all entities — keeps characters the same size
+    // regardless of whether the source sprite is AI (64x96) or procedural (24x36).
+    const sw = 32;  // TILE_W / 2
+    const sh = 48;  // TILE_H * 1.5
 
     // Walking bob: subtle vertical bounce to reinforce movement
     let bobY = 0;
@@ -389,12 +411,18 @@ export class Renderer {
           ctx.lineTo(headX, headY);
           ctx.stroke();
 
-          // Muzzle flash
-          if (progress < 0.3) {
-            const flashAlpha = (0.3 - progress) / 0.3;
-            ctx.fillStyle = `rgba(255, 200, 60, ${flashAlpha})`;
+          // Muzzle flash — bright two-layer burst at the shooter
+          if (progress < 0.4) {
+            const flashAlpha = (0.4 - progress) / 0.4;
+            // Outer glow
+            ctx.fillStyle = `rgba(255, 180, 40, ${flashAlpha * 0.6})`;
             ctx.beginPath();
-            ctx.arc(vfx.fromX, vfx.fromY, 4 + progress * 10, 0, Math.PI * 2);
+            ctx.arc(vfx.fromX, vfx.fromY, 8 + progress * 16, 0, Math.PI * 2);
+            ctx.fill();
+            // Inner bright core
+            ctx.fillStyle = `rgba(255, 255, 200, ${flashAlpha})`;
+            ctx.beginPath();
+            ctx.arc(vfx.fromX, vfx.fromY, 3 + progress * 6, 0, Math.PI * 2);
             ctx.fill();
           }
 
