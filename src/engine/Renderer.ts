@@ -254,9 +254,15 @@ export class Renderer {
       ctx.fill();
     }
 
-    // Use animation frame if available, otherwise static sprite
+    // Use animation frame if available, otherwise static sprite.
+    // AssetManager registers weapon variant aliases (player_pistol → player)
+    // so the primary lookup should always succeed. Fallback to baseSpriteKey
+    // is a safety net.
     const frameKey = AnimationSystem.getFrameKey(entity);
-    const sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
+    let sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
+    if (!sprite && entity.baseSpriteKey !== entity.spriteKey) {
+      sprite = assets.getAnimFrame(entity.baseSpriteKey, frameKey, entity.direction);
+    }
 
     // Scale sprite to fit the isometric grid.
     // AI sprites are 64x96, procedural are 24x36.  Both use the same
