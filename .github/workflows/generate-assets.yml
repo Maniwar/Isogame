@@ -13,7 +13,6 @@ on:
           - all
           - tiles
           - characters
-          - weapons
           - items
           - portraits
       dry_run:
@@ -84,16 +83,41 @@ jobs:
           cd scripts/asset-gen
           python deploy-assets.py
 
+      # Reprocess character sprites with QA validation, auto-grid detection,
+      # uniform scaling, green BG removal, palette, and direction mirroring.
+      # This overwrites the basic postprocess.py slicing with the full pipeline.
+      - name: Reprocess character sprites (QA + slice + mirror)
+        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
+        run: |
+          cd scripts/asset-gen
+          echo "=== Validating sprite sheets ==="
+          python reprocess.py --category sprites --validate-only
+          echo ""
+          echo "=== Reprocessing sprites (uniform scale + mirror + palette) ==="
+          python reprocess.py --category sprites
+
       - name: Show deployed assets
         if: inputs.dry_run == false
         run: |
           echo "=== Deployed assets ==="
           find public/assets -name "*.png" -type f | head -50 || echo "No assets deployed"
           echo ""
-          echo "Total deployed: $(find public/assets -name '*.png' -type f | wc -l)"
+          echo "Total deployed PNGs: $(find public/assets -name '*.png' -type f | wc -l)"
+          echo ""
           if [ -f public/assets/manifest.json ]; then
-            echo "=== manifest.json ==="
-            cat public/assets/manifest.json
+            echo "=== manifest.json (sprite keys) ==="
+            python3 -c "
+          import json
+          m = json.load(open('public/assets/manifest.json'))
+          for section in ('sprites', 'animations', 'tiles', 'items', 'portraits'):
+              if section in m:
+                  keys = list(m[section].keys())
+                  if section == 'animations':
+                      frames = sum(sum(len(d) for d in a.values()) for a in m[section].values())
+                      print(f'{section}: {len(keys)} characters, {frames} total frames')
+                  else:
+                      print(f'{section}: {len(keys)} entries')
+          "
           else
             echo "WARNING: No manifest.json generated"
           fi
