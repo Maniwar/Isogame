@@ -199,9 +199,25 @@ export class AssetManager {
     return this.items.get(key);
   }
 
+  /**
+   * Maps spriteKey (used by entities) to portrait key (used in manifest).
+   * The pipeline generates portraits with descriptive names (e.g., "sheriff-morgan")
+   * but entities reference them by spriteKey (e.g., "npc_sheriff").
+   */
+  private static readonly PORTRAIT_KEY_MAP: Record<string, string> = {
+    npc_sheriff: "sheriff-morgan",
+    npc_doc: "doc-hendricks",
+    npc_merchant: "scrap",
+  };
+
   getPortrait(key: string): DrawTarget | undefined {
-    // Try dedicated portrait first, then fall back to idle-S sprite frame
-    const portrait = this.portraits.get(key);
+    // Try direct key first
+    let portrait = this.portraits.get(key);
+    // Try mapped portrait name (spriteKey → portrait filename)
+    if (!portrait) {
+      const mapped = AssetManager.PORTRAIT_KEY_MAP[key];
+      if (mapped) portrait = this.portraits.get(mapped);
+    }
     if (portrait) return portrait;
     return this.getAnimFrame(key, "idle", "S");
   }

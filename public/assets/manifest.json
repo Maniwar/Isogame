@@ -558,6 +558,9 @@
     "rattlesnake": "/assets/portraits/rattlesnake.png",
     "scrap": "/assets/portraits/scrap.png",
     "sheriff-morgan": "/assets/portraits/sheriff-morgan.png",
-    "the-overseer": "/assets/portraits/the-overseer.png"
+    "the-overseer": "/assets/portraits/the-overseer.png",
+    "npc_sheriff": "/assets/portraits/sheriff-morgan.png",
+    "npc_doc": "/assets/portraits/doc-hendricks.png",
+    "npc_merchant": "/assets/portraits/scrap.png"
   }
 }

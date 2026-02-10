@@ -227,15 +227,28 @@ def deploy(source: Path, target: Path) -> dict:
                 print(f"  Item: {png.name} -> {icon_key}")
 
     # --- Portraits ---
+    # Map portrait filenames to the spriteKey used by game entities so the
+    # runtime can look up portraits by entity.spriteKey directly.
+    portrait_to_sprite_key = {
+        "sheriff-morgan": "npc_sheriff",
+        "doc-hendricks": "npc_doc",
+        "scrap": "npc_merchant",
+    }
     portraits_dir = source / "portraits"
     if portraits_dir.exists():
         for png in sorted(portraits_dir.glob("*.png")):
             portrait_key = png.stem  # e.g., "sheriff-morgan"
             dest = target / "portraits" / png.name
             shutil.copy2(png, dest)
-            manifest["portraits"][portrait_key] = f"/assets/portraits/{png.name}"
+            path = f"/assets/portraits/{png.name}"
+            manifest["portraits"][portrait_key] = path
+            # Also register under the spriteKey so entity lookups work
+            sprite_key = portrait_to_sprite_key.get(portrait_key)
+            if sprite_key:
+                manifest["portraits"][sprite_key] = path
             deployed += 1
-            print(f"  Portrait: {png.name} -> {portrait_key}")
+            print(f"  Portrait: {png.name} -> {portrait_key}"
+                  + (f" (also {sprite_key})" if sprite_key else ""))
 
     # Remove empty categories from manifest
     manifest = {k: v for k, v in manifest.items() if v}
