@@ -59,12 +59,14 @@ sprites:
   base_height: 96        # Taller than wide for character proportions
   directions: 8          # N, NE, E, SE, S, SW, W, NW
   animations:            # Animation rows in sprite sheet (top to bottom)
-    - "idle"             # Standing still
-    - "walk_1"           # Walk cycle frame 1
-    - "walk_2"           # Walk cycle frame 2
-    - "attack"           # Attack pose
+    - "idle"             # Standing still, weapon at ready
+    - "walk_1"           # Walk cycle frame 1, weapon in hand
+    - "walk_2"           # Walk cycle frame 2, weapon in hand
+    - "attack"           # Melee attack pose
+    - "shoot"            # Firing ranged weapon
+    - "reload"           # Reloading weapon
   sheet_cols: 8          # Columns = 8 directions
-  sheet_rows: 4          # Rows = 4 animation poses
+  sheet_rows: 6          # Rows = 6 animation poses
   format: "png"
   transparent_bg: true
 

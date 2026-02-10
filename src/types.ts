@@ -118,7 +118,7 @@ export interface CombatAction {
 }
 
 /** Animation state names */
-export type AnimationName = "idle" | "walk" | "attack";
+export type AnimationName = "idle" | "walk" | "attack" | "shoot" | "reload";
 
 /** Animation playback state for an entity */
 export interface AnimState {
