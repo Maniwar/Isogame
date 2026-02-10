@@ -255,9 +255,9 @@ export class Renderer {
     }
 
     // Use animation frame if available, otherwise static sprite.
-    // Try weapon-variant spriteKey first, fall back to baseSpriteKey
-    // so existing assets (keyed as "player") still work before
-    // weapon-variant sheets (keyed as "player_pistol") are generated.
+    // AssetManager registers weapon variant aliases (player_pistol → player)
+    // so the primary lookup should always succeed. Fallback to baseSpriteKey
+    // is a safety net.
     const frameKey = AnimationSystem.getFrameKey(entity);
     let sprite = assets.getAnimFrame(entity.spriteKey, frameKey, entity.direction);
     if (!sprite && entity.baseSpriteKey !== entity.spriteKey) {

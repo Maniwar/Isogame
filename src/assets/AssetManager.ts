@@ -54,6 +54,13 @@ export class AssetManager {
   private animFrames = new Map<string, Map<string, Map<Direction, DrawTarget>>>();
 
   /**
+   * Weapon variant suffixes — when assets for "player_pistol" don't exist yet,
+   * alias them to the base "player" animations so lookups always succeed.
+   * Matches WEAPON_SPRITE_SUFFIX in EntitySystem.ts.
+   */
+  private static readonly WEAPON_SUFFIXES = ["unarmed", "pistol", "rifle", "knife", "bat"];
+
+  /**
    * Weapon overlay frames: weaponKey -> animFrameKey -> direction -> image
    * Same layout as character animations but showing only the weapon + hands.
    */
@@ -79,6 +86,9 @@ export class AssetManager {
   async init() {
     // Step 1: Generate procedural placeholders for everything
     this.generateAllProcedural();
+    // Register weapon variant aliases for procedural sprites so
+    // "player_pistol" etc. resolve even without AI assets loaded.
+    this.registerWeaponAliases();
 
     // Step 2: Attempt to load manifest and override with real PNGs
     try {
@@ -89,6 +99,7 @@ export class AssetManager {
         const manifest: AssetManifest = await resp.json();
         console.log("[AssetManager] Manifest sections:", Object.keys(manifest).join(", "));
         await this.loadFromManifest(manifest);
+        this.registerWeaponAliases();
         console.log(
           `[AssetManager] Loaded ${this.loadedCount}/${this.totalToLoad} AI-generated assets`,
         );
@@ -343,6 +354,34 @@ export class AssetManager {
     }
 
     await Promise.all(promises);
+  }
+
+  /**
+   * Register weapon variant aliases so that lookups like "player_pistol" resolve
+   * to "player" animation/sprite data when per-weapon assets haven't been generated.
+   * Once weapon-variant assets exist in the manifest, they take priority (already loaded).
+   */
+  private registerWeaponAliases() {
+    // Alias animation frames: player → player_pistol, player_rifle, etc.
+    const animBaseKeys = [...this.animFrames.keys()];
+    for (const baseKey of animBaseKeys) {
+      for (const suffix of AssetManager.WEAPON_SUFFIXES) {
+        const variantKey = `${baseKey}_${suffix}`;
+        if (!this.animFrames.has(variantKey)) {
+          this.animFrames.set(variantKey, this.animFrames.get(baseKey)!);
+        }
+      }
+    }
+    // Alias static sprites the same way
+    const spriteBaseKeys = [...this.sprites.keys()];
+    for (const baseKey of spriteBaseKeys) {
+      for (const suffix of AssetManager.WEAPON_SUFFIXES) {
+        const variantKey = `${baseKey}_${suffix}`;
+        if (!this.sprites.has(variantKey)) {
+          this.sprites.set(variantKey, this.sprites.get(baseKey)!);
+        }
+      }
+    }
   }
 
   /**
