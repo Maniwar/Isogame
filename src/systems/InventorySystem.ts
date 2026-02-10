@@ -1,4 +1,5 @@
 import { Entity, GameState, ItemDef } from "../types";
+import { getWeaponSpriteKey } from "./EntitySystem";
 
 /** Item definitions database */
 export const ITEM_DB: Record<string, ItemDef> = {
@@ -159,6 +160,8 @@ export class InventorySystem {
       const inv = player.inventory.find((i) => i.itemId === itemId);
       if (inv) {
         inv.equipped = true;
+        // Swap to the weapon-specific sprite sheet
+        player.spriteKey = getWeaponSpriteKey(player.baseSpriteKey, player.inventory);
         state.notifications.unshift({
           text: `Equipped: ${def.name}`,
           color: "rgb(212, 196, 160)",
