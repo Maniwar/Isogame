@@ -16,7 +16,7 @@ import { Entity, AnimationName, GameState } from "../types";
 const WALK_FRAMES = ["walk_1", "walk_2"];
 
 /** How long attack pose is held before returning to idle (ms) */
-const ATTACK_HOLD_MS = 400;
+const ATTACK_HOLD_MS = 600;
 
 export class AnimationSystem {
   /**
