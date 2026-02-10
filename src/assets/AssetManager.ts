@@ -345,70 +345,18 @@ export class AssetManager {
     await Promise.all(promises);
   }
 
-  /** Composite an AI tile onto the procedural base tile to fill edge gaps.
-   *  AI tiles are already diamond-masked at 128x64.  We disable image
-   *  smoothing so the 128x64 → 64x32 downscale uses nearest-neighbor,
-   *  preserving crisp diamond edges and preventing semi-transparent seams
-   *  between adjacent tiles. */
+  /**
+   * Composite an AI tile onto the procedural base tile.
+   * AI tiles are now pre-processed to exactly TILE_W x TILE_H (64x32)
+   * with a proper diamond mask.  The procedural base shows through any
+   * edge gaps from anti-aliasing.
+   */
   private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
-    return canvas;
-  }
-
-  /**
-   * Remove green chroma-key background pixels from a loaded image.
-   *
-   * The AI pipeline generates sprites on bright green backgrounds.
-   * After palette reduction the green background maps to #8EC44A
-   * (142, 196, 74).  We use color-distance matching to this known
-   * background color rather than generic green detection, which was
-   * too aggressive and stripped character accent colors like the
-   * player's green highlight (#40C040).
-   */
-  private removeGreenBg(img: HTMLImageElement): HTMLCanvasElement {
-    const canvas = this.createCanvas(img.width, img.height);
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-
-    // Known background color after palette reduction: (142, 196, 74)
-    const BG_R = 142, BG_G = 196, BG_B = 74;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-
-      // Squared color distance to the known background
-      const dr = r - BG_R, dg = g - BG_G, db = b - BG_B;
-      const distSq = dr * dr + dg * dg + db * db;
-
-      // Close match to the pipeline background color
-      if (distSq < 3000) {
-        data[i + 3] = 0;
-        continue;
-      }
-
-      // Anti-aliased fringe pixels: still very bright-green and close-ish
-      // to the background.  The threshold excludes character accent greens
-      // like (64, 192, 64) which have distSq > 6000.
-      if (g > 160 && g > r * 1.3 && g > b * 2.0 && distSq < 5500) {
-        data[i + 3] = 0;
-        continue;
-      }
-
-      // Catch pure bright green (original chroma key before palette map)
-      if (g > 220 && r < 60 && b < 60) {
-        data[i + 3] = 0;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
     return canvas;
   }
 
@@ -426,43 +374,12 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image, strip green background, and crop to content.
-   * Cropping removes the large transparent frame so the Renderer can
-   * scale the actual character to the right size for the tile grid.
+   * Load a sprite image.  Green background removal and content centering
+   * are handled by the Python reprocessor (scripts/asset-gen/reprocess.py)
+   * so we load the pre-processed PNG directly.
    */
-  private async loadSpriteImage(path: string): Promise<HTMLCanvasElement | null> {
-    const img = await this.loadImage(path);
-    if (!img) return null;
-    const cleaned = this.removeGreenBg(img);
-    return this.cropToContent(cleaned);
-  }
-
-  /** Crop a canvas to the bounding box of its non-transparent content. */
-  private cropToContent(src: HTMLCanvasElement): HTMLCanvasElement {
-    const ctx = src.getContext("2d")!;
-    const { width: w, height: h } = src;
-    const data = ctx.getImageData(0, 0, w, h).data;
-
-    let top = h, bottom = 0, left = w, right = 0;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (data[(y * w + x) * 4 + 3] > 10) {
-          if (y < top) top = y;
-          if (y > bottom) bottom = y;
-          if (x < left) left = x;
-          if (x > right) right = x;
-        }
-      }
-    }
-    if (top > bottom || left > right) return src;
-
-    const cw = right - left + 1;
-    const ch = bottom - top + 1;
-    if (cw >= w * 0.9 && ch >= h * 0.9) return src;
-
-    const cropped = this.createCanvas(cw, ch);
-    cropped.getContext("2d")!.drawImage(src, left, top, cw, ch, 0, 0, cw, ch);
-    return cropped;
+  private async loadSpriteImage(path: string): Promise<HTMLImageElement | null> {
+    return this.loadImage(path);
   }
 
   // -----------------------------------------------------------------------

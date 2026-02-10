@@ -133,7 +133,8 @@ def reduce_palette(
 
 
 def resize_to_target(image: Image.Image, width: int, height: int) -> Image.Image:
-    """Resize image to exact target dimensions, maintaining aspect ratio with padding."""
+    """Resize image to exact target dimensions, maintaining aspect ratio with padding.
+    Use for sprites and items where centering within a fixed canvas is correct."""
     if image.size == (width, height):
         return image
 
@@ -156,6 +157,28 @@ def resize_to_target(image: Image.Image, width: int, height: int) -> Image.Image
     canvas.paste(resized, (offset_x, offset_y))
 
     return canvas
+
+
+def resize_to_fill(image: Image.Image, width: int, height: int) -> Image.Image:
+    """Resize image to FILL target dimensions (cover mode), cropping excess.
+    Use for tiles where every pixel in the target area must have content.
+    This prevents the letterboxing bug where square AI images get padded
+    into the target canvas, leaving empty regions around the content."""
+    if image.size == (width, height):
+        return image
+
+    img_w, img_h = image.size
+    # Scale to cover: the LARGER scale factor ensures full coverage
+    scale = max(width / img_w, height / img_h)
+    new_w = int(img_w * scale)
+    new_h = int(img_h * scale)
+
+    resized = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    # Crop from center to exact target size
+    cx = (new_w - width) // 2
+    cy = (new_h - height) // 2
+    return resized.crop((cx, cy, cx + width, cy + height))
 
 
 def cleanup_transparency(image: Image.Image, threshold: int = 10) -> Image.Image:
@@ -236,7 +259,9 @@ def find_content_bbox(image: Image.Image, threshold: int = 10) -> tuple[int, int
 
 
 def extract_and_center(region: Image.Image, target_w: int, target_h: int) -> Image.Image:
-    """Extract content from a region and center it in a target-size canvas."""
+    """Extract content from a region and place it bottom-center in a target-size canvas.
+    Bottom-center anchoring keeps character feet at a consistent position
+    for correct placement on isometric tiles."""
     bbox = find_content_bbox(region)
     if bbox is None:
         return Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
@@ -253,10 +278,10 @@ def extract_and_center(region: Image.Image, target_w: int, target_h: int) -> Ima
         content = content.resize((new_w, new_h), Image.Resampling.LANCZOS)
         cw, ch = content.size
 
-    # Center on transparent canvas
+    # Place bottom-center on transparent canvas (feet on ground)
     canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
     offset_x = (target_w - cw) // 2
-    offset_y = (target_h - ch) // 2
+    offset_y = target_h - ch
     canvas.paste(content, (offset_x, offset_y), content)
     return canvas
 
@@ -477,9 +502,19 @@ def mask_to_diamond(image: Image.Image) -> Image.Image:
 
 
 def process_tiles(config: dict, apply_palette: bool = True) -> int:
-    """Process all tile images: resize, palette reduce, clean transparency."""
-    tile_w = config["tiles"]["base_width"]
-    tile_h = config["tiles"]["base_height"]
+    """Process all tile images: resize, palette reduce, clean transparency.
+
+    Ground and terrain tiles use resize_to_fill (cover mode) to ensure
+    the texture fills the entire target area before diamond masking.
+    This prevents the letterboxing bug where square AI images get padded
+    into the canvas, leaving the diamond mask only partially filled.
+
+    Output is at GAME tile size (64x32), not double-res, so no runtime
+    scaling is needed.
+    """
+    # Game tile size — output directly at what the engine expects
+    game_tile_w = 64
+    game_tile_h = 32
     wall_h = config["tiles"]["wall_height"]
     processed = 0
 
@@ -491,20 +526,22 @@ def process_tiles(config: dict, apply_palette: bool = True) -> int:
             continue
 
         dst_dir.mkdir(parents=True, exist_ok=True)
-        target_h = wall_h if subdir == "walls" else tile_h
 
         for img_path in sorted(src_dir.glob("*.png")):
             print(f"  Processing: {img_path.name}")
             img = Image.open(img_path).convert("RGBA")
 
-            # Resize to target dimensions
-            img = resize_to_target(img, tile_w, target_h)
+            if subdir == "walls":
+                # Walls are taller, use fit-with-padding (they sit above tiles)
+                img = resize_to_target(img, game_tile_w, wall_h)
+            else:
+                # Ground/terrain: FILL to cover entire target, then clip
+                img = resize_to_fill(img, game_tile_w, game_tile_h)
 
             # Clean transparency
             img = cleanup_transparency(img)
 
             # Apply diamond mask to ground and terrain tiles
-            # (walls are taller and don't use the standard diamond)
             if subdir != "walls":
                 img = mask_to_diamond(img)
 
