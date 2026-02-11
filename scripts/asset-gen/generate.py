@@ -248,10 +248,11 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                         reference_images: list, use_sheets: bool = True) -> int:
     """Generate character sprites — either as full sprite sheets or individual images.
 
-    When use_sheets=True (default), generates one 8×8 sprite sheet per character:
-    8 animation rows (idle, walk_1-4, attack_1-2, hit) × 8 direction columns
-    (S, SW, W, NW, N, NE, E, SE) = 64 frames per sheet.
-    The game maps shoot→attack_1/attack_2 and reload→idle at runtime.
+    When use_sheets=True (default), generates one 4×4 sprite sheet per character:
+    4 animation rows (idle, walk_1, walk_2, attack) × 4 direction columns
+    (S, SW, N, NW) = 16 frames per sheet at 1024×1024 (256×256 per cell).
+    The reprocessor fills the remaining directions via mirroring and animations
+    via fallbacks to produce the full 8×8 = 64 frames the game engine expects.
 
     For characters with multiple weapon variants (e.g., player_pistol, player_rifle),
     the first variant's sheet is passed as a reference image to subsequent variants
@@ -281,10 +282,12 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 name=char["name"],
                 description=char["description"],
                 config=config,
+                weapon_idle_desc=char.get("weapon_idle_desc", "weapon held at side, relaxed"),
+                weapon_attack_desc=char.get("weapon_attack_desc", "weapon swung or fired forward"),
             )
 
             if dry_run:
-                print(f"    [DRY RUN] {filename} (8 anims x 8 dirs = 64 frames)")
+                print(f"    [DRY RUN] {filename} (4 anims x 4 dirs = 16 frames → reprocessor fills 8x8)")
                 if base_key in base_reference_sheets:
                     print(f"    + using {base_key} reference sheet for consistency")
                 print(f"    Prompt: {prompt[:200]}...")
@@ -339,8 +342,12 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
                      reference_images: list) -> int:
     """Generate weapon overlay sprite sheets.
 
-    Each weapon gets an 8x8 sprite sheet (same layout as character sheets)
+    Each weapon gets a 4×4 sprite sheet (1024×1024, 256×256 per cell)
     showing only the weapon + hands, designed to overlay on character sprites.
+    The reprocessor fills the remaining directions/animations to produce 8×8.
+
+    NOTE: Weapon overlays are currently unused — the game uses weapon-variant
+    character sprites instead. Kept for potential future use.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
@@ -361,10 +368,11 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
             description=weapon["description"],
             attack_desc=weapon["attack_desc"],
             config=config,
+            idle_desc=weapon.get("idle_desc", "weapon held at rest, relaxed grip"),
         )
 
         if dry_run:
-            print(f"    [DRY RUN] {filename} (8 anims x 8 dirs = 64 frames)")
+            print(f"    [DRY RUN] {filename} (4 anims x 4 dirs = 16 frames → reprocessor fills 8x8)")
             print(f"    Prompt: {prompt[:200]}...")
             generated += 1
             continue
