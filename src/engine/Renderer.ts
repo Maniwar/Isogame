@@ -102,7 +102,7 @@ export class Renderer {
       for (let x = minX; x <= maxX; x++) {
         if (!state.map.tiles[y] || !state.map.tiles[y][x]) continue;
         const tile = state.map.tiles[y][x];
-        this.drawTile(x, y, tile);
+        this.drawTile(x, y, tile, state);
       }
     }
 
@@ -143,23 +143,59 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
-  private drawTile(x: number, y: number, tile: Tile) {
+  private drawTile(x: number, y: number, tile: Tile, state?: GameState) {
     const { ctx, assets } = this;
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
-    // Fill a base diamond so sub-pixel gaps between tiles don't show the
-    // dark background.  Slightly oversized (+1px) to guarantee overlap.
+    // Fill a base diamond with blended neighbor colors for smooth transitions.
+    // Each corner of the diamond samples the adjacent tile's color to create
+    // a gradient that hides hard edges between different terrain types.
     const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
     if (baseColor) {
-      ctx.fillStyle = baseColor;
-      ctx.beginPath();
-      ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
-      ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
-      ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
-      ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
-      ctx.closePath();
-      ctx.fill();
+      // Get neighbor terrain colors for gradient blending
+      const topColor = this.getNeighborTerrainColor(x, y - 1, state) ?? baseColor;
+      const rightColor = this.getNeighborTerrainColor(x + 1, y, state) ?? baseColor;
+      const bottomColor = this.getNeighborTerrainColor(x, y + 1, state) ?? baseColor;
+      const leftColor = this.getNeighborTerrainColor(x - 1, y, state) ?? baseColor;
+
+      // If all neighbors are the same terrain, use a fast solid fill
+      if (topColor === baseColor && rightColor === baseColor &&
+          bottomColor === baseColor && leftColor === baseColor) {
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
+        ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
+        ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
+        ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Gradient blend: draw 4 triangles from center to each edge,
+        // each using a gradient from center color → neighbor color
+        const cx = wx;
+        const cy = wy;
+        const top = { x: wx, y: wy - TILE_HALF_H - 0.5 };
+        const right = { x: wx + TILE_HALF_W + 0.5, y: wy };
+        const bottom = { x: wx, y: wy + TILE_HALF_H + 0.5 };
+        const left = { x: wx - TILE_HALF_W - 0.5, y: wy };
+
+        // Blend each triangle sector with a radial gradient
+        const drawSector = (p1: {x: number, y: number}, p2: {x: number, y: number}, neighborCol: string) => {
+          const midColor = this.blendColors(baseColor, neighborCol, 0.35);
+          ctx.fillStyle = midColor;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.closePath();
+          ctx.fill();
+        };
+        drawSector(top, right, topColor);     // top-right sector → top neighbor
+        drawSector(right, bottom, rightColor); // bottom-right sector → right neighbor
+        drawSector(bottom, left, bottomColor); // bottom-left sector → bottom neighbor
+        drawSector(left, top, leftColor);      // top-left sector → left neighbor
+      }
     }
 
     const sprite = assets.getTile(tile.terrain);
@@ -174,6 +210,30 @@ export class Renderer {
         ctx.drawImage(obj, wx - obj.width / 2, wy - obj.height + TILE_HALF_H);
       }
     }
+  }
+
+  /** Get the base terrain color for a neighbor tile, or null if out of bounds */
+  private getNeighborTerrainColor(x: number, y: number, state?: GameState): string | null {
+    if (!state) return null;
+    const row = state.map.tiles[y];
+    if (!row) return null;
+    const tile = row[x];
+    if (!tile) return null;
+    return TERRAIN_BASE_COLOR[tile.terrain] ?? null;
+  }
+
+  /** Blend two hex colors at a given ratio (0 = color1, 1 = color2) */
+  private blendColors(hex1: string, hex2: string, ratio: number): string {
+    const r1 = parseInt(hex1.slice(1, 3), 16);
+    const g1 = parseInt(hex1.slice(3, 5), 16);
+    const b1 = parseInt(hex1.slice(5, 7), 16);
+    const r2 = parseInt(hex2.slice(1, 3), 16);
+    const g2 = parseInt(hex2.slice(3, 5), 16);
+    const b2 = parseInt(hex2.slice(5, 7), 16);
+    const r = Math.round(r1 + (r2 - r1) * ratio);
+    const g = Math.round(g1 + (g2 - g1) * ratio);
+    const b = Math.round(b1 + (b2 - b1) * ratio);
+    return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   }
 
   private drawCombatOverlays(state: GameState, minX: number, minY: number, maxX: number, maxY: number) {
@@ -330,16 +390,21 @@ export class Renderer {
     // Characters are generated with weapons built into their sprite sheets.
     // See scripts/asset-gen/prompts/characters.py for the generation prompts.
 
-    // Draw name tag — position above sprite top
+    // Label position — above sprite top
     const labelY = spriteTop - 4;
-    ctx.fillStyle = entity.isPlayer
-      ? "#40c040"
-      : entity.isHostile
-        ? "#b83030"
-        : "#d4c4a0";
-    ctx.font = "7px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(entity.name, drawX, labelY);
+
+    // Draw name tag — skip player (visible in HUD), only show NPCs
+    if (!entity.isPlayer) {
+      ctx.font = "7px monospace";
+      ctx.textAlign = "center";
+
+      // Semi-transparent background for readability
+      const nameWidth = ctx.measureText(entity.name).width;
+      ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
+      ctx.fillRect(drawX - nameWidth / 2 - 2, labelY - 8, nameWidth + 4, 11);
+      ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
+      ctx.fillText(entity.name, drawX, labelY);
+    }
 
     // Health bar (always show in combat, or when damaged)
     if (!entity.isPlayer && (isCombat || entity.stats.hp < entity.stats.maxHp)) {

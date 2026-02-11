@@ -2,15 +2,16 @@
 
 Instead of generating one direction at a time, we generate full sprite sheets:
 - One image contains ALL frames for a character
-- Layout: 4 rows (animations) × 4 columns (directions) = 16 frames
-- The reprocessor slices this into individual frames and mirrors for 8 directions
+- Layout: 4 rows (animations) × 8 columns (directions) = 32 frames
+- Uses 2048×2048 images for 256×512 per cell — plenty of detail
+- Each column is a specific facing direction with explicit visual description
+- The reprocessor slices this into individual frames
 
-Why 4×4 instead of 8×6:
-  The AI consistently produces 4 cols × 4 rows regardless of what we request.
-  Asking for 48 cells (8×6) in 1024×1024 gives ~128×170px per cell — too small
-  for detail. A 4×4 grid gives 256×256 per cell — plenty of room.
-  Missing directions (SE, E, NE) are mirrored from SW, W, NW.
-  The game's AnimationSystem maps shoot→attack and reload→idle at runtime.
+Why 8 columns instead of 4+mirror:
+  Mirroring only works for bilaterally symmetric characters (no asymmetric
+  weapons, scars, badges). Generating all 8 directions gives proper side views
+  (W/E) that mirroring from front/back views can never produce. At 2048px
+  with 8×4 cells, each cell is 256×512 — more than enough for detail.
 
 Weapon variant system:
 - Each character base can be combined with different weapons
@@ -29,21 +30,25 @@ CHAR_STYLE_PREAMBLE = (
     "NO shadows on the ground, NO text, NO labels. "
 )
 
-# The 4 directions we generate (columns). The other 4 are mirrored.
-SHEET_DIRECTIONS = ["S", "SW", "W", "NW"]
+# All 8 directions — we now generate ALL of them (no more mirroring).
+# Order matters: this is the column order in the sprite sheet.
+SHEET_DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
 
-# All 8 directions the game engine uses
-DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+# Same list, used by other modules
+DIRECTIONS = SHEET_DIRECTIONS
 
+# Explicit visual descriptions for each direction.
+# These describe what the VIEWER SEES, not abstract compass directions.
+# This prevents the AI from confusing "west" (side view) with "north" (back view).
 DIRECTION_LABELS = {
-    "S":  "facing directly toward the camera (south)",
-    "SW": "facing toward the bottom-right (southwest)",
-    "W":  "facing to the right (west)",
-    "NW": "facing toward the top-right (northwest)",
-    "N":  "facing directly away from the camera (north)",
-    "NE": "facing toward the top-left (northeast)",
-    "E":  "facing to the left (east)",
-    "SE": "facing toward the bottom-left (southeast)",
+    "S":  "FRONT VIEW — character faces directly toward the viewer, full face visible",
+    "SW": "FRONT-LEFT 3/4 VIEW — character turned 45° to their right, left shoulder toward viewer",
+    "W":  "LEFT PROFILE — character's LEFT side facing the viewer, a full side silhouette",
+    "NW": "BACK-LEFT 3/4 VIEW — character turned away 135°, showing back of left shoulder",
+    "N":  "BACK VIEW — character faces directly away from the viewer, back of head and body visible",
+    "NE": "BACK-RIGHT 3/4 VIEW — character turned away 135° the other way, showing back of right shoulder",
+    "E":  "RIGHT PROFILE — character's RIGHT side facing the viewer, a full side silhouette",
+    "SE": "FRONT-RIGHT 3/4 VIEW — character turned 45° to their left, right shoulder toward viewer",
 }
 
 # The 4 animation rows we generate. The game maps shoot→attack, reload→idle.
@@ -66,18 +71,22 @@ SPRITESHEET_TEMPLATE = (
     "Generate a COMPLETE CHARACTER SPRITE SHEET for: {name} — {description}.\n\n"
     "LAYOUT: The sprite sheet is a grid with EXACTLY {num_rows} rows and {num_cols} columns.\n"
     "The total image is {sheet_size}x{sheet_size} pixels.\n"
-    "Each cell is {cell_size}x{cell_size} pixels ({sheet_size}/{num_cols} = {cell_size}).\n\n"
+    "Each cell is {cell_w}x{cell_h} pixels (width×height).\n\n"
     "ROWS (top to bottom — each row is one animation pose):\n"
     "{row_descriptions}\n\n"
-    "COLUMNS (left to right — each column is one facing direction):\n"
+    "COLUMNS (left to right — each column is one facing direction, rotating 45° per step):\n"
     "{col_descriptions}\n\n"
     "CRITICAL RULES:\n"
     "- The image MUST be exactly {sheet_size}x{sheet_size} pixels.\n"
-    "- The grid MUST be exactly {num_rows} rows × {num_cols} columns with equal-sized cells.\n"
+    "- The grid MUST be exactly {num_rows} rows × {num_cols} columns.\n"
+    "- Each cell is {cell_w} pixels wide and {cell_h} pixels tall.\n"
     "- Every cell must show the SAME character with identical outfit, weapon, proportions, and colors.\n"
     "- The character MUST be holding their weapon in EVERY frame.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
-    "- Keep the character CENTERED in each cell, filling most of the cell.\n"
+    "- The 8 columns show a FULL 360° rotation of the character in 45° increments.\n"
+    "- Columns 3 (W) and 7 (E) MUST show clear SIDE PROFILE views — not front or back.\n"
+    "- Column 5 (N) shows the character's BACK — this is the only back-facing column.\n"
+    "- Keep the character CENTERED in each cell, filling most of the cell height.\n"
     "- Use a pure bright green (#00FF00) chroma key background in every cell.\n"
     "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks, NO grid lines.\n"
     "- The walk_1 and walk_2 rows must show DIFFERENT leg positions (alternating stride).\n"
@@ -252,23 +261,25 @@ def build_spritesheet_prompt(
     description: str,
     config: dict,
 ) -> str:
-    """Build a prompt for generating a 4×4 character sprite sheet.
+    """Build a prompt for generating an 8×4 character sprite sheet.
 
     The sheet has 4 rows (idle, walk_1, walk_2, attack)
-    × 4 columns (S, SW, W, NW) = 16 frames.
-    Missing directions (SE, E, NE) are mirrored in post-processing.
+    × 8 columns (S, SW, W, NW, N, NE, E, SE) = 32 frames.
+    All 8 directions are generated — no mirroring needed.
+    Uses 2048×2048 for 256×512 per cell.
     """
-    sheet_size = config["sprites"].get("sheet_size", 1024)
+    sheet_size = config["sprites"].get("sheet_size", 2048)
     num_cols = len(SHEET_DIRECTIONS)
     num_rows = len(SHEET_ANIMATIONS)
-    cell_size = sheet_size // max(num_cols, num_rows)
+    cell_w = sheet_size // num_cols   # 2048/8 = 256
+    cell_h = sheet_size // num_rows   # 2048/4 = 512
 
     row_descriptions = "\n".join(
         f"  Row {i + 1}: {ANIMATION_LABELS[anim]}"
         for i, anim in enumerate(SHEET_ANIMATIONS)
     )
     col_descriptions = "\n".join(
-        f"  Column {i + 1}: {DIRECTION_LABELS[d]}"
+        f"  Column {i + 1} ({d}): {DIRECTION_LABELS[d]}"
         for i, d in enumerate(SHEET_DIRECTIONS)
     )
 
@@ -278,7 +289,8 @@ def build_spritesheet_prompt(
         description=description,
         num_rows=num_rows,
         num_cols=num_cols,
-        cell_size=cell_size,
+        cell_w=cell_w,
+        cell_h=cell_h,
         sheet_size=sheet_size,
         row_descriptions=row_descriptions,
         col_descriptions=col_descriptions,

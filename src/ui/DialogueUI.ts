@@ -8,12 +8,14 @@ export class DialogueUI {
   private boundTouch: ((e: TouchEvent) => void) | null = null;
   private lastState: GameState | null = null;
   private lastScreenH = 0;
+  private lastPanelH = 0;
 
   // Layout constants
-  private readonly panelH = 220;
   private readonly padding = 20;
-  private readonly responseStartY = 120;
   private readonly responseLineH = 28;
+  private readonly textLineH = 16;
+  private readonly minPanelH = 160;
+  private readonly maxPanelH = 400;
 
   draw(
     ctx: CanvasRenderingContext2D,
@@ -31,11 +33,35 @@ export class DialogueUI {
     const node = state.dialogueTree.nodes[state.dialogueNodeId];
     if (!node) return;
 
-    const panelY = screenH - this.panelH;
+    // Measure portrait
+    const hasPortrait = !!(assets && state.selectedEntity);
+    const pSize = 64;
+    const textOffsetX = hasPortrait ? pSize + 12 : 0;
+    const textMaxWidth = screenW - this.padding * 2 - textOffsetX;
+
+    // Measure wrapped text height
+    ctx.font = "13px monospace";
+    const textLineCount = this.countWrappedLines(ctx, node.text, textMaxWidth);
+    const textHeight = textLineCount * this.textLineH;
+
+    // Compute dynamic panel height:
+    // portrait/name area (25px) + text + gap (12px) + responses + bottom padding
+    const headerH = 30;
+    const gapAfterText = 12;
+    const responsesH = node.responses.length * this.responseLineH;
+    const bottomPad = 10;
+    const panelH = Math.min(
+      this.maxPanelH,
+      Math.max(this.minPanelH, headerH + textHeight + gapAfterText + responsesH + bottomPad),
+    );
+    this.lastPanelH = panelH;
+
+    const panelY = screenH - panelH;
+    const responseStartY = headerH + textHeight + gapAfterText;
 
     // Background panel
     ctx.fillStyle = "rgba(20, 20, 16, 0.95)";
-    ctx.fillRect(0, panelY, screenW, this.panelH);
+    ctx.fillRect(0, panelY, screenW, panelH);
 
     // Border
     ctx.strokeStyle = "#40c040";
@@ -45,23 +71,18 @@ export class DialogueUI {
     ctx.lineTo(screenW, panelY);
     ctx.stroke();
 
-    // Portrait (if available for the selected NPC)
-    // Falls back to idle-S animation frame when no dedicated portrait exists
-    let textOffsetX = 0;
-    if (assets && state.selectedEntity) {
+    // Portrait
+    if (hasPortrait && assets && state.selectedEntity) {
       const portrait = assets.getPortrait(state.selectedEntity.spriteKey);
       if (portrait) {
-        const pSize = 64;
         const px = this.padding;
         const py = panelY + 10;
-        // Draw portrait frame
         ctx.fillStyle = "rgba(30, 30, 22, 0.9)";
         ctx.fillRect(px - 1, py - 1, pSize + 2, pSize + 2);
         ctx.strokeStyle = "#40c040";
         ctx.lineWidth = 1;
         ctx.strokeRect(px - 1, py - 1, pSize + 2, pSize + 2);
         ctx.drawImage(portrait, px, py, pSize, pSize);
-        textOffsetX = pSize + 12;
       }
     }
 
@@ -74,13 +95,19 @@ export class DialogueUI {
     // Dialogue text (word-wrap)
     ctx.fillStyle = "#d4c4a0";
     ctx.font = "13px monospace";
-    this.drawWrappedText(ctx, node.text, this.padding + textOffsetX, panelY + 50, screenW - this.padding * 2 - textOffsetX, 16);
+    this.drawWrappedText(
+      ctx, node.text,
+      this.padding + textOffsetX,
+      panelY + headerH + this.textLineH,
+      textMaxWidth,
+      this.textLineH,
+    );
 
-    // Response options
+    // Response options — positioned after text
     const mouseY = this.getMouseY();
 
     node.responses.forEach((response, i) => {
-      const ry = panelY + this.responseStartY + i * this.responseLineH;
+      const ry = panelY + responseStartY + i * this.responseLineH;
       const isHovered = mouseY >= ry && mouseY < ry + this.responseLineH;
       this.hoveredResponse = isHovered ? i : this.hoveredResponse;
 
@@ -124,10 +151,15 @@ export class DialogueUI {
     const node = state.dialogueTree.nodes[state.dialogueNodeId];
     if (!node) return -1;
 
-    const panelY = this.lastScreenH - this.panelH;
+    const panelH = this.lastPanelH;
+    const panelY = this.lastScreenH - panelH;
+
+    // Response options are laid out at the bottom of the panel
+    const responsesH = node.responses.length * this.responseLineH;
+    const responseStartY = panelH - responsesH - 10;
 
     for (let i = 0; i < node.responses.length; i++) {
-      const ry = panelY + this.responseStartY + i * this.responseLineH;
+      const ry = panelY + responseStartY + i * this.responseLineH;
       if (y >= ry && y < ry + this.responseLineH) {
         return i;
       }
@@ -163,6 +195,27 @@ export class DialogueUI {
       }
     };
     window.addEventListener("touchend", this.boundTouch, { passive: false });
+  }
+
+  private countWrappedLines(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number,
+  ): number {
+    const words = text.split(" ");
+    let line = "";
+    let count = 1;
+
+    for (const word of words) {
+      const test = line + word + " ";
+      if (ctx.measureText(test).width > maxWidth && line) {
+        line = word + " ";
+        count++;
+      } else {
+        line = test;
+      }
+    }
+    return count;
   }
 
   private drawWrappedText(

@@ -57,20 +57,24 @@ tiles:
 sprites:
   base_width: 64         # Final frame width after post-processing
   base_height: 96        # Final frame height (taller than wide for characters)
-  sheet_size: 1024       # AI generates 1024x1024 images
-  sheet_cols: 4          # 4 direction columns (S, SW, W, NW) — mirror for 8
+  sheet_size: 2048       # 2048x2048 images — room for all 8 directions
+  sheet_cols: 8          # 8 direction columns (full 360° rotation)
   sheet_rows: 4          # 4 animation rows (idle, walk_1, walk_2, attack)
-  # Cell size = 1024/4 = 256x256 per cell — plenty of detail for the AI
+  # Cell size = 2048/8 × 2048/4 = 256×512 per cell — plenty of detail
   animations:
     - "idle"             # Standing still, weapon at ready
     - "walk_1"           # Walk cycle frame 1, weapon in hand
     - "walk_2"           # Walk cycle frame 2, weapon in hand
     - "attack"           # Attack pose (melee swing or ranged aim)
-  directions:            # Columns generated; SE/E/NE mirrored from SW/W/NW
+  directions:            # All 8 directions generated — no mirroring needed
     - "S"
     - "SW"
     - "W"
     - "NW"
+    - "N"
+    - "NE"
+    - "E"
+    - "SE"
   format: "png"
   transparent_bg: true
 

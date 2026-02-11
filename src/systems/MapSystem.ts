@@ -152,29 +152,80 @@ export class MapSystem {
     h: number,
     rng: () => number,
   ): Terrain {
-    // Simple noise-like distribution
+    // Zone-based terrain with smooth Perlin-like noise for natural clustering.
+    // Uses layered noise (large + small scale) so similar terrains group
+    // together instead of random salt-and-pepper.
     const cx = w / 2;
     const cy = h / 2;
     const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
-    const r = rng();
 
-    // Water on edges
+    // Water border (2 tiles wide)
     if (x <= 1 || y <= 1 || x >= w - 2 || y >= h - 2) return Terrain.Water;
 
-    // More rubble near center (settlement)
+    // Settlement core (radius 6) — concrete and rubble
     if (dist < 6) {
-      if (r < 0.3) return Terrain.Concrete;
-      if (r < 0.5) return Terrain.Rubble;
+      const n = this.noise2d(x, y, 0.3, rng);
+      if (n < 0.3) return Terrain.Concrete;
+      if (n < 0.55) return Terrain.Rubble;
       return Terrain.Dirt;
     }
 
-    // Mid range — mixed terrain
-    if (r < 0.05) return Terrain.Water;
-    if (r < 0.15) return Terrain.Rubble;
-    if (r < 0.3) return Terrain.CrackedEarth;
-    if (r < 0.4) return Terrain.Grass;
-    if (r < 0.65) return Terrain.Sand;
-    return Terrain.Dirt;
+    // Roads (cross pattern through center)
+    if ((Math.abs(x - cx) <= 1 && y > 4 && y < h - 4) ||
+        (Math.abs(y - cy) <= 1 && x > 4 && x < h - 4)) {
+      return Terrain.Road;
+    }
+
+    // Outer terrain — use noise to cluster similar terrains together
+    const n1 = this.noise2d(x, y, 0.12, rng);  // Large-scale zones
+    const n2 = this.noise2d(x + 100, y + 100, 0.25, rng);  // Detail variation
+
+    // Zone distribution based on distance from center
+    if (dist < 12) {
+      // Near settlement: dirt, cracked earth, some rubble
+      if (n1 < 0.3) return Terrain.CrackedEarth;
+      if (n1 < 0.5) return Terrain.Dirt;
+      if (n1 < 0.7) return Terrain.Rubble;
+      return n2 < 0.5 ? Terrain.Sand : Terrain.Dirt;
+    }
+
+    // Outer wasteland: large patches of sand, dirt, cracked earth, sparse grass
+    if (n1 < 0.25) return Terrain.Sand;
+    if (n1 < 0.45) return Terrain.CrackedEarth;
+    if (n1 < 0.65) return Terrain.Dirt;
+    if (n1 < 0.78) return n2 < 0.3 ? Terrain.Grass : Terrain.Sand;
+    if (n1 < 0.92) return Terrain.Sand;
+    return Terrain.Grass;
+  }
+
+  /** Simple hash-based 2D noise for terrain clustering.
+   *  Returns 0-1.  freq controls patch size (lower = larger patches). */
+  private noise2d(x: number, y: number, freq: number, _rng: () => number): number {
+    const fx = x * freq;
+    const fy = y * freq;
+    // Integer lattice points
+    const ix = Math.floor(fx);
+    const iy = Math.floor(fy);
+    const dx = fx - ix;
+    const dy = fy - iy;
+    // Hash corners
+    const h00 = this.hash(ix, iy);
+    const h10 = this.hash(ix + 1, iy);
+    const h01 = this.hash(ix, iy + 1);
+    const h11 = this.hash(ix + 1, iy + 1);
+    // Smooth interpolation (hermite)
+    const sx = dx * dx * (3 - 2 * dx);
+    const sy = dy * dy * (3 - 2 * dy);
+    const top = h00 + (h10 - h00) * sx;
+    const bottom = h01 + (h11 - h01) * sx;
+    return top + (bottom - top) * sy;
+  }
+
+  private hash(x: number, y: number): number {
+    let h = (x * 374761393 + y * 668265263 + 1013904223) | 0;
+    h = ((h >> 13) ^ h) | 0;
+    h = (h * 1274126177 + 1013904223) | 0;
+    return ((h >> 16) & 0x7fff) / 0x7fff;
   }
 
   private placeStructures(
