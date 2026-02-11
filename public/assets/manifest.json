@@ -150,15 +150,55 @@
         "E": "/assets/sprites/npc_doc-walk_2-e.png",
         "SE": "/assets/sprites/npc_doc-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/npc_doc-attack-s.png",
-        "SW": "/assets/sprites/npc_doc-attack-sw.png",
-        "W": "/assets/sprites/npc_doc-attack-w.png",
-        "NW": "/assets/sprites/npc_doc-attack-nw.png",
-        "N": "/assets/sprites/npc_doc-attack-n.png",
-        "NE": "/assets/sprites/npc_doc-attack-ne.png",
-        "E": "/assets/sprites/npc_doc-attack-e.png",
-        "SE": "/assets/sprites/npc_doc-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/npc_doc-walk_3-s.png",
+        "SW": "/assets/sprites/npc_doc-walk_3-sw.png",
+        "W": "/assets/sprites/npc_doc-walk_3-w.png",
+        "NW": "/assets/sprites/npc_doc-walk_3-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_3-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_3-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_3-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_doc-walk_4-s.png",
+        "SW": "/assets/sprites/npc_doc-walk_4-sw.png",
+        "W": "/assets/sprites/npc_doc-walk_4-w.png",
+        "NW": "/assets/sprites/npc_doc-walk_4-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_4-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_4-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_4-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_doc-attack_1-s.png",
+        "SW": "/assets/sprites/npc_doc-attack_1-sw.png",
+        "W": "/assets/sprites/npc_doc-attack_1-w.png",
+        "NW": "/assets/sprites/npc_doc-attack_1-nw.png",
+        "N": "/assets/sprites/npc_doc-attack_1-n.png",
+        "NE": "/assets/sprites/npc_doc-attack_1-ne.png",
+        "E": "/assets/sprites/npc_doc-attack_1-e.png",
+        "SE": "/assets/sprites/npc_doc-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_doc-attack_2-s.png",
+        "SW": "/assets/sprites/npc_doc-attack_2-sw.png",
+        "W": "/assets/sprites/npc_doc-attack_2-w.png",
+        "NW": "/assets/sprites/npc_doc-attack_2-nw.png",
+        "N": "/assets/sprites/npc_doc-attack_2-n.png",
+        "NE": "/assets/sprites/npc_doc-attack_2-ne.png",
+        "E": "/assets/sprites/npc_doc-attack_2-e.png",
+        "SE": "/assets/sprites/npc_doc-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_doc-hit-s.png",
+        "SW": "/assets/sprites/npc_doc-hit-sw.png",
+        "W": "/assets/sprites/npc_doc-hit-w.png",
+        "NW": "/assets/sprites/npc_doc-hit-nw.png",
+        "N": "/assets/sprites/npc_doc-hit-n.png",
+        "NE": "/assets/sprites/npc_doc-hit-ne.png",
+        "E": "/assets/sprites/npc_doc-hit-e.png",
+        "SE": "/assets/sprites/npc_doc-hit-se.png"
       }
     },
     "npc_merchant": {
@@ -192,15 +232,55 @@
         "E": "/assets/sprites/npc_merchant-walk_2-e.png",
         "SE": "/assets/sprites/npc_merchant-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/npc_merchant-attack-s.png",
-        "SW": "/assets/sprites/npc_merchant-attack-sw.png",
-        "W": "/assets/sprites/npc_merchant-attack-w.png",
-        "NW": "/assets/sprites/npc_merchant-attack-nw.png",
-        "N": "/assets/sprites/npc_merchant-attack-n.png",
-        "NE": "/assets/sprites/npc_merchant-attack-ne.png",
-        "E": "/assets/sprites/npc_merchant-attack-e.png",
-        "SE": "/assets/sprites/npc_merchant-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/npc_merchant-walk_3-s.png",
+        "SW": "/assets/sprites/npc_merchant-walk_3-sw.png",
+        "W": "/assets/sprites/npc_merchant-walk_3-w.png",
+        "NW": "/assets/sprites/npc_merchant-walk_3-nw.png",
+        "N": "/assets/sprites/npc_merchant-walk_3-n.png",
+        "NE": "/assets/sprites/npc_merchant-walk_3-ne.png",
+        "E": "/assets/sprites/npc_merchant-walk_3-e.png",
+        "SE": "/assets/sprites/npc_merchant-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_merchant-walk_4-s.png",
+        "SW": "/assets/sprites/npc_merchant-walk_4-sw.png",
+        "W": "/assets/sprites/npc_merchant-walk_4-w.png",
+        "NW": "/assets/sprites/npc_merchant-walk_4-nw.png",
+        "N": "/assets/sprites/npc_merchant-walk_4-n.png",
+        "NE": "/assets/sprites/npc_merchant-walk_4-ne.png",
+        "E": "/assets/sprites/npc_merchant-walk_4-e.png",
+        "SE": "/assets/sprites/npc_merchant-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_merchant-attack_1-s.png",
+        "SW": "/assets/sprites/npc_merchant-attack_1-sw.png",
+        "W": "/assets/sprites/npc_merchant-attack_1-w.png",
+        "NW": "/assets/sprites/npc_merchant-attack_1-nw.png",
+        "N": "/assets/sprites/npc_merchant-attack_1-n.png",
+        "NE": "/assets/sprites/npc_merchant-attack_1-ne.png",
+        "E": "/assets/sprites/npc_merchant-attack_1-e.png",
+        "SE": "/assets/sprites/npc_merchant-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_merchant-attack_2-s.png",
+        "SW": "/assets/sprites/npc_merchant-attack_2-sw.png",
+        "W": "/assets/sprites/npc_merchant-attack_2-w.png",
+        "NW": "/assets/sprites/npc_merchant-attack_2-nw.png",
+        "N": "/assets/sprites/npc_merchant-attack_2-n.png",
+        "NE": "/assets/sprites/npc_merchant-attack_2-ne.png",
+        "E": "/assets/sprites/npc_merchant-attack_2-e.png",
+        "SE": "/assets/sprites/npc_merchant-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_merchant-hit-s.png",
+        "SW": "/assets/sprites/npc_merchant-hit-sw.png",
+        "W": "/assets/sprites/npc_merchant-hit-w.png",
+        "NW": "/assets/sprites/npc_merchant-hit-nw.png",
+        "N": "/assets/sprites/npc_merchant-hit-n.png",
+        "NE": "/assets/sprites/npc_merchant-hit-ne.png",
+        "E": "/assets/sprites/npc_merchant-hit-e.png",
+        "SE": "/assets/sprites/npc_merchant-hit-se.png"
       }
     },
     "npc_raider": {
@@ -234,15 +314,55 @@
         "E": "/assets/sprites/npc_raider-walk_2-e.png",
         "SE": "/assets/sprites/npc_raider-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/npc_raider-attack-s.png",
-        "SW": "/assets/sprites/npc_raider-attack-sw.png",
-        "W": "/assets/sprites/npc_raider-attack-w.png",
-        "NW": "/assets/sprites/npc_raider-attack-nw.png",
-        "N": "/assets/sprites/npc_raider-attack-n.png",
-        "NE": "/assets/sprites/npc_raider-attack-ne.png",
-        "E": "/assets/sprites/npc_raider-attack-e.png",
-        "SE": "/assets/sprites/npc_raider-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/npc_raider-walk_3-s.png",
+        "SW": "/assets/sprites/npc_raider-walk_3-sw.png",
+        "W": "/assets/sprites/npc_raider-walk_3-w.png",
+        "NW": "/assets/sprites/npc_raider-walk_3-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_3-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_3-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_3-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_raider-walk_4-s.png",
+        "SW": "/assets/sprites/npc_raider-walk_4-sw.png",
+        "W": "/assets/sprites/npc_raider-walk_4-w.png",
+        "NW": "/assets/sprites/npc_raider-walk_4-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_4-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_4-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_4-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_raider-attack_1-s.png",
+        "SW": "/assets/sprites/npc_raider-attack_1-sw.png",
+        "W": "/assets/sprites/npc_raider-attack_1-w.png",
+        "NW": "/assets/sprites/npc_raider-attack_1-nw.png",
+        "N": "/assets/sprites/npc_raider-attack_1-n.png",
+        "NE": "/assets/sprites/npc_raider-attack_1-ne.png",
+        "E": "/assets/sprites/npc_raider-attack_1-e.png",
+        "SE": "/assets/sprites/npc_raider-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_raider-attack_2-s.png",
+        "SW": "/assets/sprites/npc_raider-attack_2-sw.png",
+        "W": "/assets/sprites/npc_raider-attack_2-w.png",
+        "NW": "/assets/sprites/npc_raider-attack_2-nw.png",
+        "N": "/assets/sprites/npc_raider-attack_2-n.png",
+        "NE": "/assets/sprites/npc_raider-attack_2-ne.png",
+        "E": "/assets/sprites/npc_raider-attack_2-e.png",
+        "SE": "/assets/sprites/npc_raider-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_raider-hit-s.png",
+        "SW": "/assets/sprites/npc_raider-hit-sw.png",
+        "W": "/assets/sprites/npc_raider-hit-w.png",
+        "NW": "/assets/sprites/npc_raider-hit-nw.png",
+        "N": "/assets/sprites/npc_raider-hit-n.png",
+        "NE": "/assets/sprites/npc_raider-hit-ne.png",
+        "E": "/assets/sprites/npc_raider-hit-e.png",
+        "SE": "/assets/sprites/npc_raider-hit-se.png"
       }
     },
     "npc_sheriff": {
@@ -276,15 +396,55 @@
         "E": "/assets/sprites/npc_sheriff-walk_2-e.png",
         "SE": "/assets/sprites/npc_sheriff-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/npc_sheriff-attack-s.png",
-        "SW": "/assets/sprites/npc_sheriff-attack-sw.png",
-        "W": "/assets/sprites/npc_sheriff-attack-w.png",
-        "NW": "/assets/sprites/npc_sheriff-attack-nw.png",
-        "N": "/assets/sprites/npc_sheriff-attack-n.png",
-        "NE": "/assets/sprites/npc_sheriff-attack-ne.png",
-        "E": "/assets/sprites/npc_sheriff-attack-e.png",
-        "SE": "/assets/sprites/npc_sheriff-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/npc_sheriff-walk_3-s.png",
+        "SW": "/assets/sprites/npc_sheriff-walk_3-sw.png",
+        "W": "/assets/sprites/npc_sheriff-walk_3-w.png",
+        "NW": "/assets/sprites/npc_sheriff-walk_3-nw.png",
+        "N": "/assets/sprites/npc_sheriff-walk_3-n.png",
+        "NE": "/assets/sprites/npc_sheriff-walk_3-ne.png",
+        "E": "/assets/sprites/npc_sheriff-walk_3-e.png",
+        "SE": "/assets/sprites/npc_sheriff-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_sheriff-walk_4-s.png",
+        "SW": "/assets/sprites/npc_sheriff-walk_4-sw.png",
+        "W": "/assets/sprites/npc_sheriff-walk_4-w.png",
+        "NW": "/assets/sprites/npc_sheriff-walk_4-nw.png",
+        "N": "/assets/sprites/npc_sheriff-walk_4-n.png",
+        "NE": "/assets/sprites/npc_sheriff-walk_4-ne.png",
+        "E": "/assets/sprites/npc_sheriff-walk_4-e.png",
+        "SE": "/assets/sprites/npc_sheriff-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_sheriff-attack_1-s.png",
+        "SW": "/assets/sprites/npc_sheriff-attack_1-sw.png",
+        "W": "/assets/sprites/npc_sheriff-attack_1-w.png",
+        "NW": "/assets/sprites/npc_sheriff-attack_1-nw.png",
+        "N": "/assets/sprites/npc_sheriff-attack_1-n.png",
+        "NE": "/assets/sprites/npc_sheriff-attack_1-ne.png",
+        "E": "/assets/sprites/npc_sheriff-attack_1-e.png",
+        "SE": "/assets/sprites/npc_sheriff-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_sheriff-attack_2-s.png",
+        "SW": "/assets/sprites/npc_sheriff-attack_2-sw.png",
+        "W": "/assets/sprites/npc_sheriff-attack_2-w.png",
+        "NW": "/assets/sprites/npc_sheriff-attack_2-nw.png",
+        "N": "/assets/sprites/npc_sheriff-attack_2-n.png",
+        "NE": "/assets/sprites/npc_sheriff-attack_2-ne.png",
+        "E": "/assets/sprites/npc_sheriff-attack_2-e.png",
+        "SE": "/assets/sprites/npc_sheriff-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_sheriff-hit-s.png",
+        "SW": "/assets/sprites/npc_sheriff-hit-sw.png",
+        "W": "/assets/sprites/npc_sheriff-hit-w.png",
+        "NW": "/assets/sprites/npc_sheriff-hit-nw.png",
+        "N": "/assets/sprites/npc_sheriff-hit-n.png",
+        "NE": "/assets/sprites/npc_sheriff-hit-ne.png",
+        "E": "/assets/sprites/npc_sheriff-hit-e.png",
+        "SE": "/assets/sprites/npc_sheriff-hit-se.png"
       }
     },
     "player": {
@@ -318,15 +478,55 @@
         "E": "/assets/sprites/player-walk_2-e.png",
         "SE": "/assets/sprites/player-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player-attack-s.png",
-        "SW": "/assets/sprites/player-attack-sw.png",
-        "W": "/assets/sprites/player-attack-w.png",
-        "NW": "/assets/sprites/player-attack-nw.png",
-        "N": "/assets/sprites/player-attack-n.png",
-        "NE": "/assets/sprites/player-attack-ne.png",
-        "E": "/assets/sprites/player-attack-e.png",
-        "SE": "/assets/sprites/player-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player-walk_3-s.png",
+        "SW": "/assets/sprites/player-walk_3-sw.png",
+        "W": "/assets/sprites/player-walk_3-w.png",
+        "NW": "/assets/sprites/player-walk_3-nw.png",
+        "N": "/assets/sprites/player-walk_3-n.png",
+        "NE": "/assets/sprites/player-walk_3-ne.png",
+        "E": "/assets/sprites/player-walk_3-e.png",
+        "SE": "/assets/sprites/player-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player-walk_4-s.png",
+        "SW": "/assets/sprites/player-walk_4-sw.png",
+        "W": "/assets/sprites/player-walk_4-w.png",
+        "NW": "/assets/sprites/player-walk_4-nw.png",
+        "N": "/assets/sprites/player-walk_4-n.png",
+        "NE": "/assets/sprites/player-walk_4-ne.png",
+        "E": "/assets/sprites/player-walk_4-e.png",
+        "SE": "/assets/sprites/player-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player-attack_1-s.png",
+        "SW": "/assets/sprites/player-attack_1-sw.png",
+        "W": "/assets/sprites/player-attack_1-w.png",
+        "NW": "/assets/sprites/player-attack_1-nw.png",
+        "N": "/assets/sprites/player-attack_1-n.png",
+        "NE": "/assets/sprites/player-attack_1-ne.png",
+        "E": "/assets/sprites/player-attack_1-e.png",
+        "SE": "/assets/sprites/player-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player-attack_2-s.png",
+        "SW": "/assets/sprites/player-attack_2-sw.png",
+        "W": "/assets/sprites/player-attack_2-w.png",
+        "NW": "/assets/sprites/player-attack_2-nw.png",
+        "N": "/assets/sprites/player-attack_2-n.png",
+        "NE": "/assets/sprites/player-attack_2-ne.png",
+        "E": "/assets/sprites/player-attack_2-e.png",
+        "SE": "/assets/sprites/player-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player-hit-s.png",
+        "SW": "/assets/sprites/player-hit-sw.png",
+        "W": "/assets/sprites/player-hit-w.png",
+        "NW": "/assets/sprites/player-hit-nw.png",
+        "N": "/assets/sprites/player-hit-n.png",
+        "NE": "/assets/sprites/player-hit-ne.png",
+        "E": "/assets/sprites/player-hit-e.png",
+        "SE": "/assets/sprites/player-hit-se.png"
       }
     },
     "player_bat": {
@@ -360,15 +560,55 @@
         "E": "/assets/sprites/player_bat-walk_2-e.png",
         "SE": "/assets/sprites/player_bat-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player_bat-attack-s.png",
-        "SW": "/assets/sprites/player_bat-attack-sw.png",
-        "W": "/assets/sprites/player_bat-attack-w.png",
-        "NW": "/assets/sprites/player_bat-attack-nw.png",
-        "N": "/assets/sprites/player_bat-attack-n.png",
-        "NE": "/assets/sprites/player_bat-attack-ne.png",
-        "E": "/assets/sprites/player_bat-attack-e.png",
-        "SE": "/assets/sprites/player_bat-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player_bat-walk_3-s.png",
+        "SW": "/assets/sprites/player_bat-walk_3-sw.png",
+        "W": "/assets/sprites/player_bat-walk_3-w.png",
+        "NW": "/assets/sprites/player_bat-walk_3-nw.png",
+        "N": "/assets/sprites/player_bat-walk_3-n.png",
+        "NE": "/assets/sprites/player_bat-walk_3-ne.png",
+        "E": "/assets/sprites/player_bat-walk_3-e.png",
+        "SE": "/assets/sprites/player_bat-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player_bat-walk_4-s.png",
+        "SW": "/assets/sprites/player_bat-walk_4-sw.png",
+        "W": "/assets/sprites/player_bat-walk_4-w.png",
+        "NW": "/assets/sprites/player_bat-walk_4-nw.png",
+        "N": "/assets/sprites/player_bat-walk_4-n.png",
+        "NE": "/assets/sprites/player_bat-walk_4-ne.png",
+        "E": "/assets/sprites/player_bat-walk_4-e.png",
+        "SE": "/assets/sprites/player_bat-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player_bat-attack_1-s.png",
+        "SW": "/assets/sprites/player_bat-attack_1-sw.png",
+        "W": "/assets/sprites/player_bat-attack_1-w.png",
+        "NW": "/assets/sprites/player_bat-attack_1-nw.png",
+        "N": "/assets/sprites/player_bat-attack_1-n.png",
+        "NE": "/assets/sprites/player_bat-attack_1-ne.png",
+        "E": "/assets/sprites/player_bat-attack_1-e.png",
+        "SE": "/assets/sprites/player_bat-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player_bat-attack_2-s.png",
+        "SW": "/assets/sprites/player_bat-attack_2-sw.png",
+        "W": "/assets/sprites/player_bat-attack_2-w.png",
+        "NW": "/assets/sprites/player_bat-attack_2-nw.png",
+        "N": "/assets/sprites/player_bat-attack_2-n.png",
+        "NE": "/assets/sprites/player_bat-attack_2-ne.png",
+        "E": "/assets/sprites/player_bat-attack_2-e.png",
+        "SE": "/assets/sprites/player_bat-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player_bat-hit-s.png",
+        "SW": "/assets/sprites/player_bat-hit-sw.png",
+        "W": "/assets/sprites/player_bat-hit-w.png",
+        "NW": "/assets/sprites/player_bat-hit-nw.png",
+        "N": "/assets/sprites/player_bat-hit-n.png",
+        "NE": "/assets/sprites/player_bat-hit-ne.png",
+        "E": "/assets/sprites/player_bat-hit-e.png",
+        "SE": "/assets/sprites/player_bat-hit-se.png"
       }
     },
     "player_knife": {
@@ -402,15 +642,55 @@
         "E": "/assets/sprites/player_knife-walk_2-e.png",
         "SE": "/assets/sprites/player_knife-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player_knife-attack-s.png",
-        "SW": "/assets/sprites/player_knife-attack-sw.png",
-        "W": "/assets/sprites/player_knife-attack-w.png",
-        "NW": "/assets/sprites/player_knife-attack-nw.png",
-        "N": "/assets/sprites/player_knife-attack-n.png",
-        "NE": "/assets/sprites/player_knife-attack-ne.png",
-        "E": "/assets/sprites/player_knife-attack-e.png",
-        "SE": "/assets/sprites/player_knife-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player_knife-walk_3-s.png",
+        "SW": "/assets/sprites/player_knife-walk_3-sw.png",
+        "W": "/assets/sprites/player_knife-walk_3-w.png",
+        "NW": "/assets/sprites/player_knife-walk_3-nw.png",
+        "N": "/assets/sprites/player_knife-walk_3-n.png",
+        "NE": "/assets/sprites/player_knife-walk_3-ne.png",
+        "E": "/assets/sprites/player_knife-walk_3-e.png",
+        "SE": "/assets/sprites/player_knife-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player_knife-walk_4-s.png",
+        "SW": "/assets/sprites/player_knife-walk_4-sw.png",
+        "W": "/assets/sprites/player_knife-walk_4-w.png",
+        "NW": "/assets/sprites/player_knife-walk_4-nw.png",
+        "N": "/assets/sprites/player_knife-walk_4-n.png",
+        "NE": "/assets/sprites/player_knife-walk_4-ne.png",
+        "E": "/assets/sprites/player_knife-walk_4-e.png",
+        "SE": "/assets/sprites/player_knife-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player_knife-attack_1-s.png",
+        "SW": "/assets/sprites/player_knife-attack_1-sw.png",
+        "W": "/assets/sprites/player_knife-attack_1-w.png",
+        "NW": "/assets/sprites/player_knife-attack_1-nw.png",
+        "N": "/assets/sprites/player_knife-attack_1-n.png",
+        "NE": "/assets/sprites/player_knife-attack_1-ne.png",
+        "E": "/assets/sprites/player_knife-attack_1-e.png",
+        "SE": "/assets/sprites/player_knife-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player_knife-attack_2-s.png",
+        "SW": "/assets/sprites/player_knife-attack_2-sw.png",
+        "W": "/assets/sprites/player_knife-attack_2-w.png",
+        "NW": "/assets/sprites/player_knife-attack_2-nw.png",
+        "N": "/assets/sprites/player_knife-attack_2-n.png",
+        "NE": "/assets/sprites/player_knife-attack_2-ne.png",
+        "E": "/assets/sprites/player_knife-attack_2-e.png",
+        "SE": "/assets/sprites/player_knife-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player_knife-hit-s.png",
+        "SW": "/assets/sprites/player_knife-hit-sw.png",
+        "W": "/assets/sprites/player_knife-hit-w.png",
+        "NW": "/assets/sprites/player_knife-hit-nw.png",
+        "N": "/assets/sprites/player_knife-hit-n.png",
+        "NE": "/assets/sprites/player_knife-hit-ne.png",
+        "E": "/assets/sprites/player_knife-hit-e.png",
+        "SE": "/assets/sprites/player_knife-hit-se.png"
       }
     },
     "player_pistol": {
@@ -444,15 +724,55 @@
         "E": "/assets/sprites/player_pistol-walk_2-e.png",
         "SE": "/assets/sprites/player_pistol-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player_pistol-attack-s.png",
-        "SW": "/assets/sprites/player_pistol-attack-sw.png",
-        "W": "/assets/sprites/player_pistol-attack-w.png",
-        "NW": "/assets/sprites/player_pistol-attack-nw.png",
-        "N": "/assets/sprites/player_pistol-attack-n.png",
-        "NE": "/assets/sprites/player_pistol-attack-ne.png",
-        "E": "/assets/sprites/player_pistol-attack-e.png",
-        "SE": "/assets/sprites/player_pistol-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player_pistol-walk_3-s.png",
+        "SW": "/assets/sprites/player_pistol-walk_3-sw.png",
+        "W": "/assets/sprites/player_pistol-walk_3-w.png",
+        "NW": "/assets/sprites/player_pistol-walk_3-nw.png",
+        "N": "/assets/sprites/player_pistol-walk_3-n.png",
+        "NE": "/assets/sprites/player_pistol-walk_3-ne.png",
+        "E": "/assets/sprites/player_pistol-walk_3-e.png",
+        "SE": "/assets/sprites/player_pistol-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player_pistol-walk_4-s.png",
+        "SW": "/assets/sprites/player_pistol-walk_4-sw.png",
+        "W": "/assets/sprites/player_pistol-walk_4-w.png",
+        "NW": "/assets/sprites/player_pistol-walk_4-nw.png",
+        "N": "/assets/sprites/player_pistol-walk_4-n.png",
+        "NE": "/assets/sprites/player_pistol-walk_4-ne.png",
+        "E": "/assets/sprites/player_pistol-walk_4-e.png",
+        "SE": "/assets/sprites/player_pistol-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player_pistol-attack_1-s.png",
+        "SW": "/assets/sprites/player_pistol-attack_1-sw.png",
+        "W": "/assets/sprites/player_pistol-attack_1-w.png",
+        "NW": "/assets/sprites/player_pistol-attack_1-nw.png",
+        "N": "/assets/sprites/player_pistol-attack_1-n.png",
+        "NE": "/assets/sprites/player_pistol-attack_1-ne.png",
+        "E": "/assets/sprites/player_pistol-attack_1-e.png",
+        "SE": "/assets/sprites/player_pistol-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player_pistol-attack_2-s.png",
+        "SW": "/assets/sprites/player_pistol-attack_2-sw.png",
+        "W": "/assets/sprites/player_pistol-attack_2-w.png",
+        "NW": "/assets/sprites/player_pistol-attack_2-nw.png",
+        "N": "/assets/sprites/player_pistol-attack_2-n.png",
+        "NE": "/assets/sprites/player_pistol-attack_2-ne.png",
+        "E": "/assets/sprites/player_pistol-attack_2-e.png",
+        "SE": "/assets/sprites/player_pistol-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player_pistol-hit-s.png",
+        "SW": "/assets/sprites/player_pistol-hit-sw.png",
+        "W": "/assets/sprites/player_pistol-hit-w.png",
+        "NW": "/assets/sprites/player_pistol-hit-nw.png",
+        "N": "/assets/sprites/player_pistol-hit-n.png",
+        "NE": "/assets/sprites/player_pistol-hit-ne.png",
+        "E": "/assets/sprites/player_pistol-hit-e.png",
+        "SE": "/assets/sprites/player_pistol-hit-se.png"
       }
     },
     "player_rifle": {
@@ -486,15 +806,55 @@
         "E": "/assets/sprites/player_rifle-walk_2-e.png",
         "SE": "/assets/sprites/player_rifle-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player_rifle-attack-s.png",
-        "SW": "/assets/sprites/player_rifle-attack-sw.png",
-        "W": "/assets/sprites/player_rifle-attack-w.png",
-        "NW": "/assets/sprites/player_rifle-attack-nw.png",
-        "N": "/assets/sprites/player_rifle-attack-n.png",
-        "NE": "/assets/sprites/player_rifle-attack-ne.png",
-        "E": "/assets/sprites/player_rifle-attack-e.png",
-        "SE": "/assets/sprites/player_rifle-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player_rifle-walk_3-s.png",
+        "SW": "/assets/sprites/player_rifle-walk_3-sw.png",
+        "W": "/assets/sprites/player_rifle-walk_3-w.png",
+        "NW": "/assets/sprites/player_rifle-walk_3-nw.png",
+        "N": "/assets/sprites/player_rifle-walk_3-n.png",
+        "NE": "/assets/sprites/player_rifle-walk_3-ne.png",
+        "E": "/assets/sprites/player_rifle-walk_3-e.png",
+        "SE": "/assets/sprites/player_rifle-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player_rifle-walk_4-s.png",
+        "SW": "/assets/sprites/player_rifle-walk_4-sw.png",
+        "W": "/assets/sprites/player_rifle-walk_4-w.png",
+        "NW": "/assets/sprites/player_rifle-walk_4-nw.png",
+        "N": "/assets/sprites/player_rifle-walk_4-n.png",
+        "NE": "/assets/sprites/player_rifle-walk_4-ne.png",
+        "E": "/assets/sprites/player_rifle-walk_4-e.png",
+        "SE": "/assets/sprites/player_rifle-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player_rifle-attack_1-s.png",
+        "SW": "/assets/sprites/player_rifle-attack_1-sw.png",
+        "W": "/assets/sprites/player_rifle-attack_1-w.png",
+        "NW": "/assets/sprites/player_rifle-attack_1-nw.png",
+        "N": "/assets/sprites/player_rifle-attack_1-n.png",
+        "NE": "/assets/sprites/player_rifle-attack_1-ne.png",
+        "E": "/assets/sprites/player_rifle-attack_1-e.png",
+        "SE": "/assets/sprites/player_rifle-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player_rifle-attack_2-s.png",
+        "SW": "/assets/sprites/player_rifle-attack_2-sw.png",
+        "W": "/assets/sprites/player_rifle-attack_2-w.png",
+        "NW": "/assets/sprites/player_rifle-attack_2-nw.png",
+        "N": "/assets/sprites/player_rifle-attack_2-n.png",
+        "NE": "/assets/sprites/player_rifle-attack_2-ne.png",
+        "E": "/assets/sprites/player_rifle-attack_2-e.png",
+        "SE": "/assets/sprites/player_rifle-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player_rifle-hit-s.png",
+        "SW": "/assets/sprites/player_rifle-hit-sw.png",
+        "W": "/assets/sprites/player_rifle-hit-w.png",
+        "NW": "/assets/sprites/player_rifle-hit-nw.png",
+        "N": "/assets/sprites/player_rifle-hit-n.png",
+        "NE": "/assets/sprites/player_rifle-hit-ne.png",
+        "E": "/assets/sprites/player_rifle-hit-e.png",
+        "SE": "/assets/sprites/player_rifle-hit-se.png"
       }
     },
     "player_unarmed": {
@@ -528,15 +888,55 @@
         "E": "/assets/sprites/player_unarmed-walk_2-e.png",
         "SE": "/assets/sprites/player_unarmed-walk_2-se.png"
       },
-      "attack": {
-        "S": "/assets/sprites/player_unarmed-attack-s.png",
-        "SW": "/assets/sprites/player_unarmed-attack-sw.png",
-        "W": "/assets/sprites/player_unarmed-attack-w.png",
-        "NW": "/assets/sprites/player_unarmed-attack-nw.png",
-        "N": "/assets/sprites/player_unarmed-attack-n.png",
-        "NE": "/assets/sprites/player_unarmed-attack-ne.png",
-        "E": "/assets/sprites/player_unarmed-attack-e.png",
-        "SE": "/assets/sprites/player_unarmed-attack-se.png"
+      "walk_3": {
+        "S": "/assets/sprites/player_unarmed-walk_3-s.png",
+        "SW": "/assets/sprites/player_unarmed-walk_3-sw.png",
+        "W": "/assets/sprites/player_unarmed-walk_3-w.png",
+        "NW": "/assets/sprites/player_unarmed-walk_3-nw.png",
+        "N": "/assets/sprites/player_unarmed-walk_3-n.png",
+        "NE": "/assets/sprites/player_unarmed-walk_3-ne.png",
+        "E": "/assets/sprites/player_unarmed-walk_3-e.png",
+        "SE": "/assets/sprites/player_unarmed-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/player_unarmed-walk_4-s.png",
+        "SW": "/assets/sprites/player_unarmed-walk_4-sw.png",
+        "W": "/assets/sprites/player_unarmed-walk_4-w.png",
+        "NW": "/assets/sprites/player_unarmed-walk_4-nw.png",
+        "N": "/assets/sprites/player_unarmed-walk_4-n.png",
+        "NE": "/assets/sprites/player_unarmed-walk_4-ne.png",
+        "E": "/assets/sprites/player_unarmed-walk_4-e.png",
+        "SE": "/assets/sprites/player_unarmed-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/player_unarmed-attack_1-s.png",
+        "SW": "/assets/sprites/player_unarmed-attack_1-sw.png",
+        "W": "/assets/sprites/player_unarmed-attack_1-w.png",
+        "NW": "/assets/sprites/player_unarmed-attack_1-nw.png",
+        "N": "/assets/sprites/player_unarmed-attack_1-n.png",
+        "NE": "/assets/sprites/player_unarmed-attack_1-ne.png",
+        "E": "/assets/sprites/player_unarmed-attack_1-e.png",
+        "SE": "/assets/sprites/player_unarmed-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/player_unarmed-attack_2-s.png",
+        "SW": "/assets/sprites/player_unarmed-attack_2-sw.png",
+        "W": "/assets/sprites/player_unarmed-attack_2-w.png",
+        "NW": "/assets/sprites/player_unarmed-attack_2-nw.png",
+        "N": "/assets/sprites/player_unarmed-attack_2-n.png",
+        "NE": "/assets/sprites/player_unarmed-attack_2-ne.png",
+        "E": "/assets/sprites/player_unarmed-attack_2-e.png",
+        "SE": "/assets/sprites/player_unarmed-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/player_unarmed-hit-s.png",
+        "SW": "/assets/sprites/player_unarmed-hit-sw.png",
+        "W": "/assets/sprites/player_unarmed-hit-w.png",
+        "NW": "/assets/sprites/player_unarmed-hit-nw.png",
+        "N": "/assets/sprites/player_unarmed-hit-n.png",
+        "NE": "/assets/sprites/player_unarmed-hit-ne.png",
+        "E": "/assets/sprites/player_unarmed-hit-e.png",
+        "SE": "/assets/sprites/player_unarmed-hit-se.png"
       }
     }
   },
