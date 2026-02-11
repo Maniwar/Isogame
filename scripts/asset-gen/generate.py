@@ -56,6 +56,10 @@ from prompts.tiles import (
     build_terrain_prompt,
     build_tileset_prompt,
     build_itemset_prompt,
+    build_terrain_variant_sheet_prompt,
+    build_water_animation_sheet_prompt,
+    TERRAIN_ARCHETYPES,
+    WATER_ARCHETYPE,
 )
 from prompts.characters import (
     build_character_prompt,
@@ -91,6 +95,7 @@ def generate_image(
     prompt: str,
     model: str,
     reference_images: list | None = None,
+    image_size: str | None = None,
 ) -> Image.Image | None:
     """
     Call Gemini to generate a single image from a text prompt.
@@ -100,6 +105,9 @@ def generate_image(
         prompt: The text prompt describing the image.
         model: Model name to use.
         reference_images: Optional list of PIL Images to use as style references.
+        image_size: Output resolution tier — "1K", "2K", or "4K".
+                    Supported by gemini-3-pro-image-preview and imagen-4.
+                    If None, the model uses its default (typically 1K).
 
     Returns:
         A PIL Image on success, or None on failure.
@@ -120,14 +128,25 @@ def generate_image(
     retry_attempts = config.get("api", {}).get("retry_attempts", 3)
     retry_delay = config.get("api", {}).get("retry_delay_seconds", 5)
 
+    # Build image config with resolution tier if specified
+    image_config = None
+    if image_size:
+        image_config = types.ImageConfig(
+            image_size=image_size,
+        )
+
     for attempt in range(1, retry_attempts + 1):
         try:
+            gen_config = types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+            )
+            if image_config:
+                gen_config.image_config = image_config
+
             response = client.models.generate_content(
                 model=model,
                 contents=contents,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                ),
+                config=gen_config,
             )
 
             # Extract image from response parts
@@ -244,14 +263,70 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
+def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
+                         reference_images: list) -> int:
+    """Generate terrain variant sheets — 4 variants per terrain in a 2×2 grid.
+
+    Each terrain type produces a single 1024×1024 image containing 4 isometric
+    diamond tile variants.  Water gets a special animation sheet with 4 frames.
+    Uses image_size="1K" for 1024×1024 output.
+    """
+    model = config["api"]["model"]
+    rpm = config["api"]["requests_per_minute"]
+    generated = 0
+
+    sheets_dir = OUTPUT_DIR / "tiles" / "sheets"
+
+    print(f"\n--- Generating terrain variant sheets ({len(TERRAIN_ARCHETYPES)} terrain + water) ---")
+
+    # Generate each terrain type's 4-variant sheet
+    for archetype in TERRAIN_ARCHETYPES:
+        key = archetype["key"]
+        filename = f"{key}-sheet.png"
+        output_path = sheets_dir / filename
+
+        prompt = build_terrain_variant_sheet_prompt(archetype, config)
+
+        if dry_run:
+            print(f"  [DRY RUN] {filename} (4 variants, 1024×1024, image_size=1K)")
+            print(f"    Prompt: {prompt[:200]}...")
+            generated += 1
+            continue
+
+        print(f"  Generating: {filename} (4 variants of {archetype['terrain_name']})")
+        image = generate_image(client, prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, output_path)
+            generated += 1
+        rate_limit(rpm)
+
+    # Generate animated water sheet (4 animation frames)
+    water_filename = "water-sheet.png"
+    water_path = sheets_dir / water_filename
+    water_prompt = build_water_animation_sheet_prompt(config)
+
+    if dry_run:
+        print(f"  [DRY RUN] {water_filename} (4 anim frames, 1024×1024, image_size=1K)")
+        print(f"    Prompt: {water_prompt[:200]}...")
+        generated += 1
+    else:
+        print(f"  Generating: {water_filename} (4 animation frames)")
+        image = generate_image(client, water_prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, water_path)
+            generated += 1
+        rate_limit(rpm)
+
+    return generated
+
+
 def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                         reference_images: list, use_sheets: bool = True) -> int:
     """Generate character sprites — either as full sprite sheets or individual images.
 
     When use_sheets=True (default), generates one 8×8 sprite sheet per character:
-    8 animation rows (idle, walk_1-4, attack_1-2, hit) × 8 direction columns
-    (S, SW, W, NW, N, NE, E, SE) = 64 frames per sheet.
-    The game maps shoot→attack_1/attack_2 and reload→idle at runtime.
+    8 animation rows × 8 direction columns = 64 frames per sheet.
+    Uses gemini-3-pro-image-preview at 2K (2048×2048) for 256×256 per cell.
 
     For characters with multiple weapon variants (e.g., player_pistol, player_rifle),
     the first variant's sheet is passed as a reference image to subsequent variants
@@ -259,6 +334,7 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["sprites"].get("image_size")
     generated = 0
 
     # Track generated sheets per base character for cross-referencing
@@ -281,10 +357,16 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 name=char["name"],
                 description=char["description"],
                 config=config,
+                weapon_idle_desc=char.get("weapon_idle_desc", "weapon held at side, relaxed"),
+                weapon_attack_desc=char.get("weapon_attack_desc", "weapon swung or fired forward"),
             )
 
+            sheet_size = config["sprites"].get("sheet_size", 2048)
+            n_cols = config["sprites"].get("sheet_cols", 8)
+            n_rows = config["sprites"].get("sheet_rows", 8)
+
             if dry_run:
-                print(f"    [DRY RUN] {filename} (8 anims x 8 dirs = 64 frames)")
+                print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
                 if base_key in base_reference_sheets:
                     print(f"    + using {base_key} reference sheet for consistency")
                 print(f"    Prompt: {prompt[:200]}...")
@@ -297,8 +379,8 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 print(f"    + using {base_key} reference sheet for character consistency")
                 char_refs.append(base_reference_sheets[base_key])
 
-            print(f"    Generating sprite sheet: {filename}")
-            image = generate_image(client, prompt, model, char_refs if char_refs else None)
+            print(f"    Generating sprite sheet: {filename} ({sheet_size}×{sheet_size}px)")
+            image = generate_image(client, prompt, model, char_refs if char_refs else None, image_size=image_size)
             if image:
                 save_image(image, output_path)
                 generated += 1
@@ -339,12 +421,20 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
                      reference_images: list) -> int:
     """Generate weapon overlay sprite sheets.
 
-    Each weapon gets an 8x8 sprite sheet (same layout as character sheets)
+    Each weapon gets an 8×8 sprite sheet (2048×2048, 256×256 per cell)
     showing only the weapon + hands, designed to overlay on character sprites.
+
+    NOTE: Weapon overlays are currently unused — the game uses weapon-variant
+    character sprites instead. Kept for potential future use.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["sprites"].get("image_size")
     generated = 0
+
+    sheet_size = config["sprites"].get("sheet_size", 2048)
+    n_cols = config["sprites"].get("sheet_cols", 8)
+    n_rows = config["sprites"].get("sheet_rows", 8)
 
     print(f"\n--- Generating weapon overlay sprites ({len(WEAPON_ARCHETYPES)} weapons) ---")
 
@@ -361,16 +451,17 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
             description=weapon["description"],
             attack_desc=weapon["attack_desc"],
             config=config,
+            idle_desc=weapon.get("idle_desc", "weapon held at rest, relaxed grip"),
         )
 
         if dry_run:
-            print(f"    [DRY RUN] {filename} (8 anims x 8 dirs = 64 frames)")
+            print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
             print(f"    Prompt: {prompt[:200]}...")
             generated += 1
             continue
 
-        print(f"    Generating weapon sheet: {filename}")
-        image = generate_image(client, prompt, model, reference_images)
+        print(f"    Generating weapon sheet: {filename} ({sheet_size}×{sheet_size}px)")
+        image = generate_image(client, prompt, model, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
@@ -455,14 +546,15 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 # Weapons are now generated as part of character sprite sheets (weapon variants).
 CATEGORY_MAP = {
     "tiles": generate_tiles,
+    "tile_sheets": generate_tile_sheets,
     "characters": generate_characters,
     "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
 }
 
-# Default categories when --category=all (excludes deprecated weapons)
-DEFAULT_CATEGORIES = ["tiles", "characters", "items", "portraits"]
+# Default categories when --category=all (excludes deprecated weapons and legacy tiles)
+DEFAULT_CATEGORIES = ["tile_sheets", "characters", "items", "portraits"]
 
 
 def main():

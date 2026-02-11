@@ -111,7 +111,7 @@ npx tsc --noEmit     # Type-check without emitting
 
 - Tile sprites: 64x32 isometric diamonds with transparent backgrounds
 - Character sprites: 24x36 (procedural) / 64x96 (AI-generated), 8 directions (N, NE, E, SE, S, SW, W, NW)
-- Sprite sheets: 8 rows (idle, walk_1-4, attack_1-2, hit) x 8 columns (directions) = 64 frames per character
+- Sprite sheets: 8×8 grid (8 animations × 8 directions = 64 frames) in 2048×2048 images via gemini-3-pro-image-preview at 2K
 - Item icons: 20x20 (procedural) / 64x64 (AI-generated)
 - All placeholder art is procedurally generated in `AssetManager.ts`
 - File names: lowercase, underscore-separated for sprite keys (e.g., `npc_sheriff`)
@@ -166,7 +166,7 @@ export GEMINI_API_KEY="your-key"
 
 # Step 1: Generate raw art via Gemini API
 python generate.py --category tiles       # Generate tile assets
-python generate.py --category characters  # Full sprite sheets (4 anims x 8 dirs)
+python generate.py --category characters  # Full 8×8 sprite sheets (2048×2048 at 2K)
 python generate.py --category characters --no-sheets  # Legacy: one image per direction
 python generate.py                        # Generate everything (sheets by default)
 
@@ -184,7 +184,7 @@ npm run dev
 ### Pipeline Overview
 
 1. **generate.py** — Calls Gemini API with crafted prompts to produce raw PNGs in `output/`
-   - Character sprites default to sprite sheet mode (one image = all 32 frames)
+   - Character sprites default to sprite sheet mode (8×8 grid = 64 frames at 2048×2048)
    - Use `--no-sheets` for legacy individual-image mode
 2. **postprocess.py** — Palette reduction, resize, transparency cleanup, **sprite sheet slicing** → `processed/`
    - Detects `*-sheet.png` files and slices them into individual `{key}-{anim}-{dir}.png` frames
@@ -193,7 +193,7 @@ npm run dev
    - Manifest includes both `sprites` (static) and `animations` (per-frame) sections
 4. **AssetManager.ts** — At runtime, loads `manifest.json`, fetches PNGs + animation frames, falls back to procedural
 5. **prompts/** — Modular prompt templates for tiles, characters, items, and portraits
-   - `characters.py` — `build_spritesheet_prompt()` for full sheets, `build_character_prompt()` for singles
+   - `characters.py` — `build_spritesheet_prompt()` for 8×8 sheets (2048×2048 at 2K), `build_character_prompt()` for singles
    - `tiles.py` — `build_tileset_prompt()` for tile variant sheets, `build_itemset_prompt()` for icon sheets
 
 ### Style Consistency

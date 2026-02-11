@@ -4,8 +4,17 @@ Weapon sprites are generated as overlays — they show only the weapon and
 the hands/arms holding it, designed to be composited on top of unarmed
 character sprites at runtime.
 
-Layout matches character sheets: 8 rows (animations) x 8 columns (directions).
-Uses a chroma key green (#00FF00) background for reliable alpha extraction.
+NOTE: Weapon overlays are currently unused by the game engine. The game
+uses weapon-variant character sprites (player_pistol, player_rifle, etc.)
+instead of compositing overlays at runtime. This module is kept for
+potential future use.
+
+Generates a full 8×8 sprite sheet per weapon inside a 2048×2048 image:
+  8 columns = 8 viewing directions (S, SW, W, NW, N, NE, E, SE)
+  8 rows    = 8 animation poses   (idle, walk×4, attack×2, hit)
+  = 64 frames per weapon, each in a 256×256 cell
+
+Uses gemini-3-pro-image-preview with image_size="2K" for native 2048×2048.
 """
 
 from .characters import DIRECTIONS, DIRECTION_LABELS, ANIMATIONS, ANIMATION_LABELS
@@ -26,32 +35,35 @@ WEAPON_SHEET_TEMPLATE = (
     "Generate a WEAPON OVERLAY SPRITE SHEET for: {name} — {description}.\n\n"
     "This weapon overlay will be composited on top of a character sprite.\n"
     "Show ONLY the weapon and the hands/forearms holding it.\n\n"
-    "LAYOUT: The sprite sheet is a grid with {num_rows} rows and {num_cols} columns.\n"
-    "Each cell is {cell_w}x{cell_h} pixels.\n"
-    "Total image size: {sheet_w}x{sheet_h} pixels.\n\n"
-    "ROWS (top to bottom — each row is one weapon pose):\n"
-    "{row_descriptions}\n\n"
-    "COLUMNS (left to right — each column is one viewing direction):\n"
-    "{col_descriptions}\n\n"
-    "CRITICAL RULES:\n"
-    "- Every cell must show the SAME weapon with identical proportions and colors.\n"
-    "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
-    "- The weapon + hands should be centered in each cell at chest/waist height.\n"
-    "- Use pure bright green (#00FF00) chroma key background in every cell.\n"
-    "- Draw ONLY the weapon + hands/forearms — nothing else.\n"
-    "- No text, no labels, no watermarks, no grid lines.\n"
+    "IMAGE SIZE: 2048 × 2048 pixels.\n"
+    "GRID: 8 columns × 8 rows = 64 cells, each exactly 256 × 256 pixels.\n\n"
+    "COLUMNS (left to right) — 8 viewing angles, rotating clockwise:\n"
+    "  Col 1 — FRONT: Weapon seen from directly in front.\n"
+    "  Col 2 — FRONT-LEFT 3/4: Weapon rotated 45°. Left side visible.\n"
+    "  Col 3 — LEFT PROFILE: Weapon seen from the left side.\n"
+    "  Col 4 — BACK-LEFT 3/4: Weapon rotated 135° away.\n"
+    "  Col 5 — BACK: Weapon seen from behind.\n"
+    "  Col 6 — BACK-RIGHT 3/4: Weapon rotated 135° the other way.\n"
+    "  Col 7 — RIGHT PROFILE: Weapon seen from the right side.\n"
+    "  Col 8 — FRONT-RIGHT 3/4: Weapon rotated 45° the other way.\n\n"
+    "ROWS (top to bottom) — 8 poses:\n"
+    "  Row 1 — IDLE: {idle_desc}.\n"
+    "  Row 2 — WALK 1: Weapon swaying slightly, left foot forward motion.\n"
+    "  Row 3 — WALK 2: Weapon swaying slightly, right foot forward motion.\n"
+    "  Row 4 — WALK 3: Weapon mid-sway, passing position.\n"
+    "  Row 5 — WALK 4: Weapon mid-sway, opposite passing.\n"
+    "  Row 6 — ATTACK WIND-UP: Weapon drawn back, preparing to strike.\n"
+    "  Row 7 — ATTACK STRIKE: {attack_desc}.\n"
+    "  Row 8 — HIT REACTION: Weapon lowered, recoiling from incoming damage.\n\n"
+    "IMPORTANT RULES:\n"
+    "- The image is EXACTLY 2048×2048. Each of the 64 cells is EXACTLY 256×256.\n"
+    "- Leave 4–8 pixels of green gap between cells so they are clearly separated.\n"
+    "- The weapon + hands fills ~60%% of each cell, centered in the cell.\n"
+    "- The SAME weapon in ALL 64 cells — identical proportions and colors.\n"
+    "- Only the POSE (row) and VIEWING ANGLE (column) change.\n"
+    "- Pure bright GREEN (#00FF00) background in every cell and between cells.\n"
+    "- NO full body, NO scenery, NO text, NO labels, NO watermarks.\n"
 )
-
-WEAPON_ANIMATION_LABELS = {
-    "idle":      "weapon held at rest, relaxed grip at side or in front",
-    "walk_1":    "weapon swaying slightly with walking motion, left foot forward",
-    "walk_2":    "weapon swaying mid-stride, transitioning between steps",
-    "walk_3":    "weapon swaying slightly with walking motion, right foot forward",
-    "walk_4":    "weapon swaying mid-stride, transitioning back",
-    "attack_1":  "weapon drawn back in wind-up, preparing to strike",
-    "attack_2":  "{attack_desc}",
-    "hit":       "weapon lowered, recoiling from incoming damage",
-}
 
 # Weapon archetypes — sprite_key must match WEAPON_SPRITE_MAP in Renderer.ts
 WEAPON_ARCHETYPES = [
@@ -63,6 +75,7 @@ WEAPON_ARCHETYPES = [
             "with brown grip. Compact sidearm. Show the right hand gripping "
             "the pistol at waist level."
         ),
+        "idle_desc": "weapon held at rest, relaxed grip at side",
         "attack_desc": "pistol raised and aimed forward, muzzle flash at barrel tip",
     },
     {
@@ -73,6 +86,7 @@ WEAPON_ARCHETYPES = [
             "Long barrel, rough welds visible. Show both hands gripping the rifle — "
             "right hand on trigger, left hand supporting the barrel."
         ),
+        "idle_desc": "rifle held across chest at ready, relaxed grip",
         "attack_desc": "rifle shouldered and aimed, muzzle flash at barrel end",
     },
     {
@@ -83,6 +97,7 @@ WEAPON_ARCHETYPES = [
             "Held in the right hand. Show the hand gripping the knife at waist level, "
             "blade pointing forward."
         ),
+        "idle_desc": "knife held low at side, blade down, relaxed grip",
         "attack_desc": "knife thrust forward aggressively in a stabbing motion",
     },
     {
@@ -93,6 +108,7 @@ WEAPON_ARCHETYPES = [
             "both hands. Show both hands gripping the bat handle, bat resting "
             "on the shoulder or held at waist level."
         ),
+        "idle_desc": "bat resting on shoulder, relaxed grip",
         "attack_desc": "bat swung in a wide horizontal arc, mid-swing",
     },
 ]
@@ -103,41 +119,17 @@ def build_weapon_spritesheet_prompt(
     description: str,
     attack_desc: str,
     config: dict,
+    idle_desc: str = "weapon held at rest, relaxed grip",
 ) -> str:
-    """Build a prompt for generating a weapon overlay sprite sheet.
+    """Build a prompt for generating a full 8×8 weapon overlay sprite sheet.
 
-    Same 8 rows x 8 columns layout as character sheets.
+    The sheet has 8 rows (animations) × 8 columns (directions) = 64 frames.
+    Uses gemini-3-pro-image-preview at 2K (2048×2048) for 256×256 per cell.
     """
-    cell_w = config["sprites"]["base_width"]
-    cell_h = config["sprites"]["base_height"]
-    num_cols = len(DIRECTIONS)
-    num_rows = len(ANIMATIONS)
-    sheet_w = cell_w * num_cols
-    sheet_h = cell_h * num_rows
-
-    row_descriptions = []
-    for i, anim in enumerate(ANIMATIONS):
-        label = WEAPON_ANIMATION_LABELS[anim]
-        if "{attack_desc}" in label:
-            label = label.format(attack_desc=attack_desc)
-        row_descriptions.append(f"  Row {i + 1}: {label}")
-    row_desc_str = "\n".join(row_descriptions)
-
-    col_descriptions = "\n".join(
-        f"  Column {i + 1}: {DIRECTION_LABELS[d]}"
-        for i, d in enumerate(DIRECTIONS)
-    )
-
     return WEAPON_SHEET_TEMPLATE.format(
         preamble=WEAPON_STYLE_PREAMBLE,
         name=name,
         description=description,
-        num_rows=num_rows,
-        num_cols=num_cols,
-        cell_w=cell_w,
-        cell_h=cell_h,
-        sheet_w=sheet_w,
-        sheet_h=sheet_h,
-        row_descriptions=row_desc_str,
-        col_descriptions=col_descriptions,
+        idle_desc=idle_desc,
+        attack_desc=attack_desc,
     )

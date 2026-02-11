@@ -303,37 +303,52 @@ def detect_actual_grid_size(sheet: Image.Image, min_cell: int = 120) -> tuple[in
     col_density = np.mean(alpha > 10, axis=0)
 
     def count_cells(density: np.ndarray, total_size: int) -> tuple[int, list[int]]:
-        """Count cells and return split positions."""
-        kernel_size = min(40, max(1, total_size // 20))
-        kernel = np.ones(kernel_size) / kernel_size
-        smoothed = np.convolve(density, kernel, mode="same")
+        """Count cells using multi-pass gap detection.
 
-        threshold = 0.10
-        in_gap = smoothed < threshold
-        splits = [0]
+        Starts with a narrow kernel to catch even 5-10px gaps between cells,
+        then tries progressively wider kernels.  Gemini sheets often have
+        very narrow transparent gaps that a single wide kernel smooths away.
+        """
+        best_filtered = [0, total_size]
 
-        i = 0
-        while i < total_size:
-            if in_gap[i]:
-                gap_start = i
-                while i < total_size and in_gap[i]:
+        for kernel_size, threshold in [(5, 0.03), (12, 0.06), (25, 0.08), (40, 0.10)]:
+            ks = min(kernel_size, max(1, total_size // 5))
+            if ks < 1:
+                ks = 1
+            kernel = np.ones(ks) / ks
+            smoothed = np.convolve(density, kernel, mode="same")
+
+            in_gap = smoothed < threshold
+            splits = [0]
+
+            i = 0
+            while i < total_size:
+                if in_gap[i]:
+                    gap_start = i
+                    while i < total_size and in_gap[i]:
+                        i += 1
+                    gap_mid = (gap_start + i) // 2
+                    if gap_mid - splits[-1] >= min_cell:
+                        splits.append(gap_mid)
+                else:
                     i += 1
-                gap_mid = (gap_start + i) // 2
-                if gap_mid - splits[-1] >= min_cell:
-                    splits.append(gap_mid)
-            else:
-                i += 1
-        splits.append(total_size)
+            splits.append(total_size)
 
-        # Filter out tiny trailing cells
-        filtered = [splits[0]]
-        for s in splits[1:]:
-            if s - filtered[-1] >= min_cell:
-                filtered.append(s)
-            else:
-                filtered[-1] = s
+            # Filter out tiny trailing cells
+            filtered = [splits[0]]
+            for s in splits[1:]:
+                if s - filtered[-1] >= min_cell:
+                    filtered.append(s)
+                else:
+                    filtered[-1] = s
 
-        return len(filtered) - 1, filtered
+            if len(filtered) > len(best_filtered):
+                best_filtered = filtered
+
+            if len(best_filtered) - 1 >= 8:
+                break
+
+        return len(best_filtered) - 1, best_filtered
 
     actual_rows, row_splits = count_cells(row_density, sh)
     actual_cols, col_splits = count_cells(col_density, sw)
@@ -615,6 +630,86 @@ def mask_to_diamond(image: Image.Image) -> Image.Image:
     return Image.fromarray(arr, "RGBA")
 
 
+def process_tile_sheets(config: dict, apply_palette: bool = True) -> int:
+    """Slice 2×2 terrain variant sheets into individual diamond tiles.
+
+    Each sheet is 1024×1024 with a 2×2 grid of 512×512 cells.
+    Each cell contains one isometric diamond tile variant on green background.
+
+    Output:
+      - 4 individual tiles per terrain at game resolution (64×32)
+      - Diamond-masked with transparent background
+      - _tile_meta.json mapping terrain keys to variant filenames
+    """
+    game_tile_w = 64
+    game_tile_h = 32
+    processed = 0
+
+    sheets_dir = OUTPUT_DIR / "tiles" / "sheets"
+    dst_dir = PROCESSED_DIR / "tiles" / "ground"
+
+    if not sheets_dir.exists():
+        return 0
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    tile_meta: dict[str, list[str]] = {}
+
+    for sheet_path in sorted(sheets_dir.glob("*-sheet.png")):
+        key = sheet_path.stem.replace("-sheet", "")
+        print(f"  Processing tile sheet: {sheet_path.name} ({key})")
+
+        sheet = Image.open(sheet_path).convert("RGBA")
+
+        # Remove green chroma-key background
+        sheet = force_transparent_bg(sheet)
+
+        sw, sh = sheet.size
+        cell_w = sw // 2
+        cell_h = sh // 2
+
+        variant_files = []
+        for idx in range(4):
+            row = idx // 2
+            col = idx % 2
+            x = col * cell_w
+            y = row * cell_h
+
+            # Extract cell
+            cell = sheet.crop((x, y, x + cell_w, y + cell_h))
+
+            # Resize to game tile size using fill mode (cover)
+            cell = resize_to_fill(cell, game_tile_w, game_tile_h)
+
+            # Clean up transparency
+            cell = cleanup_transparency(cell)
+
+            # Apply diamond mask
+            cell = mask_to_diamond(cell)
+
+            # Palette reduction
+            if apply_palette:
+                palette_img = build_palette_image(config)
+                cell = reduce_palette(cell, palette_img)
+
+            filename = f"{key}-{idx + 1:02d}.png"
+            cell.save(dst_dir / filename, "PNG")
+            variant_files.append(filename)
+            processed += 1
+
+        tile_meta[key] = variant_files
+        print(f"    Sliced {len(variant_files)} variants: {', '.join(variant_files)}")
+
+    # Save metadata for deploy step
+    if tile_meta:
+        meta_path = PROCESSED_DIR / "tiles" / "_tile_meta.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(meta_path, "w") as f:
+            json.dump(tile_meta, f, indent=2)
+        print(f"\n  Tile metadata: {meta_path}")
+
+    return processed
+
+
 def process_tiles(config: dict, apply_palette: bool = True) -> int:
     """Process all tile images: resize, palette reduce, clean transparency.
 
@@ -838,14 +933,15 @@ def process_portraits(config: dict, apply_palette: bool = True) -> int:
 
 STEP_MAP = {
     "tiles": process_tiles,
+    "tile_sheets": process_tile_sheets,
     "sprites": process_sprites,
     "weapons": process_weapons,
     "items": process_items,
     "portraits": process_portraits,
 }
 
-# Default categories when --category=all (excludes deprecated weapons)
-DEFAULT_CATEGORIES = ["tiles", "sprites", "items", "portraits"]
+# Default categories when --category=all (excludes deprecated weapons and legacy tiles)
+DEFAULT_CATEGORIES = ["tile_sheets", "sprites", "items", "portraits"]
 
 
 def main():

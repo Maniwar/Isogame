@@ -40,6 +40,18 @@ TILE_TERRAIN_MAP = {
     "concrete-floor": "Concrete",
 }
 
+# Maps terrain sheet keys (from TERRAIN_ARCHETYPES) to game Terrain enum names
+TILE_SHEET_TERRAIN_MAP = {
+    "sand": "Sand",
+    "dirt": "Dirt",
+    "cracked-earth": "CrackedEarth",
+    "rubble": "Rubble",
+    "road": "Road",
+    "concrete": "Concrete",
+    "grass": "Grass",
+    "water": "Water",
+}
+
 # Water tiles from terrain features
 TERRAIN_OBJECT_MAP = {
     "water-puddle": "Water",
@@ -77,7 +89,32 @@ def deploy(source: Path, target: Path) -> dict:
 
     deployed = 0
 
-    # --- Tiles ---
+    # --- Tile variant sheets (new: arrays of variants per terrain) ---
+    tile_meta_path = source / "tiles" / "_tile_meta.json"
+    if tile_meta_path.exists():
+        with open(tile_meta_path) as f:
+            tile_meta = json.load(f)
+
+        for sheet_key, variant_files in tile_meta.items():
+            terrain_name = TILE_SHEET_TERRAIN_MAP.get(sheet_key)
+            if not terrain_name:
+                print(f"  WARNING: Unknown tile sheet key: {sheet_key}")
+                continue
+
+            paths = []
+            for filename in variant_files:
+                src_file = source / "tiles" / "ground" / filename
+                if src_file.exists():
+                    dest = target / "tiles" / filename
+                    shutil.copy2(src_file, dest)
+                    paths.append(f"/assets/tiles/{filename}")
+                    deployed += 1
+
+            if paths:
+                manifest["tiles"][terrain_name] = paths
+                print(f"  Tile: {terrain_name} ({len(paths)} variants)")
+
+    # --- Legacy tiles (single images, backwards compatibility) ---
     tiles_dir = source / "tiles"
     if tiles_dir.exists():
         for subdir in ["ground", "walls", "terrain"]:
@@ -95,6 +132,7 @@ def deploy(source: Path, target: Path) -> dict:
                 if terrain_name and terrain_name not in manifest["tiles"]:
                     dest = target / "tiles" / png.name
                     shutil.copy2(png, dest)
+                    # Legacy: single string path (AssetManager handles both formats)
                     manifest["tiles"][terrain_name] = f"/assets/tiles/{png.name}"
                     deployed += 1
                     print(f"  Tile: {png.name} -> {terrain_name}")

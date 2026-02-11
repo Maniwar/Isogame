@@ -149,19 +149,25 @@ export class Renderer {
     const wy = (x + y) * TILE_HALF_H;
 
     // Fill a base diamond with blended neighbor colors for smooth transitions.
-    // Each corner of the diamond samples the adjacent tile's color to create
-    // a gradient that hides hard edges between different terrain types.
+    // Uses all 8 neighbors (cardinal + diagonal) for smoother terrain blending.
+    // Each sector of the diamond blends toward its adjacent tile's color.
     const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
     if (baseColor) {
-      // Get neighbor terrain colors for gradient blending
-      const topColor = this.getNeighborTerrainColor(x, y - 1, state) ?? baseColor;
-      const rightColor = this.getNeighborTerrainColor(x + 1, y, state) ?? baseColor;
-      const bottomColor = this.getNeighborTerrainColor(x, y + 1, state) ?? baseColor;
-      const leftColor = this.getNeighborTerrainColor(x - 1, y, state) ?? baseColor;
+      // Get all 8 neighbor terrain colors
+      const nTop = this.getNeighborTerrainColor(x, y - 1, state) ?? baseColor;
+      const nRight = this.getNeighborTerrainColor(x + 1, y, state) ?? baseColor;
+      const nBottom = this.getNeighborTerrainColor(x, y + 1, state) ?? baseColor;
+      const nLeft = this.getNeighborTerrainColor(x - 1, y, state) ?? baseColor;
+      const nTopRight = this.getNeighborTerrainColor(x + 1, y - 1, state) ?? baseColor;
+      const nBottomRight = this.getNeighborTerrainColor(x + 1, y + 1, state) ?? baseColor;
+      const nBottomLeft = this.getNeighborTerrainColor(x - 1, y + 1, state) ?? baseColor;
+      const nTopLeft = this.getNeighborTerrainColor(x - 1, y - 1, state) ?? baseColor;
 
       // If all neighbors are the same terrain, use a fast solid fill
-      if (topColor === baseColor && rightColor === baseColor &&
-          bottomColor === baseColor && leftColor === baseColor) {
+      if (nTop === baseColor && nRight === baseColor &&
+          nBottom === baseColor && nLeft === baseColor &&
+          nTopRight === baseColor && nBottomRight === baseColor &&
+          nBottomLeft === baseColor && nTopLeft === baseColor) {
         ctx.fillStyle = baseColor;
         ctx.beginPath();
         ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
@@ -171,16 +177,20 @@ export class Renderer {
         ctx.closePath();
         ctx.fill();
       } else {
-        // Gradient blend: draw 4 triangles from center to each edge,
-        // each using a gradient from center color → neighbor color
+        // 8-sector gradient blend: draw 8 triangles from center to each edge,
+        // blending with both cardinal and diagonal neighbor colors
         const cx = wx;
         const cy = wy;
         const top = { x: wx, y: wy - TILE_HALF_H - 0.5 };
         const right = { x: wx + TILE_HALF_W + 0.5, y: wy };
         const bottom = { x: wx, y: wy + TILE_HALF_H + 0.5 };
         const left = { x: wx - TILE_HALF_W - 0.5, y: wy };
+        // Diamond midpoints (corners of the iso diamond where diagonals meet edges)
+        const topRight = { x: wx + TILE_HALF_W * 0.5 + 0.25, y: wy - TILE_HALF_H * 0.5 - 0.25 };
+        const bottomRight = { x: wx + TILE_HALF_W * 0.5 + 0.25, y: wy + TILE_HALF_H * 0.5 + 0.25 };
+        const bottomLeft = { x: wx - TILE_HALF_W * 0.5 - 0.25, y: wy + TILE_HALF_H * 0.5 + 0.25 };
+        const topLeft = { x: wx - TILE_HALF_W * 0.5 - 0.25, y: wy - TILE_HALF_H * 0.5 - 0.25 };
 
-        // Blend each triangle sector with a radial gradient
         const drawSector = (p1: {x: number, y: number}, p2: {x: number, y: number}, neighborCol: string) => {
           const midColor = this.blendColors(baseColor, neighborCol, 0.35);
           ctx.fillStyle = midColor;
@@ -191,14 +201,20 @@ export class Renderer {
           ctx.closePath();
           ctx.fill();
         };
-        drawSector(top, right, topColor);     // top-right sector → top neighbor
-        drawSector(right, bottom, rightColor); // bottom-right sector → right neighbor
-        drawSector(bottom, left, bottomColor); // bottom-left sector → bottom neighbor
-        drawSector(left, top, leftColor);      // top-left sector → left neighbor
+
+        // 8 sectors, clockwise from top
+        drawSector(top, topRight, this.blendColors(nTop, nTopRight, 0.5));
+        drawSector(topRight, right, this.blendColors(nTopRight, nRight, 0.5));
+        drawSector(right, bottomRight, this.blendColors(nRight, nBottomRight, 0.5));
+        drawSector(bottomRight, bottom, this.blendColors(nBottomRight, nBottom, 0.5));
+        drawSector(bottom, bottomLeft, this.blendColors(nBottom, nBottomLeft, 0.5));
+        drawSector(bottomLeft, left, this.blendColors(nBottomLeft, nLeft, 0.5));
+        drawSector(left, topLeft, this.blendColors(nLeft, nTopLeft, 0.5));
+        drawSector(topLeft, top, this.blendColors(nTopLeft, nTop, 0.5));
       }
     }
 
-    const sprite = assets.getTile(tile.terrain);
+    const sprite = assets.getTile(tile.terrain, x, y);
     if (sprite) {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
     }

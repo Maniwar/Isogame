@@ -1,27 +1,16 @@
 """Prompt templates for character sprite sheet generation.
 
-Instead of generating one direction at a time, we generate full sprite sheets:
-- One image contains ALL frames for a character
-- Layout: 8 rows (animations) × 8 columns (directions) = 64 frames
-- Uses 2048×2048 images for 256×256 per cell — good detail per frame
-- Each column is a specific facing direction with explicit visual description
-- The reprocessor slices this into individual frames
+Generates a full 8×8 sprite sheet per character inside a 2048×2048 image:
+  8 columns = 8 viewing directions (S, SW, W, NW, N, NE, E, SE)
+  8 rows    = 8 animation poses   (idle, walk×4, attack×2, hit)
+  = 64 frames per character, each in a 256×256 cell
 
-Animation layout (8 rows):
-  Row 1: idle        — standing still, weapon at ready
-  Row 2: walk_1      — left foot forward (contact)
-  Row 3: walk_2      — upright mid-stride transition (passing)
-  Row 4: walk_3      — right foot forward (contact)
-  Row 5: walk_4      — upright mid-stride transition (passing, opposite)
-  Row 6: attack_1    — wind-up / preparation (weapon drawn back)
-  Row 7: attack_2    — strike / impact (weapon extended forward)
-  Row 8: hit         — recoiling from damage / stagger
+Uses gemini-3-pro-image-preview with image_size="2K" for native 2048×2048
+output. This model supports "thinking" for better layout adherence and can
+produce up to 4096×4096 if image_size="4K" is configured.
 
-Why 8 columns instead of 4+mirror:
-  Mirroring only works for bilaterally symmetric characters (no asymmetric
-  weapons, scars, badges). Generating all 8 directions gives proper side views
-  (W/E) that mirroring from front/back views can never produce. At 2048px
-  with 8×8 cells, each cell is 256×256.
+All 8 directions and 8 animations are generated natively — no mirroring
+or animation fallbacks needed.
 
 Weapon variant system:
 - Each character base can be combined with different weapons
@@ -31,25 +20,33 @@ Weapon variant system:
 
 CHAR_STYLE_PREAMBLE = (
     "Create a character sprite in the style of classic Fallout 2. "
-    "The character should be viewed from a top-down 3/4 isometric perspective. "
-    "Use a muted, desaturated post-apocalyptic color palette with earthy tones. "
-    "The art style should be detailed pixel art. "
-    "CRITICAL: Use a pure bright green (#00FF00) chroma key background "
-    "so the background can be removed in post-processing. "
-    "Draw ONLY the character on a flat bright green background — NO scenery, NO ground textures, "
-    "NO shadows on the ground, NO text, NO labels. "
+    "Top-down 3/4 isometric perspective. "
+    "Muted, desaturated post-apocalyptic color palette with earthy tones. "
+    "Detailed pixel art with a gritty, weathered feel. "
+    "CRITICAL: Pure bright GREEN (#00FF00) chroma key background everywhere. "
+    "Draw ONLY the character — NO scenery, NO ground, NO shadows, NO text, NO labels. "
 )
 
-# All 8 directions — we now generate ALL of them (no more mirroring).
-# Order matters: this is the column order in the sprite sheet.
-SHEET_DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+# ---------------------------------------------------------------------------
+# Direction & animation constants
+# ---------------------------------------------------------------------------
 
-# Same list, used by other modules
-DIRECTIONS = SHEET_DIRECTIONS
+# All 8 directions and 8 animations are generated natively at 2048×2048.
+# gemini-3-pro-image-preview with image_size="2K" → 8×8 grid → 256×256 per cell.
+DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+ANIMATIONS = [
+    "idle", "walk_1", "walk_2", "walk_3", "walk_4",
+    "attack_1", "attack_2", "hit",
+]
 
-# Explicit visual descriptions for each direction.
-# These describe what the VIEWER SEES, not abstract compass directions.
-# This prevents the AI from confusing "west" (side view) with "north" (back view).
+# Aliases for backwards compatibility with other modules
+GENERATED_DIRECTIONS = DIRECTIONS
+GENERATED_ANIMATIONS = ANIMATIONS
+SHEET_DIRECTIONS = DIRECTIONS
+SHEET_ANIMATIONS = ANIMATIONS
+
+# Visual descriptions for all 8 directions.
+# Describes what the VIEWER SEES, not abstract compass labels.
 DIRECTION_LABELS = {
     "S":  "FRONT VIEW — character faces directly toward the viewer, full face visible",
     "SW": "FRONT-LEFT 3/4 VIEW — character turned 45° to their right, left shoulder toward viewer",
@@ -61,57 +58,59 @@ DIRECTION_LABELS = {
     "SE": "FRONT-RIGHT 3/4 VIEW — character turned 45° to their left, right shoulder toward viewer",
 }
 
-# The 8 animation rows in the sprite sheet (one per row, top to bottom).
-SHEET_ANIMATIONS = [
-    "idle", "walk_1", "walk_2", "walk_3", "walk_4",
-    "attack_1", "attack_2", "hit",
-]
-
-# All animation keys the game engine uses
-ANIMATIONS = SHEET_ANIMATIONS
-
+# Visual descriptions for all 8 animation rows.
 ANIMATION_LABELS = {
     "idle":     "standing idle, weapon held at ready (lowered or holstered), weight evenly balanced",
     "walk_1":   "walking pose: LEFT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
-    "walk_2":   "walking pose: mid-stride PASSING position, body upright, feet close together, transitioning",
-    "walk_3":   "walking pose: RIGHT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
+    "walk_2":   "walking pose: RIGHT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
+    "walk_3":   "walking pose: mid-stride PASSING position, body upright, feet close together, transitioning",
     "walk_4":   "walking pose: mid-stride PASSING position (opposite), body upright, transitioning back",
     "attack_1": "attack WIND-UP: weapon drawn back or raised, body coiled, preparing to strike",
     "attack_2": "attack STRIKE: weapon fully extended forward (melee thrust/swing) or aimed and firing (ranged)",
     "hit":      "HIT REACTION: recoiling from damage, body leaning back, staggered, pain expression",
 }
 
-# --- Full sprite sheet prompt (8×8 grid) ---
+# Backwards-compatible aliases (all 8 are now generated natively)
+GENERATED_DIRECTION_LABELS = DIRECTION_LABELS
+GENERATED_ANIMATION_LABELS = ANIMATION_LABELS
+
+# --- Sprite sheet prompt (8×8 grid, 2048×2048 via image_size="2K") ---
 
 SPRITESHEET_TEMPLATE = (
     "{preamble}"
-    "Generate a COMPLETE CHARACTER SPRITE SHEET for: {name} — {description}.\n\n"
-    "LAYOUT: The sprite sheet is a grid with EXACTLY {num_rows} rows and {num_cols} columns.\n"
-    "The total image is {sheet_size}x{sheet_size} pixels.\n"
-    "Each cell is {cell_w}x{cell_h} pixels (width×height).\n\n"
-    "ROWS (top to bottom — each row is one animation pose):\n"
-    "{row_descriptions}\n\n"
-    "COLUMNS (left to right — each column is one facing direction, rotating 45° per step):\n"
-    "{col_descriptions}\n\n"
-    "CRITICAL RULES:\n"
-    "- The image MUST be exactly {sheet_size}x{sheet_size} pixels.\n"
-    "- The grid MUST be exactly {num_rows} rows × {num_cols} columns.\n"
-    "- Each cell is {cell_w} pixels wide and {cell_h} pixels tall.\n"
-    "- Every cell must show the SAME character with identical outfit, weapon, proportions, and colors.\n"
-    "- The character MUST be holding their weapon in EVERY frame.\n"
+    "Generate a CHARACTER SPRITE SHEET for: {name}\n"
+    "{description}\n\n"
+    "IMAGE SIZE: 2048 × 2048 pixels.\n"
+    "GRID: 8 columns × 8 rows = 64 cells, each exactly 256 × 256 pixels.\n\n"
+    "COLUMNS (left to right) — 8 viewing angles, rotating clockwise:\n"
+    "  Col 1 — FRONT: Character faces directly toward the camera. Full face visible.\n"
+    "  Col 2 — FRONT-LEFT 3/4: Turned 45° to their right. Left shoulder toward camera.\n"
+    "  Col 3 — LEFT PROFILE: Character's left side facing camera. Full side silhouette.\n"
+    "  Col 4 — BACK-LEFT 3/4: Turned 135° away. Back and left shoulder visible.\n"
+    "  Col 5 — BACK: Faces away from camera. Back of head and body visible.\n"
+    "  Col 6 — BACK-RIGHT 3/4: Turned 135° the other way. Back and right shoulder.\n"
+    "  Col 7 — RIGHT PROFILE: Character's right side facing camera. Full side silhouette.\n"
+    "  Col 8 — FRONT-RIGHT 3/4: Turned 45° to their left. Right shoulder toward camera.\n\n"
+    "ROWS (top to bottom) — 8 animation poses:\n"
+    "  Row 1 — IDLE: Standing still, relaxed. {idle_desc}.\n"
+    "  Row 2 — WALK 1: LEFT foot forward (contact position), body leaning slightly forward.\n"
+    "  Row 3 — WALK 2: RIGHT foot forward (contact position), body leaning slightly forward.\n"
+    "  Row 4 — WALK 3: Mid-stride passing position, body upright, feet close together.\n"
+    "  Row 5 — WALK 4: Mid-stride passing (opposite), body upright, transitioning.\n"
+    "  Row 6 — ATTACK WIND-UP: Weapon drawn back or raised, body coiled, preparing to strike.\n"
+    "  Row 7 — ATTACK STRIKE: {attack_desc}.\n"
+    "  Row 8 — HIT REACTION: Recoiling from damage, body leaning back, staggered.\n\n"
+    "IMPORTANT RULES:\n"
+    "- The image is EXACTLY 2048×2048 pixels. Each of the 64 cells is 256×256.\n"
+    "- Leave 4–8 pixels of green gap between cells so they are clearly separated.\n"
+    "- The character fills ~80%% of each cell's height, centered horizontally.\n"
+    "- The SAME character in ALL 64 cells — identical outfit, weapon, build, colors.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
-    "- The 8 columns show a FULL 360° rotation of the character in 45° increments.\n"
-    "- Columns 3 (W) and 7 (E) MUST show clear SIDE PROFILE views — not front or back.\n"
-    "- Column 5 (N) shows the character's BACK — this is the only back-facing column.\n"
-    "- Keep the character CENTERED in each cell, filling most of the cell height.\n"
-    "- Use a pure bright green (#00FF00) chroma key background in every cell.\n"
-    "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks, NO grid lines.\n"
-    "- The 4 walk rows (walk_1 through walk_4) must each show a DIFFERENT leg position:\n"
-    "  walk_1=left foot forward, walk_2=passing, walk_3=right foot forward, walk_4=passing opposite.\n"
-    "- attack_1 shows a WIND-UP (weapon drawn back) and attack_2 shows the STRIKE (weapon extended).\n"
-    "- The hit row shows the character RECOILING from damage — leaning back, staggered.\n"
-    "- If a reference image of this character is provided, match their face, hair, "
-    "body type, outfit, and colors EXACTLY — only the weapon changes.\n"
+    "- Walk poses MUST show clearly DIFFERENT leg positions from each other.\n"
+    "- Attack wind-up and attack strike MUST be visibly different poses.\n"
+    "- Pure bright GREEN (#00FF00) background in every cell and between cells.\n"
+    "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks.\n"
+    "- If a reference image is provided, match face, hair, outfit, and colors exactly.\n"
 )
 
 # --- Single-direction prompt (fallback for individual generation) ---
@@ -193,26 +192,31 @@ WEAPON_VARIANTS = {
         "label": "Unarmed",
         "held_desc": "Empty hands, fists clenched and ready",
         "idle_pose": "standing with fists at sides",
+        "attack_desc": "fists punching forward aggressively",
     },
     "pistol": {
         "label": "10mm Pistol",
         "held_desc": "Holding a 10mm semi-automatic pistol in the right hand",
         "idle_pose": "pistol held low at side",
+        "attack_desc": "pistol raised and aimed forward, firing",
     },
     "rifle": {
         "label": "Pipe Rifle",
         "held_desc": "Holding a crude pipe rifle in both hands",
         "idle_pose": "rifle held across chest at ready",
+        "attack_desc": "rifle shouldered and aimed forward, firing",
     },
     "knife": {
         "label": "Combat Knife",
         "held_desc": "Gripping a military combat knife in the right hand",
         "idle_pose": "knife held low at side, blade down",
+        "attack_desc": "knife thrust forward in a stabbing motion",
     },
     "bat": {
         "label": "Baseball Bat",
         "held_desc": "Holding a nail-studded baseball bat over one shoulder",
         "idle_pose": "bat resting on right shoulder",
+        "attack_desc": "bat swung in a wide horizontal arc",
     },
 }
 
@@ -247,6 +251,8 @@ def _build_archetypes():
                 f"{weapon['held_desc']}."
             ),
             "pose": f"standing idle, {weapon['idle_pose']}",
+            "weapon_idle_desc": weapon["idle_pose"],
+            "weapon_attack_desc": weapon["attack_desc"],
         })
 
     # NPCs: one signature weapon each
@@ -268,6 +274,8 @@ def _build_archetypes():
                 f"{weapon['held_desc']}."
             ),
             "pose": f"standing idle, {weapon['idle_pose']}",
+            "weapon_idle_desc": weapon["idle_pose"],
+            "weapon_attack_desc": weapon["attack_desc"],
         })
 
     return archetypes
@@ -279,40 +287,23 @@ def build_spritesheet_prompt(
     name: str,
     description: str,
     config: dict,
+    weapon_idle_desc: str = "weapon held at side, relaxed",
+    weapon_attack_desc: str = "weapon swung or fired forward",
 ) -> str:
-    """Build a prompt for generating an 8×8 character sprite sheet.
+    """Build a prompt for generating a full 8×8 character sprite sheet.
 
     The sheet has 8 rows (idle, walk_1-4, attack_1-2, hit)
     × 8 columns (S, SW, W, NW, N, NE, E, SE) = 64 frames.
-    All 8 directions are generated — no mirroring needed.
-    Uses 2048×2048 for 256×256 per cell.
+
+    Uses gemini-3-pro-image-preview with image_size="2K" for native
+    2048×2048 output (256×256 per cell).
     """
-    sheet_size = config["sprites"].get("sheet_size", 2048)
-    num_cols = len(SHEET_DIRECTIONS)
-    num_rows = len(SHEET_ANIMATIONS)
-    cell_w = sheet_size // num_cols   # 2048/8 = 256
-    cell_h = sheet_size // num_rows   # 2048/8 = 256
-
-    row_descriptions = "\n".join(
-        f"  Row {i + 1}: {ANIMATION_LABELS[anim]}"
-        for i, anim in enumerate(SHEET_ANIMATIONS)
-    )
-    col_descriptions = "\n".join(
-        f"  Column {i + 1} ({d}): {DIRECTION_LABELS[d]}"
-        for i, d in enumerate(SHEET_DIRECTIONS)
-    )
-
     return SPRITESHEET_TEMPLATE.format(
         preamble=CHAR_STYLE_PREAMBLE,
         name=name,
         description=description,
-        num_rows=num_rows,
-        num_cols=num_cols,
-        cell_w=cell_w,
-        cell_h=cell_h,
-        sheet_size=sheet_size,
-        row_descriptions=row_descriptions,
-        col_descriptions=col_descriptions,
+        idle_desc=weapon_idle_desc,
+        attack_desc=weapon_attack_desc,
     )
 
 

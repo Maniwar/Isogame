@@ -57,10 +57,12 @@ tiles:
 sprites:
   base_width: 64         # Final frame width after post-processing
   base_height: 96        # Final frame height (taller than wide for characters)
-  sheet_size: 2048       # 2048x2048 images — room for 8×8 grid
+  sheet_size: 2048       # 2048x2048 images via gemini-3-pro-image-preview at 2K
   sheet_cols: 8          # 8 direction columns (full 360° rotation)
   sheet_rows: 8          # 8 animation rows (64 frames total per character)
+  image_size: "2K"       # API parameter: "1K" (1024), "2K" (2048), or "4K" (4096)
   # Cell size = 2048/8 × 2048/8 = 256×256 per cell
+  # All 8 directions and 8 animations generated natively — no mirroring needed.
   animations:
     - "idle"             # Row 1: Standing still, weapon at ready
     - "walk_1"           # Row 2: Left foot forward (contact)
@@ -68,7 +70,7 @@ sprites:
     - "walk_3"           # Row 4: Right foot forward (contact)
     - "walk_4"           # Row 5: Mid-stride passing (opposite)
     - "attack_1"         # Row 6: Wind-up, weapon drawn back
-    - "attack_2"         # Row 7: Strike, weapon extended
+    - "attack_2"         # Row 7: Strike, weapon extended / firing
     - "hit"              # Row 8: Hit reaction / stagger
   directions:            # All 8 directions generated — no mirroring needed
     - "S"
@@ -94,7 +96,7 @@ portraits:
 
 # Gemini API settings
 api:
-  model: "gemini-2.5-flash-image"  # Native image generation model
+  model: "gemini-3-pro-image-preview"  # Supports 2K/4K output with image_size param
   requests_per_minute: 10        # Rate limiting
   retry_attempts: 3
   retry_delay_seconds: 5
