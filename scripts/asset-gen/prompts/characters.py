@@ -81,7 +81,7 @@ ANIMATION_LABELS = {
     "hit":      "HIT REACTION: recoiling from damage, body leaning back, staggered, pain expression",
 }
 
-# --- Full sprite sheet prompt (4×4 grid) ---
+# --- Full sprite sheet prompt (8×8 grid) ---
 
 SPRITESHEET_TEMPLATE = (
     "{preamble}"
@@ -106,8 +106,10 @@ SPRITESHEET_TEMPLATE = (
     "- Keep the character CENTERED in each cell, filling most of the cell height.\n"
     "- Use a pure bright green (#00FF00) chroma key background in every cell.\n"
     "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks, NO grid lines.\n"
-    "- The walk_1 and walk_2 rows must show DIFFERENT leg positions (alternating stride).\n"
-    "- The attack row must show a clearly different pose with the weapon extended.\n"
+    "- The 4 walk rows (walk_1 through walk_4) must each show a DIFFERENT leg position:\n"
+    "  walk_1=left foot forward, walk_2=passing, walk_3=right foot forward, walk_4=passing opposite.\n"
+    "- attack_1 shows a WIND-UP (weapon drawn back) and attack_2 shows the STRIKE (weapon extended).\n"
+    "- The hit row shows the character RECOILING from damage — leaning back, staggered.\n"
     "- If a reference image of this character is provided, match their face, hair, "
     "body type, outfit, and colors EXACTLY — only the weapon changes.\n"
 )
@@ -278,18 +280,18 @@ def build_spritesheet_prompt(
     description: str,
     config: dict,
 ) -> str:
-    """Build a prompt for generating an 8×4 character sprite sheet.
+    """Build a prompt for generating an 8×8 character sprite sheet.
 
-    The sheet has 4 rows (idle, walk_1, walk_2, attack)
-    × 8 columns (S, SW, W, NW, N, NE, E, SE) = 32 frames.
+    The sheet has 8 rows (idle, walk_1-4, attack_1-2, hit)
+    × 8 columns (S, SW, W, NW, N, NE, E, SE) = 64 frames.
     All 8 directions are generated — no mirroring needed.
-    Uses 2048×2048 for 256×512 per cell.
+    Uses 2048×2048 for 256×256 per cell.
     """
     sheet_size = config["sprites"].get("sheet_size", 2048)
     num_cols = len(SHEET_DIRECTIONS)
     num_rows = len(SHEET_ANIMATIONS)
     cell_w = sheet_size // num_cols   # 2048/8 = 256
-    cell_h = sheet_size // num_rows   # 2048/4 = 512
+    cell_h = sheet_size // num_rows   # 2048/8 = 256
 
     row_descriptions = "\n".join(
         f"  Row {i + 1}: {ANIMATION_LABELS[anim]}"

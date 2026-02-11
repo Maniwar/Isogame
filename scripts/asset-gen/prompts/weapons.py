@@ -4,7 +4,7 @@ Weapon sprites are generated as overlays — they show only the weapon and
 the hands/arms holding it, designed to be composited on top of unarmed
 character sprites at runtime.
 
-Layout matches character sheets: 4 rows (animations) x 8 columns (directions).
+Layout matches character sheets: 8 rows (animations) x 8 columns (directions).
 Uses a chroma key green (#00FF00) background for reliable alpha extraction.
 """
 
@@ -43,10 +43,14 @@ WEAPON_SHEET_TEMPLATE = (
 )
 
 WEAPON_ANIMATION_LABELS = {
-    "idle":    "weapon held at rest, relaxed grip at side or in front",
-    "walk_1":  "weapon swaying slightly with walking motion, left step",
-    "walk_2":  "weapon swaying slightly with walking motion, right step",
-    "attack":  "{attack_desc}",
+    "idle":      "weapon held at rest, relaxed grip at side or in front",
+    "walk_1":    "weapon swaying slightly with walking motion, left foot forward",
+    "walk_2":    "weapon swaying mid-stride, transitioning between steps",
+    "walk_3":    "weapon swaying slightly with walking motion, right foot forward",
+    "walk_4":    "weapon swaying mid-stride, transitioning back",
+    "attack_1":  "weapon drawn back in wind-up, preparing to strike",
+    "attack_2":  "{attack_desc}",
+    "hit":       "weapon lowered, recoiling from incoming damage",
 }
 
 # Weapon archetypes — sprite_key must match WEAPON_SPRITE_MAP in Renderer.ts
@@ -102,7 +106,7 @@ def build_weapon_spritesheet_prompt(
 ) -> str:
     """Build a prompt for generating a weapon overlay sprite sheet.
 
-    Same 4 rows x 8 columns layout as character sheets.
+    Same 8 rows x 8 columns layout as character sheets.
     """
     cell_w = config["sprites"]["base_width"]
     cell_h = config["sprites"]["base_height"]

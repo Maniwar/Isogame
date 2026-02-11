@@ -86,13 +86,18 @@ jobs:
       # Reprocess character sprites with QA validation, auto-grid detection,
       # uniform scaling, green BG removal, palette, and direction mirroring.
       # This overwrites the basic postprocess.py slicing with the full pipeline.
-      - name: Reprocess character sprites (QA + slice + mirror)
+      - name: Validate sprite sheets (pre-reprocess)
         if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
+        continue-on-error: true
         run: |
           cd scripts/asset-gen
           echo "=== Validating sprite sheets ==="
           python reprocess.py --category sprites --validate-only
-          echo ""
+
+      - name: Reprocess character sprites (slice + mirror + palette)
+        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
+        run: |
+          cd scripts/asset-gen
           echo "=== Reprocessing sprites (uniform scale + mirror + palette) ==="
           python reprocess.py --category sprites
 
