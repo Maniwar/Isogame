@@ -18,7 +18,11 @@ GROUND_TILE_TEMPLATE = (
     "{preamble}"
     "This is a GROUND tile ({width}x{height} pixels, isometric diamond). "
     "Subject: {description}. "
-    "The tile should seamlessly connect with other ground tiles. "
+    "SEAMLESS EDGES ARE CRITICAL: The diamond edges must use soft, neutral tones "
+    "(muted brown/tan) that blend naturally with ANY adjacent terrain type. "
+    "Concentrate texture detail in the CENTER of the diamond. "
+    "The outer 20% of each edge should FADE to a uniform neutral earth tone "
+    "so tiles transition smoothly into neighbors without hard color boundaries. "
     "Keep the perspective consistent — flat ground viewed from above at roughly 30 degrees. "
     "Variation #{variant_num} of this terrain type — make it visually distinct from other "
     "variants while maintaining the same material and mood. "
@@ -70,7 +74,8 @@ TILE_SET_TEMPLATE = (
     "- Every tile must be an isometric diamond shape\n"
     "- Transparent background around each diamond\n"
     "- Consistent perspective (top-down 3/4 view)\n"
-    "- Tiles should seamlessly connect when placed adjacent to each other\n"
+    "- Tiles MUST seamlessly connect: edges should fade to neutral earth tones\n"
+    "- Concentrate detail in the CENTER; the outer 20% of edges should be soft/blended\n"
     "- No text, no labels, no watermarks, no grid lines\n"
 )
 

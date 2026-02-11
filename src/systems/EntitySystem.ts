@@ -30,7 +30,7 @@ const DEFAULT_ANIM: AnimState = {
   current: "idle",
   frame: 0,
   elapsed: 0,
-  speed: 250,     // ms per frame for walk cycle
+  speed: 150,     // ms per frame for walk cycle (~6.7 fps)
 };
 
 const DEFAULT_STATS: Stats = {

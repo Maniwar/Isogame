@@ -43,8 +43,20 @@ TILE_H = 32
 SPRITE_W = 64
 SPRITE_H = 96
 
-# All 8 directions the game engine expects (column order in the sprite sheet prompt)
+# All 8 directions the game engine expects
 ALL_DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
+
+# What the AI ACTUALLY generates per column count.
+# The prompt asks for S,SW,W,NW but AI consistently produces a front-to-back
+# rotation: S (front), SW (front-diagonal), N (back), NW (back-diagonal).
+# It skips the pure side view (W) entirely for 4-column sheets.
+DIRECTION_MAP_BY_COLS = {
+    4: ["s", "sw", "n", "nw"],       # AI skips W, gives N instead
+    5: ["s", "sw", "w", "n", "nw"],
+    6: ["s", "sw", "w", "nw", "n", "ne"],
+    8: ["s", "sw", "w", "nw", "n", "ne", "e", "se"],
+}
+
 # The 4 animation rows the AI actually generates (row order in the sprite sheet).
 # The prompt asks for 6 rows (+ shoot, reload) but the AI consistently produces
 # only 4.  The game's AnimationSystem maps shoot→attack and reload→idle at
@@ -52,12 +64,26 @@ ALL_DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
 REAL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
 
 # Mirror mapping: missing direction → source direction to horizontally flip.
-# The prompt asks S,SW,W,NW,N,NE,E,SE but AI typically generates only the
-# first 4–6 columns.  Mirroring exploits bilateral symmetry.
+# Exploits bilateral symmetry of the human body.
 MIRROR_PAIRS = {
     "se": "sw",
     "e":  "w",
     "ne": "nw",
+}
+
+# When a mirror source doesn't exist (e.g., W missing in 4-col sheets),
+# fall back to the closest available direction.
+# Order matters — first match wins.  Prefer front-facing over back-facing
+# so the character appears to face their movement direction.
+DIRECTION_FALLBACKS = {
+    "w":  ["sw", "nw"],   # SW (front-left) is closer to W than NW (back-left)
+    "e":  ["se", "ne"],   # SE (front-right) is closer to E than NE (back-right)
+    "n":  ["nw", "ne"],   # NW/NE are close to N
+    "s":  ["sw", "se"],   # SW/SE are close to S
+    "sw": ["s", "w"],
+    "se": ["s", "e"],
+    "nw": ["n", "w"],
+    "ne": ["n", "e"],
 }
 
 # Fallout 2 palette for color mapping
@@ -566,10 +592,14 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     print(f"    Grid detected: {actual_cols} cols x {actual_rows} rows "
           f"(expected 8x6, image {sheet.size[0]}x{sheet.size[1]})")
 
-    # Map actual columns → direction names.
-    # The prompt orders columns as S, SW, W, NW, N, NE, E, SE.
-    # If the AI only generated N columns, take the first N from that list.
-    detected_dirs = ALL_DIRECTIONS[:actual_cols]
+    # Map actual columns → direction names based on what the AI actually produces.
+    # AI models generate a front-to-back rotation, NOT the prompt's column order.
+    if actual_cols in DIRECTION_MAP_BY_COLS:
+        detected_dirs = DIRECTION_MAP_BY_COLS[actual_cols]
+    else:
+        # Unknown column count — use first N from ALL_DIRECTIONS as best guess
+        detected_dirs = ALL_DIRECTIONS[:actual_cols]
+    print(f"    Direction mapping: {detected_dirs}")
 
     # Map actual rows → animation names (first N of REAL_ANIMATIONS)
     detected_anims = REAL_ANIMATIONS[:actual_rows]
@@ -634,8 +664,13 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             else:
                 extracted[anim][direction] = frame
 
-    # Phase 2: Fill missing directions via mirroring
+    # Phase 2: Fill all 8 directions via mirroring + directional fallbacks.
+    # The AI may not provide all directions.  We use three strategies in order:
+    #   1. Mirror: SE←SW, E←W, NE←NW (horizontal flip for bilateral symmetry)
+    #   2. Directional fallback: W←SW, E←SE, N←NW, etc. (nearest available)
+    #   3. Last-resort: any available direction
     for anim in list(extracted.keys()):
+        # Step 1: Try mirroring first
         for target_dir, source_dir in MIRROR_PAIRS.items():
             if target_dir not in extracted[anim] and source_dir in extracted[anim]:
                 mirrored = extracted[anim][source_dir].transpose(
@@ -644,13 +679,29 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                 extracted[anim][target_dir] = mirrored
                 stats["mirrored"] += 1
 
-    # If N direction is missing, try to derive it
-    for anim in list(extracted.keys()):
-        if "n" not in extracted[anim]:
-            # Use nw or ne if available
-            for fallback in ["nw", "ne"]:
-                if fallback in extracted[anim]:
-                    extracted[anim]["n"] = extracted[anim][fallback]
+        # Step 2: Fill remaining gaps with directional fallbacks
+        for target_dir in ALL_DIRECTIONS:
+            if target_dir in extracted[anim]:
+                continue
+            # Try mirror source first, then mirror source's fallbacks
+            mirror_source = MIRROR_PAIRS.get(target_dir)
+            if mirror_source and mirror_source not in extracted[anim]:
+                # Mirror source itself is missing — try its fallbacks, then mirror
+                for fb in DIRECTION_FALLBACKS.get(mirror_source, []):
+                    if fb in extracted[anim]:
+                        mirrored = extracted[anim][fb].transpose(
+                            Image.Transpose.FLIP_LEFT_RIGHT
+                        )
+                        extracted[anim][target_dir] = mirrored
+                        stats["mirrored"] += 1
+                        break
+            if target_dir in extracted[anim]:
+                continue
+            # Direct fallback (no mirror, just use nearest direction as-is)
+            for fb in DIRECTION_FALLBACKS.get(target_dir, []):
+                if fb in extracted[anim]:
+                    extracted[anim][target_dir] = extracted[anim][fb].copy()
+                    stats["mirrored"] += 1
                     break
 
     # Phase 3: Save all frames (only the 4 real animations)
