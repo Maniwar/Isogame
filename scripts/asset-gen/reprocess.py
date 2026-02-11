@@ -57,11 +57,16 @@ DIRECTION_MAP_BY_COLS = {
     8: ["s", "sw", "w", "nw", "n", "ne", "e", "se"],
 }
 
-# The 4 animation rows the AI actually generates (row order in the sprite sheet).
-# The prompt asks for 6 rows (+ shoot, reload) but the AI consistently produces
-# only 4.  The game's AnimationSystem maps shoot→attack and reload→idle at
-# runtime, so we only need to output these 4.
-REAL_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
+# The 8 animation rows in the sprite sheet (row order top to bottom).
+# 4-frame walk cycle, 2-frame attack, hit reaction.
+REAL_ANIMATIONS = [
+    "idle", "walk_1", "walk_2", "walk_3", "walk_4",
+    "attack_1", "attack_2", "hit",
+]
+
+# Legacy mapping: if sheet only has 4 rows, map them to these animations.
+# This lets existing 4-row sheets still work until regenerated.
+LEGACY_4ROW_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack_2"]
 
 # Mirror mapping: missing direction → source direction to horizontally flip.
 # Exploits bilateral symmetry of the human body.

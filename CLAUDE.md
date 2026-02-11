@@ -111,16 +111,18 @@ npx tsc --noEmit     # Type-check without emitting
 
 - Tile sprites: 64x32 isometric diamonds with transparent backgrounds
 - Character sprites: 24x36 (procedural) / 64x96 (AI-generated), 8 directions (N, NE, E, SE, S, SW, W, NW)
-- Sprite sheets: 4 rows (idle, walk_1, walk_2, attack) x 8 columns (directions) = 32 frames per character
+- Sprite sheets: 8 rows (idle, walk_1-4, attack_1-2, hit) x 8 columns (directions) = 64 frames per character
 - Item icons: 20x20 (procedural) / 64x64 (AI-generated)
 - All placeholder art is procedurally generated in `AssetManager.ts`
 - File names: lowercase, underscore-separated for sprite keys (e.g., `npc_sheriff`)
 
 ### Animation System
 
-- Entity animations: `idle`, `walk`, `attack` (defined in `AnimState` in types.ts)
-- Walk cycle: alternates between `walk_1` and `walk_2` frames at 250ms per frame
-- Attack animation: holds for 400ms then returns to idle
+- Entity animations: `idle`, `walk`, `attack`, `shoot`, `reload`, `hit` (defined in `AnimState` in types.ts)
+- Walk cycle: 4-frame cycle (walk_1 → walk_2 → walk_3 → walk_4) at 150ms per frame (~6.7 fps)
+- Attack animation: 2-frame sequence (attack_1 wind-up 250ms → attack_2 strike 350ms → idle)
+- Shoot animation: same 2 frames, faster timing (150ms → 250ms)
+- Hit reaction: single frame held 400ms then returns to idle
 - `AnimationSystem.ts` manages frame state; `Renderer.ts` queries `AnimationSystem.getFrameKey()` for the current frame
 - `AssetManager.getAnimFrame()` falls back to static sprites if no animation data is loaded
 
