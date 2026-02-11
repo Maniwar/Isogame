@@ -114,6 +114,75 @@ def remove_green_bg(image: Image.Image) -> Image.Image:
     return Image.fromarray(arr, "RGBA")
 
 
+def defringe(image: Image.Image, passes: int = 2, dark_threshold: int = 35) -> Image.Image:
+    """Remove dark fringe pixels around content edges.
+
+    The palette reduction maps semi-transparent edge pixels (created by
+    LANCZOS resize blending content with transparent black) to the darkest
+    palette color (#1E1E16 = RGB 30,30,22).  The binary alpha threshold
+    then makes them fully opaque, creating a visible dark outline.
+
+    This function iteratively removes opaque very-dark pixels that border
+    transparent regions.  Interior dark pixels (eyes, shadows) are not
+    affected because they are surrounded by other opaque pixels.
+
+    Args:
+        image: RGBA image to defringe
+        passes: Number of erosion passes (2 handles 2px-wide borders)
+        dark_threshold: max(R,G,B) below this is considered "dark fringe"
+    """
+    arr = np.array(image.convert("RGBA")).copy()
+
+    for _ in range(passes):
+        h, w = arr.shape[:2]
+        alpha = arr[:, :, 3]
+        rgb_max = np.max(arr[:, :, :3], axis=2)
+
+        # Find transparent pixels
+        is_transparent = alpha == 0
+
+        # Find opaque pixels adjacent to at least one transparent pixel
+        near_transparent = np.zeros((h, w), dtype=bool)
+        near_transparent[1:, :] |= is_transparent[:-1, :]
+        near_transparent[:-1, :] |= is_transparent[1:, :]
+        near_transparent[:, 1:] |= is_transparent[:, :-1]
+        near_transparent[:, :-1] |= is_transparent[:, 1:]
+
+        # Remove dark edge pixels
+        dark_edge = (alpha > 0) & (rgb_max <= dark_threshold) & near_transparent
+        arr[dark_edge, 3] = 0
+
+    return Image.fromarray(arr, "RGBA")
+
+
+def resize_premultiplied(image: Image.Image, new_size: tuple,
+                         resample=Image.Resampling.LANCZOS) -> Image.Image:
+    """Resize an RGBA image using premultiplied alpha to prevent dark halos.
+
+    Standard LANCZOS on non-premultiplied RGBA blends RGB values of
+    transparent pixels (0,0,0,0) with content, creating dark fringes.
+    Premultiplied alpha avoids this by scaling RGB by alpha before resize.
+    """
+    arr = np.array(image).astype(np.float64)
+    alpha = arr[:, :, 3:4] / 255.0
+
+    # Premultiply: RGB *= alpha
+    premul = arr.copy()
+    premul[:, :, :3] *= alpha
+    premul_img = Image.fromarray(premul.astype(np.uint8), "RGBA")
+
+    # Resize in premultiplied space
+    resized = premul_img.resize(new_size, resample)
+
+    # Un-premultiply: RGB /= alpha
+    out = np.array(resized).astype(np.float64)
+    out_alpha = out[:, :, 3:4] / 255.0
+    safe_alpha = np.maximum(out_alpha, 1.0 / 255.0)
+    out[:, :, :3] = np.clip(out[:, :, :3] / safe_alpha, 0, 255)
+
+    return Image.fromarray(out.astype(np.uint8), "RGBA")
+
+
 def reduce_palette(image: Image.Image, num_colors: int = 32) -> Image.Image:
     """Reduce to Fallout 2 palette, preserving alpha."""
     arr = np.array(image.convert("RGBA"))
@@ -388,9 +457,8 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         new_w = max(1, int(cw * scale))
         new_h = max(1, int(ch * scale))
         if (new_w, new_h) != (cw, ch):
-            content = content.resize(
-                (new_w, new_h),
-                Image.Resampling.LANCZOS,
+            content = resize_premultiplied(
+                content, (new_w, new_h),
             )
 
         cw, ch = content.size
@@ -404,9 +472,8 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
         # Uniform scale: preserve relative position within cell
         rw, rh = region.size
         scale = min(target_w / rw, target_h / rh)
-        scaled = clean.resize(
-            (max(1, int(rw * scale)), max(1, int(rh * scale))),
-            Image.Resampling.LANCZOS,
+        scaled = resize_premultiplied(
+            clean, (max(1, int(rw * scale)), max(1, int(rh * scale))),
         )
         canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
         sw, sh = scaled.size
@@ -601,12 +668,15 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             if apply_palette:
                 frame = reduce_palette(frame)
 
-            # Clean transparency
+            # Clean transparency: binary alpha threshold
             frame_arr = np.array(frame)
             frame_arr[:, :, 3] = np.where(
-                frame_arr[:, :, 3] < 10, 0, 255
+                frame_arr[:, :, 3] < 30, 0, 255
             ).astype(np.uint8)
             frame = Image.fromarray(frame_arr, "RGBA")
+
+            # Remove dark fringe pixels at content edges
+            frame = defringe(frame, passes=2, dark_threshold=35)
 
             filename = f"{sprite_key}-{anim}-{direction}.png"
             frame.save(dst_dir / filename, "PNG")
