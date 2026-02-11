@@ -157,7 +157,7 @@ export class MovementSystem {
   }
 
   /**
-   * Convert tile-coordinate movement into a screen-space facing direction.
+   * Convert tile-coordinate delta into a screen-space facing direction.
    *
    * Isometric projection rotates tile axes 45° from screen axes:
    *   screenX = (tileX - tileY) * 32
@@ -168,10 +168,12 @@ export class MovementSystem {
    *
    * Sprite direction labels use screen-space:
    *   "S" = front view (facing camera), "N" = back view, etc.
+   *
+   * Public static so other systems (combat, dialogue) can compute facing.
    */
-  private getDirection(from: TilePos, to: TilePos): Direction {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
+  static getDirectionBetween(from: TilePos, to: TilePos): Direction {
+    const dx = Math.sign(to.x - from.x);
+    const dy = Math.sign(to.y - from.y);
 
     // Map tile deltas → screen-space directions (45° CW rotation)
     if (dx === 0 && dy < 0) return "NE";   // tile-N → screen upper-right
@@ -182,5 +184,9 @@ export class MovementSystem {
     if (dx < 0 && dy > 0) return "W";      // tile-SW → screen left
     if (dx < 0 && dy === 0) return "NW";   // tile-W → screen upper-left
     return "N";                            // tile-NW → screen up (back view)
+  }
+
+  private getDirection(from: TilePos, to: TilePos): Direction {
+    return MovementSystem.getDirectionBetween(from, to);
   }
 }
