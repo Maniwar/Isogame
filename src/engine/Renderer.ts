@@ -330,16 +330,21 @@ export class Renderer {
     // Characters are generated with weapons built into their sprite sheets.
     // See scripts/asset-gen/prompts/characters.py for the generation prompts.
 
-    // Draw name tag — position above sprite top
+    // Label position — above sprite top
     const labelY = spriteTop - 4;
-    ctx.fillStyle = entity.isPlayer
-      ? "#40c040"
-      : entity.isHostile
-        ? "#b83030"
-        : "#d4c4a0";
-    ctx.font = "7px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(entity.name, drawX, labelY);
+
+    // Draw name tag — skip player (visible in HUD), only show NPCs
+    if (!entity.isPlayer) {
+      ctx.font = "7px monospace";
+      ctx.textAlign = "center";
+
+      // Semi-transparent background for readability
+      const nameWidth = ctx.measureText(entity.name).width;
+      ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
+      ctx.fillRect(drawX - nameWidth / 2 - 2, labelY - 8, nameWidth + 4, 11);
+      ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
+      ctx.fillText(entity.name, drawX, labelY);
+    }
 
     // Health bar (always show in combat, or when damaged)
     if (!entity.isPlayer && (isCombat || entity.stats.hp < entity.stats.maxHp)) {
