@@ -2,16 +2,26 @@
 
 Instead of generating one direction at a time, we generate full sprite sheets:
 - One image contains ALL frames for a character
-- Layout: 4 rows (animations) × 8 columns (directions) = 32 frames
-- Uses 2048×2048 images for 256×512 per cell — plenty of detail
+- Layout: 8 rows (animations) × 8 columns (directions) = 64 frames
+- Uses 2048×2048 images for 256×256 per cell — good detail per frame
 - Each column is a specific facing direction with explicit visual description
 - The reprocessor slices this into individual frames
+
+Animation layout (8 rows):
+  Row 1: idle        — standing still, weapon at ready
+  Row 2: walk_1      — left foot forward (contact)
+  Row 3: walk_2      — upright mid-stride transition (passing)
+  Row 4: walk_3      — right foot forward (contact)
+  Row 5: walk_4      — upright mid-stride transition (passing, opposite)
+  Row 6: attack_1    — wind-up / preparation (weapon drawn back)
+  Row 7: attack_2    — strike / impact (weapon extended forward)
+  Row 8: hit         — recoiling from damage / stagger
 
 Why 8 columns instead of 4+mirror:
   Mirroring only works for bilaterally symmetric characters (no asymmetric
   weapons, scars, badges). Generating all 8 directions gives proper side views
   (W/E) that mirroring from front/back views can never produce. At 2048px
-  with 8×4 cells, each cell is 256×512 — more than enough for detail.
+  with 8×8 cells, each cell is 256×256.
 
 Weapon variant system:
 - Each character base can be combined with different weapons
@@ -51,17 +61,24 @@ DIRECTION_LABELS = {
     "SE": "FRONT-RIGHT 3/4 VIEW — character turned 45° to their left, right shoulder toward viewer",
 }
 
-# The 4 animation rows we generate. The game maps shoot→attack, reload→idle.
-SHEET_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
+# The 8 animation rows in the sprite sheet (one per row, top to bottom).
+SHEET_ANIMATIONS = [
+    "idle", "walk_1", "walk_2", "walk_3", "walk_4",
+    "attack_1", "attack_2", "hit",
+]
 
-# Legacy: full 6-animation list (kept for backwards compatibility)
-ANIMATIONS = ["idle", "walk_1", "walk_2", "attack", "shoot", "reload"]
+# All animation keys the game engine uses
+ANIMATIONS = SHEET_ANIMATIONS
 
 ANIMATION_LABELS = {
-    "idle":    "standing idle, weapon held at ready (lowered or holstered)",
-    "walk_1":  "mid-stride walking pose, left foot forward, weapon in hand",
-    "walk_2":  "mid-stride walking pose, right foot forward, weapon in hand",
-    "attack":  "attack pose — weapon swung/thrust forward (melee) or raised and aimed (ranged)",
+    "idle":     "standing idle, weapon held at ready (lowered or holstered), weight evenly balanced",
+    "walk_1":   "walking pose: LEFT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
+    "walk_2":   "walking pose: mid-stride PASSING position, body upright, feet close together, transitioning",
+    "walk_3":   "walking pose: RIGHT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
+    "walk_4":   "walking pose: mid-stride PASSING position (opposite), body upright, transitioning back",
+    "attack_1": "attack WIND-UP: weapon drawn back or raised, body coiled, preparing to strike",
+    "attack_2": "attack STRIKE: weapon fully extended forward (melee thrust/swing) or aimed and firing (ranged)",
+    "hit":      "HIT REACTION: recoiling from damage, body leaning back, staggered, pain expression",
 }
 
 # --- Full sprite sheet prompt (4×4 grid) ---

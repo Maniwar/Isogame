@@ -12,7 +12,8 @@ import { Terrain, Direction, TILE_W, TILE_H, TILE_HALF_W, TILE_HALF_H } from "..
  * The manifest.json "animations" section maps:
  *   spriteKey -> animName -> direction -> image path
  *
- * Frame keys: "idle", "walk_1", "walk_2", "attack"
+ * Frame keys (8 rows): "idle", "walk_1", "walk_2", "walk_3", "walk_4",
+ *                       "attack_1", "attack_2", "hit"
  */
 
 type DrawTarget = HTMLCanvasElement | HTMLImageElement;
@@ -49,7 +50,7 @@ export class AssetManager {
 
   /**
    * Animation frames: spriteKey -> animFrameKey -> direction -> image
-   * animFrameKey is "idle" | "walk_1" | "walk_2" | "attack"
+   * animFrameKey is "idle" | "walk_1".."walk_4" | "attack_1" | "attack_2" | "hit"
    */
   private animFrames = new Map<string, Map<string, Map<Direction, DrawTarget>>>();
 
@@ -145,6 +146,19 @@ export class AssetManager {
    * @param frameKey - animation frame key (e.g., "walk_1") from AnimationSystem.getFrameKey()
    * @param dir - facing direction
    */
+  /**
+   * Legacy frame key fallbacks: when new 8-row frame keys are requested but
+   * only old 4-row data exists (or vice versa), try equivalent keys.
+   */
+  private static readonly FRAME_FALLBACKS: Record<string, string[]> = {
+    "walk_3": ["walk_1"],            // 4-frame walk → 2-frame walk
+    "walk_4": ["walk_2"],
+    "attack_1": ["attack"],          // 2-frame attack → legacy single "attack"
+    "attack_2": ["attack"],
+    "attack": ["attack_2"],          // legacy "attack" → new strike frame
+    "hit": ["idle"],                 // hit → idle if no hit frame
+  };
+
   getAnimFrame(spriteKey: string, frameKey: string, dir: Direction): DrawTarget | undefined {
     const animData = this.animFrames.get(spriteKey);
     if (animData) {
@@ -152,6 +166,17 @@ export class AssetManager {
       if (frameDir) {
         const img = frameDir.get(dir);
         if (img) return img;
+      }
+      // Try fallback frame keys for backward/forward compatibility
+      const fallbacks = AssetManager.FRAME_FALLBACKS[frameKey];
+      if (fallbacks) {
+        for (const fb of fallbacks) {
+          const fbDir = animData.get(fb);
+          if (fbDir) {
+            const img = fbDir.get(dir);
+            if (img) return img;
+          }
+        }
       }
       // Fall back to idle for this direction if specific frame missing
       const idleDir = animData.get("idle");

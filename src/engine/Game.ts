@@ -523,6 +523,9 @@ export class Game {
       this.animationSystem.triggerAttack(player);
     }
     const result = this.combatSystem.attack(state, player, target, bodyPart);
+    if (result.hit && !target.dead) {
+      this.animationSystem.triggerHit(target);
+    }
     this.spawnAttackVFX(player, target, result);
     this.notify(result.message, result.hit ? "rgb(184, 48, 48)" : "rgb(212, 196, 160)");
 
@@ -589,6 +592,9 @@ export class Game {
           this.animationSystem.triggerShoot(npc);
         } else {
           this.animationSystem.triggerAttack(npc);
+        }
+        if (!state.player.dead) {
+          this.animationSystem.triggerHit(state.player);
         }
         const lastLog = state.combatLog[state.combatLog.length - 1];
         const isCrit = lastLog?.text.includes("CRITICAL") ?? false;
