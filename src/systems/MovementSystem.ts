@@ -30,14 +30,22 @@ export class MovementSystem {
   private moveEntity(entity: Entity, _state: GameState, dt: number) {
     if (entity.path.length === 0) return;
 
+    // Set facing direction toward the next waypoint BEFORE interpolating,
+    // so the sprite faces the correct way during the entire movement leg.
+    entity.direction = this.getDirection(entity.pos, entity.path[0]);
+
     entity.moveProgress += this.moveSpeed * dt;
 
     if (entity.moveProgress >= 1) {
       // Arrived at next tile
       const next = entity.path.shift()!;
-      entity.direction = this.getDirection(entity.pos, next);
       entity.pos = next;
       entity.moveProgress = 0;
+
+      // Immediately face the next waypoint if path continues
+      if (entity.path.length > 0) {
+        entity.direction = this.getDirection(entity.pos, entity.path[0]);
+      }
     }
   }
 
@@ -148,17 +156,31 @@ export class MovementSystem {
     return map.tiles[pos.y][pos.x].collision === Collision.None;
   }
 
+  /**
+   * Convert tile-coordinate movement into a screen-space facing direction.
+   *
+   * Isometric projection rotates tile axes 45° from screen axes:
+   *   screenX = (tileX - tileY) * 32
+   *   screenY = (tileX + tileY) * 16
+   *
+   * So tile-east (dx=+1,dy=0) is screen-SE (down-right), and
+   * tile-SE (dx=+1,dy=+1) is screen-S (straight down toward viewer).
+   *
+   * Sprite direction labels use screen-space:
+   *   "S" = front view (facing camera), "N" = back view, etc.
+   */
   private getDirection(from: TilePos, to: TilePos): Direction {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
 
-    if (dx === 0 && dy < 0) return "N";
-    if (dx > 0 && dy < 0) return "NE";
-    if (dx > 0 && dy === 0) return "E";
-    if (dx > 0 && dy > 0) return "SE";
-    if (dx === 0 && dy > 0) return "S";
-    if (dx < 0 && dy > 0) return "SW";
-    if (dx < 0 && dy === 0) return "W";
-    return "NW";
+    // Map tile deltas → screen-space directions (45° CW rotation)
+    if (dx === 0 && dy < 0) return "NE";   // tile-N → screen upper-right
+    if (dx > 0 && dy < 0) return "E";      // tile-NE → screen right
+    if (dx > 0 && dy === 0) return "SE";   // tile-E → screen lower-right
+    if (dx > 0 && dy > 0) return "S";      // tile-SE → screen down (front view)
+    if (dx === 0 && dy > 0) return "SW";   // tile-S → screen lower-left
+    if (dx < 0 && dy > 0) return "W";      // tile-SW → screen left
+    if (dx < 0 && dy === 0) return "NW";   // tile-W → screen upper-left
+    return "N";                            // tile-NW → screen up (back view)
   }
 }
