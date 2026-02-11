@@ -134,19 +134,6 @@ export class AssetManager {
   /**
    * Get a tile variant for the given terrain at a specific map position.
    *
-   * For non-water terrain: deterministically selects a variant based on
-   * position hash so the same tile always looks the same.
-   *
-   * For water: cycles through animation frames based on time, creating
-   * an animated water surface effect.
-   *
-   * @param terrain - terrain type
-   * @param tileX - map X coordinate (for deterministic variant selection)
-   * @param tileY - map Y coordinate (for deterministic variant selection)
-   */
-  /**
-   * Get a tile variant for the given terrain at a specific map position.
-   *
    * Content-aware selection: neighborSig encodes which cardinal neighbors
    * have different terrain (bit 0=N, 1=E, 2=S, 3=W). Mixing this into
    * the hash ensures interior tiles and border tiles get consistently
@@ -441,6 +428,10 @@ export class AssetManager {
     }
 
     await Promise.all(promises);
+
+    // Post-process: normalize character sprite sizes using per-key scaling
+    // (must happen before registerWeaponAliases so aliases inherit normalized frames)
+    this.normalizeCharacterSprites();
   }
 
   /**
@@ -500,12 +491,122 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image.  Green background removal and content centering
-   * are handled by the Python reprocessor (scripts/asset-gen/reprocess.py)
-   * so we load the pre-processed PNG directly.
+   * Load a sprite image (no per-frame processing — normalization is done
+   * post-load in normalizeCharacterSprites for consistent per-key scaling).
    */
   private async loadSpriteImage(path: string): Promise<HTMLImageElement | null> {
     return this.loadImage(path);
+  }
+
+  /**
+   * Post-load normalization: for each sprite key, compute a single scale
+   * factor from the idle-S reference frame and apply it uniformly to ALL
+   * frames. This ensures consistent character proportions across walk/attack
+   * frames (per-frame scaling distorts proportions when content bounds vary).
+   */
+  private normalizeCharacterSprites() {
+    for (const [spriteKey, animData] of this.animFrames) {
+      const idleDir = animData.get("idle");
+      if (!idleDir) continue;
+
+      const refFrame = idleDir.get("S" as Direction) ?? [...idleDir.values()][0];
+      if (!refFrame) continue;
+
+      const refH = this.measureContentHeight(refFrame);
+      if (refH <= 0) continue;
+
+      const sh = refFrame instanceof HTMLCanvasElement
+        ? refFrame.height
+        : (refFrame as HTMLImageElement).naturalHeight || (refFrame as HTMLImageElement).height;
+      const targetH = sh * 0.82;
+      const rawScale = targetH / refH;
+      if (rawScale < 1.08) continue; // Already large enough
+
+      const scale = Math.min(1.5, rawScale);
+
+      // Apply the SAME scale to every animation frame for this sprite key
+      for (const [, dirMap] of animData) {
+        for (const [dir, frame] of dirMap) {
+          dirMap.set(dir, this.rescaleSprite(frame, scale));
+        }
+      }
+
+      // Also normalize static sprites for this key
+      const staticMap = this.sprites.get(spriteKey);
+      if (staticMap) {
+        for (const [dir, frame] of staticMap) {
+          staticMap.set(dir, this.rescaleSprite(frame, scale));
+        }
+      }
+    }
+  }
+
+  /** Measure the height of non-transparent content in a sprite */
+  private measureContentHeight(frame: DrawTarget): number {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+    if (sw === 0 || sh === 0) return 0;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(frame, 0, 0);
+
+    let data: ImageData;
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return 0; }
+
+    let minY = sh, maxY = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    return maxY > minY ? maxY - minY + 1 : 0;
+  }
+
+  /** Rescale a sprite using per-frame content bounds for positioning but a shared scale factor */
+  private rescaleSprite(frame: DrawTarget, scale: number): HTMLCanvasElement {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(frame, 0, 0);
+
+    let data: ImageData;
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return temp; }
+
+    let minY = sh, maxY = 0, minX = sw, maxX = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    if (minY >= maxY || minX >= maxX) return temp;
+
+    const contentCX = (minX + maxX) / 2;
+    const result = this.createCanvas(sw, sh);
+    const ctx = result.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Anchor feet at bottom, center horizontally
+    const offsetY = (sh - 4) - maxY * scale;
+    const offsetX = (sw / 2) - contentCX * scale;
+    ctx.drawImage(frame as CanvasImageSource, offsetX, offsetY, sw * scale, sh * scale);
+    return result;
   }
 
   // -----------------------------------------------------------------------
@@ -745,7 +846,11 @@ export class AssetManager {
   }
 
   private genChar(c: {body:string;head:string;accent:string}, dir: Direction, isPlayer: boolean): HTMLCanvasElement {
-    const w=24, h=36, canvas=this.createCanvas(w,h), ctx=canvas.getContext("2d")!, cx=w/2;
+    // Use 64x96 canvas (matching AI sprite dimensions) so procedural fallback
+    // renders at the same visual size when drawn at the fixed display size.
+    const canvas=this.createCanvas(64,96), ctx=canvas.getContext("2d")!;
+    ctx.scale(64/24, 96/36); // Scale original 24x36 coordinate space to 64x96
+    const w=24, h=36, cx=w/2;
     ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(cx,h-3,8,3,0,0,Math.PI*2); ctx.fill();
     const bs=this.dirOff(dir);
     ctx.fillStyle=c.body; ctx.fillRect(cx-5+bs*1.5,14,10,14);

@@ -517,6 +517,9 @@ export class Game {
   private executePlayerAttack(player: Entity, target: Entity, bodyPart: BodyPart) {
     const { state } = this;
 
+    // Face the target before attacking
+    player.direction = MovementSystem.getDirectionBetween(player.pos, target.pos);
+
     if (this.combatSystem.isRangedWeapon(player)) {
       this.animationSystem.triggerShoot(player);
     } else {
@@ -524,6 +527,8 @@ export class Game {
     }
     const result = this.combatSystem.attack(state, player, target, bodyPart);
     if (result.hit && !target.dead) {
+      // Target faces the attacker during hit reaction
+      target.direction = MovementSystem.getDirectionBetween(target.pos, player.pos);
       this.animationSystem.triggerHit(target);
     }
     this.spawnAttackVFX(player, target, result);
@@ -583,17 +588,28 @@ export class Game {
     if (this.aiActionTimer > 0) return;
 
     const playerHpBefore = state.player.stats.hp;
+    const prevPos = { ...npc.pos };
     const didAct = this.combatSystem.aiAct(state, npc);
 
     if (didAct) {
+      // If NPC moved (pos changed), set facing toward movement direction
+      if (npc.pos.x !== prevPos.x || npc.pos.y !== prevPos.y) {
+        npc.direction = MovementSystem.getDirectionBetween(prevPos, npc.pos);
+      }
+
       const dmg = playerHpBefore - state.player.stats.hp;
       if (dmg > 0) {
+        // Face the player when attacking
+        npc.direction = MovementSystem.getDirectionBetween(npc.pos, state.player.pos);
+
         if (this.combatSystem.isRangedWeapon(npc)) {
           this.animationSystem.triggerShoot(npc);
         } else {
           this.animationSystem.triggerAttack(npc);
         }
         if (!state.player.dead) {
+          // Player faces the attacker during hit reaction
+          state.player.direction = MovementSystem.getDirectionBetween(state.player.pos, npc.pos);
           this.animationSystem.triggerHit(state.player);
         }
         const lastLog = state.combatLog[state.combatLog.length - 1];
@@ -620,6 +636,10 @@ export class Game {
   private openDialogue(npc: Entity) {
     const tree = this.dialogueSystem.getDialogue(npc.dialogueId!);
     if (tree) {
+      // Face each other during dialogue
+      this.state.player.direction = MovementSystem.getDirectionBetween(this.state.player.pos, npc.pos);
+      npc.direction = MovementSystem.getDirectionBetween(npc.pos, this.state.player.pos);
+
       this.state.phase = "dialogue";
       this.state.dialogueTree = tree;
       this.state.dialogueNodeId = tree.startNodeId;

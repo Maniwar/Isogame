@@ -234,25 +234,6 @@ export class Renderer {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
     }
 
-    // Draw subtle border edges at terrain boundaries for visual definition
-    if (neighborSig > 0) {
-      const top = { x: wx, y: wy - TILE_HALF_H };
-      const right = { x: wx + TILE_HALF_W, y: wy };
-      const bottom = { x: wx, y: wy + TILE_HALF_H };
-      const left = { x: wx - TILE_HALF_W, y: wy };
-
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
-      ctx.lineWidth = 1;
-      // N neighbor different → top-right edge
-      if (neighborSig & 1) { ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); ctx.stroke(); }
-      // E neighbor different → bottom-right edge
-      if (neighborSig & 2) { ctx.beginPath(); ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); ctx.stroke(); }
-      // S neighbor different → bottom-left edge
-      if (neighborSig & 4) { ctx.beginPath(); ctx.moveTo(bottom.x, bottom.y); ctx.lineTo(left.x, left.y); ctx.stroke(); }
-      // W neighbor different → top-left edge
-      if (neighborSig & 8) { ctx.beginPath(); ctx.moveTo(left.x, left.y); ctx.lineTo(top.x, top.y); ctx.stroke(); }
-    }
-
     // Draw tile object if present
     if (tile.object) {
       const obj = assets.getObject(tile.object);
@@ -407,11 +388,13 @@ export class Renderer {
     const sw = 40;
     const sh = 60;
 
-    // Walking bob: subtle vertical bounce to reinforce movement
+    // Walking bob: subtle vertical bounce synced to the stride cycle.
+    // One full sine wave per 4-slot walk cycle (~600ms) — not per frame.
     let bobY = 0;
     if (entity.anim.current === "walk") {
-      const phase = (entity.anim.elapsed / entity.anim.speed) * Math.PI * 2;
-      bobY = Math.sin(phase) * -2;
+      const frameFraction = entity.anim.elapsed / entity.anim.speed;
+      const cyclePos = (entity.anim.frame + frameFraction) / 4;
+      bobY = Math.sin(cyclePos * Math.PI * 2) * -1.5;
     }
 
     // Attack/shoot lean: slight forward shift during attack or shooting

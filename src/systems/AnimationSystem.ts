@@ -18,8 +18,10 @@ import { Entity, AnimationName, GameState } from "../types";
  * Hit: single frame held briefly then returns to idle
  */
 
-/** Walk cycle frame keys — 4-frame cycle for smooth movement */
-const WALK_FRAMES = ["walk_1", "walk_2", "walk_3", "walk_4"];
+/** Walk cycle frame keys — contact-only cycle (skip mid-stride frames
+ *  walk_2/walk_4 which have extreme leg spread that looks like splitting).
+ *  Each frame is repeated to maintain the same 600ms stride duration. */
+const WALK_FRAMES = ["walk_1", "walk_1", "walk_3", "walk_3"];
 
 /** Attack frame keys — wind-up then strike */
 const ATTACK_FRAMES = ["attack_1", "attack_2"];
