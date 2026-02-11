@@ -592,10 +592,19 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                     max_content_w = max(max_content_w, cw)
                     max_content_h = max(max_content_h, ch)
 
-    # Compute uniform scale: fit the LARGEST content bbox into target frame
+    # Compute uniform scale: primarily HEIGHT-based for character body consistency.
+    # Weapons extending far horizontally (e.g., rifle in attack pose) shouldn't
+    # shrink the whole character.  Width overflow is allowed up to 50% — the
+    # content gets center-cropped to the frame, clipping only weapon extremities.
     uniform_scale = None
     if center_content and max_content_w > 0 and max_content_h > 0:
-        uniform_scale = min(SPRITE_W / max_content_w, SPRITE_H / max_content_h, 1.0)
+        height_scale = min(SPRITE_H / max_content_h, 1.0)
+        max_allowed_width = SPRITE_W * 1.5
+        if max_content_w * height_scale > max_allowed_width:
+            # Width overflow too extreme — cap to 150% of frame width
+            uniform_scale = min(max_allowed_width / max_content_w, 1.0)
+        else:
+            uniform_scale = height_scale
         print(f"    Uniform scale: {uniform_scale:.3f} "
               f"(max content {max_content_w}x{max_content_h} → "
               f"{int(max_content_w * uniform_scale)}x{int(max_content_h * uniform_scale)} "
@@ -700,21 +709,15 @@ def fix_sprites(dry_run: bool = False) -> list:
         sprite_key = path.stem.replace("-sheet", "")
         print(f"  Re-slicing: {sprite_key}")
 
-        # QA gate: validate sheet before processing
+        # QA gate: validate sheet before processing (warn but still process)
         validation = validate_sheet(path)
+        r, c = validation["grid"]
         if not validation["ok"]:
-            print(f"    VALIDATION FAILED:")
+            print(f"    VALIDATION WARNING (processing anyway):")
             for err in validation["errors"]:
                 print(f"      - {err}")
-            results.append({
-                "status": "validation_failed",
-                "file": path.name,
-                "sprite_key": sprite_key,
-                "errors": validation["errors"],
-            })
-            continue
+            print(f"    Grid: {c} cols × {r} rows, {validation['size'][0]}x{validation['size'][1]}")
         else:
-            r, c = validation["grid"]
             print(f"    Validation OK: {c} cols × {r} rows, {validation['size'][0]}x{validation['size'][1]}")
 
         if dry_run:

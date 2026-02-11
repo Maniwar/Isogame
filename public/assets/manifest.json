@@ -21,7 +21,11 @@
       "S": "/assets/sprites/npc_doc-idle-s.png",
       "SW": "/assets/sprites/npc_doc-idle-sw.png",
       "W": "/assets/sprites/npc_doc-idle-w.png",
-      "NW": "/assets/sprites/npc_doc-idle-nw.png"
+      "NW": "/assets/sprites/npc_doc-idle-nw.png",
+      "N": "/assets/sprites/npc_doc-idle-n.png",
+      "NE": "/assets/sprites/npc_doc-idle-ne.png",
+      "E": "/assets/sprites/npc_doc-idle-e.png",
+      "SE": "/assets/sprites/npc_doc-idle-se.png"
     },
     "npc_merchant": {
       "S": "/assets/sprites/npc_merchant-idle-s.png",
@@ -37,7 +41,11 @@
       "S": "/assets/sprites/npc_raider-idle-s.png",
       "SW": "/assets/sprites/npc_raider-idle-sw.png",
       "W": "/assets/sprites/npc_raider-idle-w.png",
-      "NW": "/assets/sprites/npc_raider-idle-nw.png"
+      "NW": "/assets/sprites/npc_raider-idle-nw.png",
+      "N": "/assets/sprites/npc_raider-idle-n.png",
+      "NE": "/assets/sprites/npc_raider-idle-ne.png",
+      "E": "/assets/sprites/npc_raider-idle-e.png",
+      "SE": "/assets/sprites/npc_raider-idle-se.png"
     },
     "npc_sheriff": {
       "S": "/assets/sprites/npc_sheriff-idle-s.png",
@@ -116,25 +124,41 @@
         "S": "/assets/sprites/npc_doc-idle-s.png",
         "SW": "/assets/sprites/npc_doc-idle-sw.png",
         "W": "/assets/sprites/npc_doc-idle-w.png",
-        "NW": "/assets/sprites/npc_doc-idle-nw.png"
+        "NW": "/assets/sprites/npc_doc-idle-nw.png",
+        "N": "/assets/sprites/npc_doc-idle-n.png",
+        "NE": "/assets/sprites/npc_doc-idle-ne.png",
+        "E": "/assets/sprites/npc_doc-idle-e.png",
+        "SE": "/assets/sprites/npc_doc-idle-se.png"
       },
       "walk_1": {
         "S": "/assets/sprites/npc_doc-walk_1-s.png",
         "SW": "/assets/sprites/npc_doc-walk_1-sw.png",
         "W": "/assets/sprites/npc_doc-walk_1-w.png",
-        "NW": "/assets/sprites/npc_doc-walk_1-nw.png"
+        "NW": "/assets/sprites/npc_doc-walk_1-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_1-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_1-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_1-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_1-se.png"
       },
       "walk_2": {
         "S": "/assets/sprites/npc_doc-walk_2-s.png",
         "SW": "/assets/sprites/npc_doc-walk_2-sw.png",
         "W": "/assets/sprites/npc_doc-walk_2-w.png",
-        "NW": "/assets/sprites/npc_doc-walk_2-nw.png"
+        "NW": "/assets/sprites/npc_doc-walk_2-nw.png",
+        "N": "/assets/sprites/npc_doc-walk_2-n.png",
+        "NE": "/assets/sprites/npc_doc-walk_2-ne.png",
+        "E": "/assets/sprites/npc_doc-walk_2-e.png",
+        "SE": "/assets/sprites/npc_doc-walk_2-se.png"
       },
       "attack": {
         "S": "/assets/sprites/npc_doc-attack-s.png",
         "SW": "/assets/sprites/npc_doc-attack-sw.png",
         "W": "/assets/sprites/npc_doc-attack-w.png",
-        "NW": "/assets/sprites/npc_doc-attack-nw.png"
+        "NW": "/assets/sprites/npc_doc-attack-nw.png",
+        "N": "/assets/sprites/npc_doc-attack-n.png",
+        "NE": "/assets/sprites/npc_doc-attack-ne.png",
+        "E": "/assets/sprites/npc_doc-attack-e.png",
+        "SE": "/assets/sprites/npc_doc-attack-se.png"
       }
     },
     "npc_merchant": {
@@ -184,25 +208,41 @@
         "S": "/assets/sprites/npc_raider-idle-s.png",
         "SW": "/assets/sprites/npc_raider-idle-sw.png",
         "W": "/assets/sprites/npc_raider-idle-w.png",
-        "NW": "/assets/sprites/npc_raider-idle-nw.png"
+        "NW": "/assets/sprites/npc_raider-idle-nw.png",
+        "N": "/assets/sprites/npc_raider-idle-n.png",
+        "NE": "/assets/sprites/npc_raider-idle-ne.png",
+        "E": "/assets/sprites/npc_raider-idle-e.png",
+        "SE": "/assets/sprites/npc_raider-idle-se.png"
       },
       "walk_1": {
         "S": "/assets/sprites/npc_raider-walk_1-s.png",
         "SW": "/assets/sprites/npc_raider-walk_1-sw.png",
         "W": "/assets/sprites/npc_raider-walk_1-w.png",
-        "NW": "/assets/sprites/npc_raider-walk_1-nw.png"
+        "NW": "/assets/sprites/npc_raider-walk_1-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_1-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_1-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_1-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_1-se.png"
       },
       "walk_2": {
         "S": "/assets/sprites/npc_raider-walk_2-s.png",
         "SW": "/assets/sprites/npc_raider-walk_2-sw.png",
         "W": "/assets/sprites/npc_raider-walk_2-w.png",
-        "NW": "/assets/sprites/npc_raider-walk_2-nw.png"
+        "NW": "/assets/sprites/npc_raider-walk_2-nw.png",
+        "N": "/assets/sprites/npc_raider-walk_2-n.png",
+        "NE": "/assets/sprites/npc_raider-walk_2-ne.png",
+        "E": "/assets/sprites/npc_raider-walk_2-e.png",
+        "SE": "/assets/sprites/npc_raider-walk_2-se.png"
       },
       "attack": {
         "S": "/assets/sprites/npc_raider-attack-s.png",
         "SW": "/assets/sprites/npc_raider-attack-sw.png",
         "W": "/assets/sprites/npc_raider-attack-w.png",
-        "NW": "/assets/sprites/npc_raider-attack-nw.png"
+        "NW": "/assets/sprites/npc_raider-attack-nw.png",
+        "N": "/assets/sprites/npc_raider-attack-n.png",
+        "NE": "/assets/sprites/npc_raider-attack-ne.png",
+        "E": "/assets/sprites/npc_raider-attack-e.png",
+        "SE": "/assets/sprites/npc_raider-attack-se.png"
       }
     },
     "npc_sheriff": {
