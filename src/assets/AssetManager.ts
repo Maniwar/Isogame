@@ -372,7 +372,7 @@ export class AssetManager {
           for (const [dir, path] of Object.entries(directions)) {
             this.totalToLoad++;
             promises.push(
-              this.loadSpriteImage(path).then((img) => {
+              this.loadSpriteImage(path, false).then((img) => {
                 if (img) {
                   dirMap.set(dir as Direction, img);
                   this.loadedCount++;
@@ -487,12 +487,76 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image.  Green background removal and content centering
-   * are handled by the Python reprocessor (scripts/asset-gen/reprocess.py)
-   * so we load the pre-processed PNG directly.
+   * Load a sprite image and normalize its content size.
+   * Ensures all character sprites fill a consistent portion of the canvas
+   * regardless of how the AI generated the art (some characters are drawn
+   * smaller within the 64×96 canvas than others).
    */
-  private async loadSpriteImage(path: string): Promise<HTMLImageElement | null> {
-    return this.loadImage(path);
+  private async loadSpriteImage(path: string, normalize = true): Promise<DrawTarget | null> {
+    const img = await this.loadImage(path);
+    if (!img) return null;
+    return normalize ? this.normalizeSprite(img) : img;
+  }
+
+  /**
+   * Detect the content bounding box of a sprite image and scale it up
+   * so the character fills ~82% of the canvas height. Only scales UP
+   * sprites that are too small — already-large sprites pass through unchanged.
+   * Anchors feet at the bottom and centers horizontally.
+   */
+  private normalizeSprite(img: HTMLImageElement): DrawTarget {
+    const sw = img.naturalWidth || img.width;
+    const sh = img.naturalHeight || img.height;
+    if (sw === 0 || sh === 0) return img;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(img, 0, 0);
+
+    let data: ImageData;
+    try {
+      data = tempCtx.getImageData(0, 0, sw, sh);
+    } catch {
+      return img;
+    }
+
+    // Find bounding box of non-transparent pixels
+    let minY = sh, maxY = 0, minX = sw, maxX = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+
+    if (minY >= maxY || minX >= maxX) return img;
+
+    const contentH = maxY - minY + 1;
+    const contentCX = (minX + maxX) / 2;
+
+    // Target: content should fill ~82% of canvas height
+    const targetH = sh * 0.82;
+    const rawScale = targetH / contentH;
+
+    // Only scale up sprites whose content is too small
+    if (rawScale < 1.08) return img;
+    const scale = Math.min(1.5, rawScale);
+
+    const result = this.createCanvas(sw, sh);
+    const ctx = result.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+
+    // Anchor feet at bottom (maxY → canvas bottom minus 4px margin)
+    // Center horizontally based on content center
+    const offsetY = (sh - 4) - maxY * scale;
+    const offsetX = (sw / 2) - contentCX * scale;
+
+    ctx.drawImage(img, offsetX, offsetY, sw * scale, sh * scale);
+    return result;
   }
 
   // -----------------------------------------------------------------------
