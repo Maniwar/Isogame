@@ -388,11 +388,13 @@ export class Renderer {
     const sw = 40;
     const sh = 60;
 
-    // Walking bob: subtle vertical bounce to reinforce movement
+    // Walking bob: subtle vertical bounce synced to the stride cycle.
+    // One full sine wave per 4-slot walk cycle (~600ms) — not per frame.
     let bobY = 0;
     if (entity.anim.current === "walk") {
-      const phase = (entity.anim.elapsed / entity.anim.speed) * Math.PI * 2;
-      bobY = Math.sin(phase) * -2;
+      const frameFraction = entity.anim.elapsed / entity.anim.speed;
+      const cyclePos = (entity.anim.frame + frameFraction) / 4;
+      bobY = Math.sin(cyclePos * Math.PI * 2) * -1.5;
     }
 
     // Attack/shoot lean: slight forward shift during attack or shooting

@@ -372,7 +372,7 @@ export class AssetManager {
           for (const [dir, path] of Object.entries(directions)) {
             this.totalToLoad++;
             promises.push(
-              this.loadSpriteImage(path, false).then((img) => {
+              this.loadSpriteImage(path).then((img) => {
                 if (img) {
                   dirMap.set(dir as Direction, img);
                   this.loadedCount++;
@@ -428,6 +428,10 @@ export class AssetManager {
     }
 
     await Promise.all(promises);
+
+    // Post-process: normalize character sprite sizes using per-key scaling
+    // (must happen before registerWeaponAliases so aliases inherit normalized frames)
+    this.normalizeCharacterSprites();
   }
 
   /**
@@ -487,40 +491,99 @@ export class AssetManager {
   }
 
   /**
-   * Load a sprite image and normalize its content size.
-   * Ensures all character sprites fill a consistent portion of the canvas
-   * regardless of how the AI generated the art (some characters are drawn
-   * smaller within the 64×96 canvas than others).
+   * Load a sprite image (no per-frame processing — normalization is done
+   * post-load in normalizeCharacterSprites for consistent per-key scaling).
    */
-  private async loadSpriteImage(path: string, normalize = true): Promise<DrawTarget | null> {
-    const img = await this.loadImage(path);
-    if (!img) return null;
-    return normalize ? this.normalizeSprite(img) : img;
+  private async loadSpriteImage(path: string): Promise<HTMLImageElement | null> {
+    return this.loadImage(path);
   }
 
   /**
-   * Detect the content bounding box of a sprite image and scale it up
-   * so the character fills ~82% of the canvas height. Only scales UP
-   * sprites that are too small — already-large sprites pass through unchanged.
-   * Anchors feet at the bottom and centers horizontally.
+   * Post-load normalization: for each sprite key, compute a single scale
+   * factor from the idle-S reference frame and apply it uniformly to ALL
+   * frames. This ensures consistent character proportions across walk/attack
+   * frames (per-frame scaling distorts proportions when content bounds vary).
    */
-  private normalizeSprite(img: HTMLImageElement): DrawTarget {
-    const sw = img.naturalWidth || img.width;
-    const sh = img.naturalHeight || img.height;
-    if (sw === 0 || sh === 0) return img;
+  private normalizeCharacterSprites() {
+    for (const [spriteKey, animData] of this.animFrames) {
+      const idleDir = animData.get("idle");
+      if (!idleDir) continue;
+
+      const refFrame = idleDir.get("S" as Direction) ?? [...idleDir.values()][0];
+      if (!refFrame) continue;
+
+      const refH = this.measureContentHeight(refFrame);
+      if (refH <= 0) continue;
+
+      const sh = refFrame instanceof HTMLCanvasElement
+        ? refFrame.height
+        : (refFrame as HTMLImageElement).naturalHeight || (refFrame as HTMLImageElement).height;
+      const targetH = sh * 0.82;
+      const rawScale = targetH / refH;
+      if (rawScale < 1.08) continue; // Already large enough
+
+      const scale = Math.min(1.5, rawScale);
+
+      // Apply the SAME scale to every animation frame for this sprite key
+      for (const [, dirMap] of animData) {
+        for (const [dir, frame] of dirMap) {
+          dirMap.set(dir, this.rescaleSprite(frame, scale));
+        }
+      }
+
+      // Also normalize static sprites for this key
+      const staticMap = this.sprites.get(spriteKey);
+      if (staticMap) {
+        for (const [dir, frame] of staticMap) {
+          staticMap.set(dir, this.rescaleSprite(frame, scale));
+        }
+      }
+    }
+  }
+
+  /** Measure the height of non-transparent content in a sprite */
+  private measureContentHeight(frame: DrawTarget): number {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+    if (sw === 0 || sh === 0) return 0;
 
     const temp = this.createCanvas(sw, sh);
     const tempCtx = temp.getContext("2d")!;
-    tempCtx.drawImage(img, 0, 0);
+    tempCtx.drawImage(frame, 0, 0);
 
     let data: ImageData;
-    try {
-      data = tempCtx.getImageData(0, 0, sw, sh);
-    } catch {
-      return img;
-    }
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return 0; }
 
-    // Find bounding box of non-transparent pixels
+    let minY = sh, maxY = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    return maxY > minY ? maxY - minY + 1 : 0;
+  }
+
+  /** Rescale a sprite using per-frame content bounds for positioning but a shared scale factor */
+  private rescaleSprite(frame: DrawTarget, scale: number): HTMLCanvasElement {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(frame, 0, 0);
+
+    let data: ImageData;
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return temp; }
+
     let minY = sh, maxY = 0, minX = sw, maxX = 0;
     for (let y = 0; y < sh; y++) {
       for (let x = 0; x < sw; x++) {
@@ -532,30 +595,17 @@ export class AssetManager {
         }
       }
     }
+    if (minY >= maxY || minX >= maxX) return temp;
 
-    if (minY >= maxY || minX >= maxX) return img;
-
-    const contentH = maxY - minY + 1;
     const contentCX = (minX + maxX) / 2;
-
-    // Target: content should fill ~82% of canvas height
-    const targetH = sh * 0.82;
-    const rawScale = targetH / contentH;
-
-    // Only scale up sprites whose content is too small
-    if (rawScale < 1.08) return img;
-    const scale = Math.min(1.5, rawScale);
-
     const result = this.createCanvas(sw, sh);
     const ctx = result.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
 
-    // Anchor feet at bottom (maxY → canvas bottom minus 4px margin)
-    // Center horizontally based on content center
+    // Anchor feet at bottom, center horizontally
     const offsetY = (sh - 4) - maxY * scale;
     const offsetX = (sw / 2) - contentCX * scale;
-
-    ctx.drawImage(img, offsetX, offsetY, sw * scale, sh * scale);
+    ctx.drawImage(frame as CanvasImageSource, offsetX, offsetY, sw * scale, sh * scale);
     return result;
   }
 
