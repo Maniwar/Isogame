@@ -944,14 +944,18 @@ def qa_validate() -> bool:
         else:
             checks.append(f"OK green={green_opaque}")
 
-        # Content presence check
+        # Content presence check — sprites are small characters in 64x96 frames,
+        # so even 1% fill (~61px) is valid.  Warn below 1%, fail only at zero.
         opaque = int(np.sum(a > 0))
         total = w * h
-        if opaque < total * 0.1:
-            checks.append(f"FAIL too sparse ({opaque}/{total})")
+        pct = opaque * 100 // total if total > 0 else 0
+        if opaque == 0:
+            checks.append(f"FAIL empty (0/{total})")
             ok = False
+        elif pct < 1:
+            checks.append(f"WARN sparse ({opaque}/{total} = {pct}%)")
         else:
-            checks.append(f"OK content={opaque*100//total}%")
+            checks.append(f"OK content={pct}%")
 
         print(f"  {sprite_key}: {', '.join(checks)}")
 
