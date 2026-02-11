@@ -360,45 +360,62 @@ def detect_grid_auto(sheet: Image.Image) -> tuple:
     def find_natural_splits(density, total_size, min_cell=120):
         """Find actual cell boundaries by detecting runs of low-density pixels.
 
-        Uses a smoothed density profile to avoid splitting on noise within
-        large gaps (e.g., a few pixels of content between two empty regions).
+        Uses a multi-pass approach: starts with a narrow kernel to catch even
+        small (5-10px) gaps between cells, then tries progressively wider
+        kernels.  Gemini often produces sheets with only 5-15px transparent
+        gaps between character rows/columns; a single 40px kernel smooths
+        these away entirely.
+
         min_cell=120 prevents splitting a real column (typically 170-256px in
         a 4-6 column 1024px sheet) while still allowing up to ~8 real columns.
         """
-        # Smooth with a wide kernel to merge small blips in gaps
-        kernel_size = 40
-        kernel = np.ones(kernel_size) / kernel_size
-        smoothed = np.convolve(density, kernel, mode="same")
+        best_filtered = [0, total_size]
 
-        threshold = 0.10  # smoothed density below this = gap
-        in_gap = smoothed < threshold
-        splits = [0]
+        # Try progressively wider kernels — narrow catches small gaps,
+        # wide handles noisy sheets where content leaks into gaps
+        for kernel_size, threshold in [(5, 0.03), (12, 0.06), (25, 0.08), (40, 0.10)]:
+            ks = min(kernel_size, max(1, total_size // 5))
+            if ks < 1:
+                ks = 1
+            kernel = np.ones(ks) / ks
+            smoothed = np.convolve(density, kernel, mode="same")
 
-        i = 0
-        while i < total_size:
-            if in_gap[i]:
-                gap_start = i
-                while i < total_size and in_gap[i]:
+            in_gap = smoothed < threshold
+            splits = [0]
+
+            i = 0
+            while i < total_size:
+                if in_gap[i]:
+                    gap_start = i
+                    while i < total_size and in_gap[i]:
+                        i += 1
+                    gap_end = i
+                    gap_mid = (gap_start + gap_end) // 2
+
+                    # Only count as a split if the cell on either side is big enough
+                    if gap_mid - splits[-1] >= min_cell:
+                        splits.append(gap_mid)
+                else:
                     i += 1
-                gap_end = i
-                gap_mid = (gap_start + gap_end) // 2
 
-                # Only count as a split if the cell on either side is big enough
-                if gap_mid - splits[-1] >= min_cell:
-                    splits.append(gap_mid)
-            else:
-                i += 1
+            splits.append(total_size)
 
-        splits.append(total_size)
+            # Filter out tiny trailing cells
+            filtered = [splits[0]]
+            for s in splits[1:]:
+                if s - filtered[-1] >= min_cell:
+                    filtered.append(s)
+                else:
+                    filtered[-1] = s  # merge into previous
 
-        # Filter out tiny trailing cells
-        filtered = [splits[0]]
-        for s in splits[1:]:
-            if s - filtered[-1] >= min_cell:
-                filtered.append(s)
-            else:
-                filtered[-1] = s  # merge into previous
-        return filtered
+            if len(filtered) > len(best_filtered):
+                best_filtered = filtered
+
+            # Stop early if we found enough cells (8 is the max expected)
+            if len(best_filtered) - 1 >= 8:
+                break
+
+        return best_filtered
 
     row_splits = find_natural_splits(row_density, sh)
     col_splits = find_natural_splits(col_density, sw)

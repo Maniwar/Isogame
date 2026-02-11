@@ -303,37 +303,52 @@ def detect_actual_grid_size(sheet: Image.Image, min_cell: int = 120) -> tuple[in
     col_density = np.mean(alpha > 10, axis=0)
 
     def count_cells(density: np.ndarray, total_size: int) -> tuple[int, list[int]]:
-        """Count cells and return split positions."""
-        kernel_size = min(40, max(1, total_size // 20))
-        kernel = np.ones(kernel_size) / kernel_size
-        smoothed = np.convolve(density, kernel, mode="same")
+        """Count cells using multi-pass gap detection.
 
-        threshold = 0.10
-        in_gap = smoothed < threshold
-        splits = [0]
+        Starts with a narrow kernel to catch even 5-10px gaps between cells,
+        then tries progressively wider kernels.  Gemini sheets often have
+        very narrow transparent gaps that a single wide kernel smooths away.
+        """
+        best_filtered = [0, total_size]
 
-        i = 0
-        while i < total_size:
-            if in_gap[i]:
-                gap_start = i
-                while i < total_size and in_gap[i]:
+        for kernel_size, threshold in [(5, 0.03), (12, 0.06), (25, 0.08), (40, 0.10)]:
+            ks = min(kernel_size, max(1, total_size // 5))
+            if ks < 1:
+                ks = 1
+            kernel = np.ones(ks) / ks
+            smoothed = np.convolve(density, kernel, mode="same")
+
+            in_gap = smoothed < threshold
+            splits = [0]
+
+            i = 0
+            while i < total_size:
+                if in_gap[i]:
+                    gap_start = i
+                    while i < total_size and in_gap[i]:
+                        i += 1
+                    gap_mid = (gap_start + i) // 2
+                    if gap_mid - splits[-1] >= min_cell:
+                        splits.append(gap_mid)
+                else:
                     i += 1
-                gap_mid = (gap_start + i) // 2
-                if gap_mid - splits[-1] >= min_cell:
-                    splits.append(gap_mid)
-            else:
-                i += 1
-        splits.append(total_size)
+            splits.append(total_size)
 
-        # Filter out tiny trailing cells
-        filtered = [splits[0]]
-        for s in splits[1:]:
-            if s - filtered[-1] >= min_cell:
-                filtered.append(s)
-            else:
-                filtered[-1] = s
+            # Filter out tiny trailing cells
+            filtered = [splits[0]]
+            for s in splits[1:]:
+                if s - filtered[-1] >= min_cell:
+                    filtered.append(s)
+                else:
+                    filtered[-1] = s
 
-        return len(filtered) - 1, filtered
+            if len(filtered) > len(best_filtered):
+                best_filtered = filtered
+
+            if len(best_filtered) - 1 >= 8:
+                break
+
+        return len(best_filtered) - 1, best_filtered
 
     actual_rows, row_splits = count_cells(row_density, sh)
     actual_cols, col_splits = count_cells(col_density, sw)
