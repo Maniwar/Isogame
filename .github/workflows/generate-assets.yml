@@ -101,6 +101,13 @@ jobs:
           echo "=== Reprocessing sprites (uniform scale + mirror + palette) ==="
           python reprocess.py --category sprites
 
+      - name: Reprocess weapon overlays (slice + mirror + palette)
+        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
+        run: |
+          cd scripts/asset-gen
+          echo "=== Reprocessing weapons (position-preserving + mirror + palette) ==="
+          python reprocess.py --category weapons
+
       - name: Show deployed assets
         if: inputs.dry_run == false
         run: |

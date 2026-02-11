@@ -286,6 +286,61 @@ def extract_and_center(region: Image.Image, target_w: int, target_h: int) -> Ima
     return canvas
 
 
+def detect_actual_grid_size(sheet: Image.Image, min_cell: int = 120) -> tuple[int, int]:
+    """Detect the actual number of rows and columns in a sprite sheet.
+
+    Gemini often ignores the requested grid size (e.g. 8×8) and produces
+    anything from 4×1 to 6×6.  This function analyses alpha-channel density
+    to find natural gaps between cells and counts the real grid dimensions.
+
+    Returns (actual_rows, actual_cols).
+    """
+    arr = np.array(sheet.convert("RGBA"))
+    alpha = arr[:, :, 3]
+    sh, sw = alpha.shape
+
+    row_density = np.mean(alpha > 10, axis=1)
+    col_density = np.mean(alpha > 10, axis=0)
+
+    def count_cells(density: np.ndarray, total_size: int) -> tuple[int, list[int]]:
+        """Count cells and return split positions."""
+        kernel_size = min(40, max(1, total_size // 20))
+        kernel = np.ones(kernel_size) / kernel_size
+        smoothed = np.convolve(density, kernel, mode="same")
+
+        threshold = 0.10
+        in_gap = smoothed < threshold
+        splits = [0]
+
+        i = 0
+        while i < total_size:
+            if in_gap[i]:
+                gap_start = i
+                while i < total_size and in_gap[i]:
+                    i += 1
+                gap_mid = (gap_start + i) // 2
+                if gap_mid - splits[-1] >= min_cell:
+                    splits.append(gap_mid)
+            else:
+                i += 1
+        splits.append(total_size)
+
+        # Filter out tiny trailing cells
+        filtered = [splits[0]]
+        for s in splits[1:]:
+            if s - filtered[-1] >= min_cell:
+                filtered.append(s)
+            else:
+                filtered[-1] = s
+
+        return len(filtered) - 1, filtered
+
+    actual_rows, row_splits = count_cells(row_density, sh)
+    actual_cols, col_splits = count_cells(col_density, sw)
+
+    return actual_rows, actual_cols
+
+
 def detect_grid(sheet: Image.Image, expected_rows: int, expected_cols: int) -> list[list[tuple[int, int, int, int]]]:
     """Detect the grid cell boundaries in a sprite sheet.
 
@@ -415,12 +470,18 @@ def slice_and_save_character_sheet(
     apply_palette: bool = True,
 ) -> dict:
     """
-    Content-aware sprite sheet slicer.
+    Content-aware sprite sheet slicer with auto grid detection.
+
+    Gemini often ignores the requested 8×8 grid and produces anything from
+    4×1 to 6×6.  This function:
 
     1. Opens the sheet and forces transparent background
-    2. Uses smart grid detection to find cell boundaries
-    3. Extracts and centers each character in the target cell size
-    4. Saves individual frames AND keeps the original sheet
+    2. Auto-detects the ACTUAL grid dimensions (not hardcoded 8×8)
+    3. Slices using the detected grid
+    4. Maps actual rows/cols to animation names and directions
+    5. Fills missing directions via horizontal mirroring
+    6. Falls back to idle for missing animation rows
+    7. Outputs all 8 animations × 8 directions (with fallbacks)
 
     Returns a frame metadata dict for the manifest.
     """
@@ -428,41 +489,94 @@ def slice_and_save_character_sheet(
 
     cell_w = config["sprites"]["base_width"]
     cell_h = config["sprites"]["base_height"]
-    num_cols = len(SHEET_DIRECTIONS)
-    num_rows = len(SHEET_ANIMATIONS)
 
     sheet = Image.open(sheet_path).convert("RGBA")
 
-    # Force white backgrounds to transparent (Gemini often ignores alpha requests)
+    # Force green backgrounds to transparent (Gemini often ignores alpha requests)
     sheet = force_transparent_bg(sheet)
 
-    print(f"    Sheet size: {sheet.size[0]}x{sheet.size[1]}, target grid: {num_cols}x{num_rows} cells of {cell_w}x{cell_h}")
+    # Auto-detect actual grid dimensions — Gemini rarely produces the requested 8×8
+    actual_rows, actual_cols = detect_actual_grid_size(sheet)
 
-    # Keep the original sheet (cleaned up)
+    print(f"    Sheet size: {sheet.size[0]}x{sheet.size[1]}, "
+          f"detected grid: {actual_cols} cols x {actual_rows} rows "
+          f"(expected 8x8), frame target: {cell_w}x{cell_h}")
+
+    # Keep the original sheet (cleaned up) for reprocess.py to re-slice later
     sheet_copy_name = f"{sprite_key}-sheet.png"
     sheet.save(dst_dir / sheet_copy_name, "PNG")
     print(f"    Kept original sheet: {sheet_copy_name}")
 
-    # Smart slice
-    frames = slice_spritesheet(sheet, cell_w, cell_h, num_rows, num_cols)
+    # Direction mapping based on actual column count.
+    # The AI generates a front-to-back rotation — not always matching prompt order.
+    DIRECTION_MAP = {
+        1: ["S"],
+        2: ["S", "N"],
+        3: ["S", "SW", "N"],
+        4: ["S", "SW", "N", "NW"],
+        5: ["S", "SW", "W", "N", "NW"],
+        6: ["S", "SW", "W", "NW", "N", "NE"],
+        7: ["S", "SW", "W", "NW", "N", "NE", "E"],
+        8: list(SHEET_DIRECTIONS),
+    }
+    actual_dirs = DIRECTION_MAP.get(actual_cols, list(SHEET_DIRECTIONS[:actual_cols]))
 
-    frame_meta = {}
+    # Animation mapping: use first N of SHEET_ANIMATIONS for the detected row count
+    actual_anims = list(SHEET_ANIMATIONS[:min(actual_rows, len(SHEET_ANIMATIONS))])
+
+    # Slice using detected grid dimensions
+    frames = slice_spritesheet(sheet, cell_w, cell_h, actual_rows, actual_cols)
+
+    # Mirror pairs for filling missing directions
+    MIRROR_PAIRS = {"SE": "SW", "E": "W", "NE": "NW"}
+
+    # Build extracted dict: {anim: {direction: Image}}
+    extracted: dict[str, dict[str, Image.Image]] = {}
     empty_cells = 0
 
-    for row_idx, anim_name in enumerate(SHEET_ANIMATIONS):
-        frame_meta[anim_name] = {}
-        for col_idx, direction in enumerate(SHEET_DIRECTIONS):
+    for row_idx, anim_name in enumerate(actual_anims):
+        extracted[anim_name] = {}
+        for col_idx, direction in enumerate(actual_dirs):
             frame = frames[row_idx][col_idx]
-
-            # Check if cell has any content
             bbox = find_content_bbox(frame)
-            if bbox is None:
+            if bbox is not None:
+                extracted[anim_name][direction] = frame
+            else:
                 empty_cells += 1
-                # Try to reuse idle frame for empty cells
-                if anim_name != "idle" and "idle" in frame_meta:
-                    if direction in frame_meta["idle"]:
-                        frame_meta[anim_name][direction] = frame_meta["idle"][direction]
-                        continue
+
+    actual_count = sum(len(dirs) for dirs in extracted.values())
+
+    # Fill missing directions via mirroring (SE←SW, E←W, NE←NW)
+    for anim_name in list(extracted.keys()):
+        for target, source in MIRROR_PAIRS.items():
+            if target not in extracted[anim_name] and source in extracted[anim_name]:
+                extracted[anim_name][target] = extracted[anim_name][source].transpose(
+                    Image.Transpose.FLIP_LEFT_RIGHT
+                )
+
+    # Output all 8 animations × 8 directions, with fallbacks for missing data
+    frame_meta: dict[str, dict[str, str]] = {}
+
+    for anim_name in SHEET_ANIMATIONS:
+        frame_meta[anim_name] = {}
+        for direction in SHEET_DIRECTIONS:
+            # Try: exact match → idle same direction → any idle → empty
+            frame = None
+            if anim_name in extracted and direction in extracted[anim_name]:
+                frame = extracted[anim_name][direction]
+            elif "idle" in extracted and direction in extracted["idle"]:
+                frame = extracted["idle"][direction]
+            else:
+                # Last resort: any available frame
+                for a in extracted.values():
+                    for f in a.values():
+                        frame = f
+                        break
+                    if frame:
+                        break
+
+            if frame is None:
+                frame = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
 
             # Post-process each frame
             frame = cleanup_transparency(frame)
@@ -470,13 +584,13 @@ def slice_and_save_character_sheet(
                 palette_img = build_palette_image(config)
                 frame = reduce_palette(frame, palette_img)
 
-            # Save individual frame
             filename = f"{sprite_key}-{anim_name}-{direction.lower()}.png"
             frame.save(dst_dir / filename, "PNG")
             frame_meta[anim_name][direction] = filename
 
-    total = num_rows * num_cols
-    print(f"    Sliced {total - empty_cells}/{total} frames ({empty_cells} empty, using fallbacks)")
+    total = len(SHEET_ANIMATIONS) * len(SHEET_DIRECTIONS)
+    print(f"    Extracted {actual_count} real frames → output {total} "
+          f"({empty_cells} empty cells, rest filled from mirroring/fallbacks)")
     return frame_meta
 
 
