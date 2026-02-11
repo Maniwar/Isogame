@@ -231,7 +231,16 @@ export class Renderer {
 
     const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
     if (sprite) {
+      // At terrain borders, reduce tile sprite opacity so the smooth base
+      // color gradient shows through — creates natural terrain transitions.
+      // More borders = more transparency for smoother blending.
+      if (neighborSig > 0) {
+        const borderCount = (neighborSig & 1) + ((neighborSig >> 1) & 1) +
+                            ((neighborSig >> 2) & 1) + ((neighborSig >> 3) & 1);
+        ctx.globalAlpha = Math.max(0.45, 1 - borderCount * 0.15);
+      }
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+      ctx.globalAlpha = 1;
     }
 
     // Draw subtle border edges at terrain boundaries for visual definition
@@ -241,7 +250,7 @@ export class Renderer {
       const bottom = { x: wx, y: wy + TILE_HALF_H };
       const left = { x: wx - TILE_HALF_W, y: wy };
 
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.18)";
       ctx.lineWidth = 1;
       // N neighbor different → top-right edge
       if (neighborSig & 1) { ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); ctx.stroke(); }

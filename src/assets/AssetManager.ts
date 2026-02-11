@@ -134,19 +134,6 @@ export class AssetManager {
   /**
    * Get a tile variant for the given terrain at a specific map position.
    *
-   * For non-water terrain: deterministically selects a variant based on
-   * position hash so the same tile always looks the same.
-   *
-   * For water: cycles through animation frames based on time, creating
-   * an animated water surface effect.
-   *
-   * @param terrain - terrain type
-   * @param tileX - map X coordinate (for deterministic variant selection)
-   * @param tileY - map Y coordinate (for deterministic variant selection)
-   */
-  /**
-   * Get a tile variant for the given terrain at a specific map position.
-   *
    * Content-aware selection: neighborSig encodes which cardinal neighbors
    * have different terrain (bit 0=N, 1=E, 2=S, 3=W). Mixing this into
    * the hash ensures interior tiles and border tiles get consistently
@@ -745,7 +732,11 @@ export class AssetManager {
   }
 
   private genChar(c: {body:string;head:string;accent:string}, dir: Direction, isPlayer: boolean): HTMLCanvasElement {
-    const w=24, h=36, canvas=this.createCanvas(w,h), ctx=canvas.getContext("2d")!, cx=w/2;
+    // Use 64x96 canvas (matching AI sprite dimensions) so procedural fallback
+    // renders at the same visual size when drawn at the fixed display size.
+    const canvas=this.createCanvas(64,96), ctx=canvas.getContext("2d")!;
+    ctx.scale(64/24, 96/36); // Scale original 24x36 coordinate space to 64x96
+    const w=24, h=36, cx=w/2;
     ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(cx,h-3,8,3,0,0,Math.PI*2); ctx.fill();
     const bs=this.dirOff(dir);
     ctx.fillStyle=c.body; ctx.fillRect(cx-5+bs*1.5,14,10,14);
