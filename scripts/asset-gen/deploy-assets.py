@@ -47,8 +47,8 @@ TERRAIN_OBJECT_MAP = {
 
 DIRECTIONS = ["s", "sw", "w", "nw", "n", "ne", "e", "se"]
 
-# Animation names matching the sprite sheet layout
-ANIMATIONS = ["idle", "walk_1", "walk_2", "attack"]
+# Animation names matching the 8-row sprite sheet layout
+ANIMATIONS = ["idle", "walk_1", "walk_2", "walk_3", "walk_4", "attack_1", "attack_2", "hit"]
 
 
 def deploy(source: Path, target: Path) -> dict:

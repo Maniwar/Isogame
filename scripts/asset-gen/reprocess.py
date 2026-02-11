@@ -11,7 +11,7 @@ Root causes this fixes:
   2. SPRITES: Green background removal was incomplete — postprocessor removed
      some green, palette reduction changed the colors, then game-side removal
      used wrong thresholds.  Individual frames still have ~3000 green pixels.
-     FIX: Re-slice from 1024x1024 sheets with thorough green removal.
+     FIX: Re-slice from 2048x2048 sheets with thorough green removal.
 
   3. WEAPONS: extract_and_center recentered each weapon on its own content,
      destroying spatial alignment with character frames.
@@ -338,8 +338,8 @@ def fix_tiles(dry_run: bool = False) -> list:
 def detect_grid_auto(sheet: Image.Image) -> tuple:
     """Auto-detect actual grid dimensions in a sprite sheet.
 
-    The AI generates variable grids (typically 4-6 cols × 4 rows) inside a
-    1024×1024 image.  Instead of assuming a fixed 8×6 layout, we find the
+    The AI generates variable grids (typically 8 cols × 8 rows) inside a
+    2048×2048 image.  Instead of assuming a fixed layout, we find the
     real cell boundaries by analysing content-density gaps.
 
     Returns (cells, actual_rows, actual_cols) where cells is a 2D list of
@@ -549,8 +549,8 @@ def validate_sheet(sheet_path: Path) -> dict:
     empty_cells = 0
     total_cells = 0
 
-    for ri in range(min(actual_rows, 4)):
-        for ci in range(min(actual_cols, 4)):
+    for ri in range(actual_rows):
+        for ci in range(min(actual_cols, 8)):
             x, y, w, h = grid[ri][ci]
             region = sheet.crop((x, y, x + w, y + h))
             clean = remove_green_bg(region)
@@ -577,17 +577,17 @@ def validate_sheet(sheet_path: Path) -> dict:
 def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                   center_content: bool = True,
                   apply_palette: bool = True) -> dict:
-    """Re-slice a 1024x1024 sprite sheet into individual frames.
+    """Re-slice a 2048x2048 sprite sheet into individual frames.
 
-    The AI generates 4-6 columns (directions) × 4 rows (animations: idle,
-    walk_1, walk_2, attack).  This function:
+    The AI generates 8 columns (directions) × 8 rows (animations: idle,
+    walk_1-4, attack_1-2, hit).  This function:
       1. Auto-detects the actual grid layout
       2. Measures all content bboxes to compute uniform scale
       3. Extracts all cells with consistent sizing
       4. Mirrors missing directions (SW→SE, W→E, NW→NE)
 
-    Only outputs the 4 real animation rows.  The game's AnimationSystem maps
-    shoot→attack and reload→idle at runtime (no synthetic frames needed).
+    Outputs up to 8 animation rows.  The game's AnimationSystem maps
+    shoot→attack_1/attack_2 and reload→idle at runtime.
 
     Returns frame metadata dict for manifest.
     """
@@ -595,7 +595,7 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     grid, actual_rows, actual_cols = detect_grid_auto(sheet)
 
     print(f"    Grid detected: {actual_cols} cols x {actual_rows} rows "
-          f"(expected 8x6, image {sheet.size[0]}x{sheet.size[1]})")
+          f"(expected 8x8, image {sheet.size[0]}x{sheet.size[1]})")
 
     # Map actual columns → direction names based on what the AI actually produces.
     # AI models generate a front-to-back rotation, NOT the prompt's column order.
