@@ -144,7 +144,15 @@ export class AssetManager {
    * @param tileX - map X coordinate (for deterministic variant selection)
    * @param tileY - map Y coordinate (for deterministic variant selection)
    */
-  getTile(terrain: Terrain, tileX = 0, tileY = 0): DrawTarget | undefined {
+  /**
+   * Get a tile variant for the given terrain at a specific map position.
+   *
+   * Content-aware selection: neighborSig encodes which cardinal neighbors
+   * have different terrain (bit 0=N, 1=E, 2=S, 3=W). Mixing this into
+   * the hash ensures interior tiles and border tiles get consistently
+   * different variants, creating natural visual patterns.
+   */
+  getTile(terrain: Terrain, tileX = 0, tileY = 0, neighborSig = 0): DrawTarget | undefined {
     const variants = this.tiles.get(terrain);
     if (!variants || variants.length === 0) return undefined;
     if (variants.length === 1) return variants[0];
@@ -155,9 +163,9 @@ export class AssetManager {
       return variants[frameIndex];
     }
 
-    // Deterministic variant selection from position hash
-    // Simple hash: mix x and y to get a stable index per tile
-    const hash = ((tileX * 73856093) ^ (tileY * 19349663)) >>> 0;
+    // Content-aware variant selection: mix position + neighbor context
+    // so tiles at terrain borders use different variants than interior tiles
+    const hash = ((tileX * 73856093) ^ (tileY * 19349663) ^ (neighborSig * 83492791)) >>> 0;
     return variants[hash % variants.length];
   }
 
@@ -563,28 +571,159 @@ export class AssetManager {
     ctx.lineTo(TILE_HALF_W, TILE_H - 1); ctx.lineTo(1, TILE_HALF_H);
     ctx.closePath();
     ctx.clip();
-    const dotCount = terrain === Terrain.Water ? 8 : 25;
-    for (let i = 0; i < dotCount; i++) {
-      ctx.fillStyle = rng() > 0.5 ? detail : noise;
-      ctx.globalAlpha = 0.3 + rng() * 0.4;
-      ctx.fillRect(rng() * TILE_W, rng() * TILE_H, 1 + rng() * 2, 1 + rng() * 2);
+
+    switch (terrain) {
+      case Terrain.Sand:
+        // Subtle sand ripple lines for dune texture
+        ctx.strokeStyle = detail;
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.2;
+        for (let i = 0; i < 4; i++) {
+          const y = 5 + i * 7;
+          ctx.beginPath();
+          ctx.moveTo(10 + rng() * 6, y + rng() * 2);
+          ctx.quadraticCurveTo(32, y + 2 + rng() * 3, 54 - rng() * 6, y + rng() * 2);
+          ctx.stroke();
+        }
+        // Scattered pebbles
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.15 + rng() * 0.15;
+          ctx.fillRect(10 + rng() * 44, 4 + rng() * 24, 1, 1);
+        }
+        break;
+
+      case Terrain.Dirt:
+        // Patchy earth texture with small irregular spots
+        for (let i = 0; i < 10; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.15 + rng() * 0.25;
+          const px = 8 + rng() * 48;
+          const py = 4 + rng() * 24;
+          const sz = 1 + rng() * 2.5;
+          ctx.beginPath();
+          ctx.ellipse(px, py, sz, sz * 0.6, rng() * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      case Terrain.CrackedEarth:
+        // Visible crack lines radiating outward
+        ctx.strokeStyle = noise;
+        ctx.lineWidth = 0.7;
+        ctx.globalAlpha = 0.5;
+        for (let i = 0; i < 3; i++) {
+          const sx = 15 + rng() * 30;
+          const sy = 6 + rng() * 16;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          for (let j = 0; j < 3; j++) {
+            ctx.lineTo(sx + (rng() - 0.3) * 18, sy + (rng() - 0.3) * 10);
+          }
+          ctx.stroke();
+        }
+        // Surface texture dots
+        for (let i = 0; i < 6; i++) {
+          ctx.fillStyle = detail;
+          ctx.globalAlpha = 0.12 + rng() * 0.12;
+          ctx.fillRect(8 + rng() * 48, 4 + rng() * 24, 1 + rng(), 1);
+        }
+        break;
+
+      case Terrain.Rubble:
+        // Scattered debris fragments
+        for (let i = 0; i < 8; i++) {
+          ctx.fillStyle = rng() > 0.4 ? detail : noise;
+          ctx.globalAlpha = 0.2 + rng() * 0.3;
+          const px = 8 + rng() * 48;
+          const py = 4 + rng() * 24;
+          const sz = 1 + rng() * 3;
+          ctx.fillRect(px, py, sz, sz * (0.5 + rng() * 0.5));
+        }
+        break;
+
+      case Terrain.Road:
+        // Center line dashes
+        ctx.strokeStyle = "#b8a67c";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.25;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath();
+        ctx.moveTo(TILE_HALF_W - 14, TILE_HALF_H);
+        ctx.lineTo(TILE_HALF_W + 14, TILE_HALF_H);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Subtle surface wear
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = noise;
+          ctx.globalAlpha = 0.1 + rng() * 0.1;
+          ctx.fillRect(12 + rng() * 40, 6 + rng() * 20, 1 + rng() * 2, 1);
+        }
+        break;
+
+      case Terrain.Concrete:
+        // Clean surface with subtle seam lines
+        ctx.strokeStyle = noise;
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.15;
+        ctx.beginPath();
+        ctx.moveTo(20, 8); ctx.lineTo(44, 24);
+        ctx.stroke();
+        // Few surface marks
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.1 + rng() * 0.12;
+          ctx.fillRect(12 + rng() * 40, 6 + rng() * 20, 1 + rng(), 1);
+        }
+        break;
+
+      case Terrain.Grass:
+        // Grass tufts - short vertical strokes
+        ctx.strokeStyle = "#7a8b5a";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.6;
+        for (let i = 0; i < 10; i++) {
+          const gx = 10 + rng() * 44;
+          const gy = 5 + rng() * 22;
+          ctx.beginPath();
+          ctx.moveTo(gx, gy);
+          ctx.lineTo(gx + (rng() - 0.5) * 3, gy - 2 - rng() * 4);
+          ctx.stroke();
+        }
+        // Ground color patches
+        for (let i = 0; i < 4; i++) {
+          ctx.fillStyle = detail;
+          ctx.globalAlpha = 0.12;
+          ctx.beginPath();
+          ctx.ellipse(12 + rng() * 40, 6 + rng() * 20, 2 + rng() * 2, 1 + rng(), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      case Terrain.Water:
+        // Gentle wave lines
+        ctx.strokeStyle = "#5a8a8a";
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.4;
+        for (let i = 0; i < 3; i++) {
+          const y = 8 + i * 8;
+          ctx.beginPath();
+          ctx.moveTo(14 + rng() * 8, y);
+          ctx.quadraticCurveTo(32, y + 2 * (rng() - 0.5), 50 - rng() * 8, y);
+          ctx.stroke();
+        }
+        break;
+
+      default:
+        // Generic noise fallback
+        for (let i = 0; i < 12; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.2 + rng() * 0.3;
+          ctx.fillRect(rng() * TILE_W, rng() * TILE_H, 1 + rng() * 2, 1 + rng() * 2);
+        }
+        break;
     }
-    if (terrain === Terrain.CrackedEarth) {
-      ctx.strokeStyle = noise; ctx.lineWidth = 0.5; ctx.globalAlpha = 0.6;
-      for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(10+rng()*44,5+rng()*22); ctx.lineTo(10+rng()*44,5+rng()*22); ctx.stroke(); }
-    }
-    if (terrain === Terrain.Road) {
-      ctx.strokeStyle = "#b8a67c"; ctx.lineWidth = 1; ctx.globalAlpha = 0.3;
-      ctx.setLineDash([3,4]); ctx.beginPath(); ctx.moveTo(TILE_HALF_W-10,TILE_HALF_H); ctx.lineTo(TILE_HALF_W+10,TILE_HALF_H); ctx.stroke(); ctx.setLineDash([]);
-    }
-    if (terrain === Terrain.Water) {
-      ctx.strokeStyle = "#5a8a8a"; ctx.lineWidth = 0.5; ctx.globalAlpha = 0.5;
-      for (let i = 0; i < 3; i++) { const y=8+i*8; ctx.beginPath(); ctx.moveTo(15+rng()*10,y); ctx.quadraticCurveTo(32,y+2*(rng()-0.5),49-rng()*10,y); ctx.stroke(); }
-    }
-    if (terrain === Terrain.Grass) {
-      ctx.strokeStyle = "#7a8b5a"; ctx.lineWidth = 1; ctx.globalAlpha = 0.7;
-      for (let i = 0; i < 8; i++) { const gx=10+rng()*44; const gy=5+rng()*22; ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx+(rng()-0.5)*3,gy-3-rng()*3); ctx.stroke(); }
-    }
+
     ctx.globalAlpha = 1;
     ctx.restore();
   }

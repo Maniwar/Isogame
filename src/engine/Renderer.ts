@@ -214,9 +214,43 @@ export class Renderer {
       }
     }
 
-    const sprite = assets.getTile(tile.terrain, x, y);
+    // Content-aware variant selection: compute neighbor terrain signature
+    // so tiles at terrain borders get consistently different variants
+    let neighborSig = 0;
+    if (state) {
+      const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      for (let i = 0; i < cardinalDirs.length; i++) {
+        const nx = x + cardinalDirs[i][0];
+        const ny = y + cardinalDirs[i][1];
+        const nTile = state.map.tiles[ny]?.[nx];
+        if (!nTile || nTile.terrain !== tile.terrain) {
+          neighborSig |= (1 << i);
+        }
+      }
+    }
+
+    const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
     if (sprite) {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+    }
+
+    // Draw subtle border edges at terrain boundaries for visual definition
+    if (neighborSig > 0) {
+      const top = { x: wx, y: wy - TILE_HALF_H };
+      const right = { x: wx + TILE_HALF_W, y: wy };
+      const bottom = { x: wx, y: wy + TILE_HALF_H };
+      const left = { x: wx - TILE_HALF_W, y: wy };
+
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.12)";
+      ctx.lineWidth = 1;
+      // N neighbor different → top-right edge
+      if (neighborSig & 1) { ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); ctx.stroke(); }
+      // E neighbor different → bottom-right edge
+      if (neighborSig & 2) { ctx.beginPath(); ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); ctx.stroke(); }
+      // S neighbor different → bottom-left edge
+      if (neighborSig & 4) { ctx.beginPath(); ctx.moveTo(bottom.x, bottom.y); ctx.lineTo(left.x, left.y); ctx.stroke(); }
+      // W neighbor different → top-left edge
+      if (neighborSig & 8) { ctx.beginPath(); ctx.moveTo(left.x, left.y); ctx.lineTo(top.x, top.y); ctx.stroke(); }
     }
 
     // Draw tile object if present
@@ -343,7 +377,7 @@ export class Renderer {
       ctx.strokeStyle = `rgba(184, 48, 48, ${pulse})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(drawX, drawY - 10, 16, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY - 14, 20, 0, Math.PI * 2);
       ctx.stroke();
 
       // Red target marker on tile
@@ -369,8 +403,9 @@ export class Renderer {
 
     // Fixed display size for all entities — keeps characters the same size
     // regardless of whether the source sprite is AI (64x96) or procedural (24x36).
-    const sw = 32;  // TILE_W / 2
-    const sh = 48;  // TILE_H * 1.5
+    // Sized for Fallout 2-like proportions: ~62% tile width, ~1.9 tiles tall.
+    const sw = 40;
+    const sh = 60;
 
     // Walking bob: subtle vertical bounce to reinforce movement
     let bobY = 0;
@@ -411,20 +446,20 @@ export class Renderer {
 
     // Draw name tag — skip player (visible in HUD), only show NPCs
     if (!entity.isPlayer) {
-      ctx.font = "7px monospace";
+      ctx.font = "8px monospace";
       ctx.textAlign = "center";
 
       // Semi-transparent background for readability
       const nameWidth = ctx.measureText(entity.name).width;
       ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
-      ctx.fillRect(drawX - nameWidth / 2 - 2, labelY - 8, nameWidth + 4, 11);
+      ctx.fillRect(drawX - nameWidth / 2 - 3, labelY - 9, nameWidth + 6, 12);
       ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
       ctx.fillText(entity.name, drawX, labelY);
     }
 
     // Health bar (always show in combat, or when damaged)
     if (!entity.isPlayer && (isCombat || entity.stats.hp < entity.stats.maxHp)) {
-      const barW = 24;
+      const barW = 28;
       const barH = 3;
       const bx = drawX - barW / 2;
       const by = labelY + 4;
