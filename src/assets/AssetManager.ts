@@ -19,7 +19,7 @@ import { Terrain, Direction, TILE_W, TILE_H, TILE_HALF_W, TILE_HALF_H } from "..
 type DrawTarget = HTMLCanvasElement | HTMLImageElement;
 
 interface AssetManifest {
-  tiles?: Record<string, string>;
+  tiles?: Record<string, string | string[]>;
   sprites?: Record<string, Record<string, string>>;
   animations?: Record<string, Record<string, Record<string, string>>>;
   weapons?: Record<string, Record<string, Record<string, string>>>;
@@ -29,7 +29,8 @@ interface AssetManifest {
 }
 
 export class AssetManager {
-  private tiles = new Map<Terrain, DrawTarget>();
+  /** Tile variants: each terrain type has an array of visual variants */
+  private tiles = new Map<Terrain, DrawTarget[]>();
   private sprites = new Map<string, Map<Direction, DrawTarget>>();
   private objects = new Map<string, DrawTarget>();
   private items = new Map<string, DrawTarget>();
@@ -130,8 +131,34 @@ export class AssetManager {
     this.generateAllProcedural();
   }
 
-  getTile(terrain: Terrain): DrawTarget | undefined {
-    return this.tiles.get(terrain);
+  /**
+   * Get a tile variant for the given terrain at a specific map position.
+   *
+   * For non-water terrain: deterministically selects a variant based on
+   * position hash so the same tile always looks the same.
+   *
+   * For water: cycles through animation frames based on time, creating
+   * an animated water surface effect.
+   *
+   * @param terrain - terrain type
+   * @param tileX - map X coordinate (for deterministic variant selection)
+   * @param tileY - map Y coordinate (for deterministic variant selection)
+   */
+  getTile(terrain: Terrain, tileX = 0, tileY = 0): DrawTarget | undefined {
+    const variants = this.tiles.get(terrain);
+    if (!variants || variants.length === 0) return undefined;
+    if (variants.length === 1) return variants[0];
+
+    if (terrain === Terrain.Water) {
+      // Animate water: cycle through frames at ~500ms per frame
+      const frameIndex = Math.floor(Date.now() / 500) % variants.length;
+      return variants[frameIndex];
+    }
+
+    // Deterministic variant selection from position hash
+    // Simple hash: mix x and y to get a stable index per tile
+    const hash = ((tileX * 73856093) ^ (tileY * 19349663)) >>> 0;
+    return variants[hash % variants.length];
   }
 
   getSprite(key: string, dir: Direction): DrawTarget | undefined {
@@ -254,19 +281,27 @@ export class AssetManager {
   private async loadFromManifest(manifest: AssetManifest) {
     const promises: Promise<void>[] = [];
 
-    // Tiles — composite AI tiles onto procedural base.
-    // AI tiles are 128x64, pre-diamond-masked by postprocess.py.  Drawing
-    // the procedural tile first fills any edge gaps from clip anti-aliasing.
+    // Tiles — supports both single path (legacy) and array of paths (variant system).
+    // AI tiles are pre-diamond-masked by postprocess.py.  Drawing the procedural
+    // tile first fills any edge gaps from clip anti-aliasing.
     if (manifest.tiles) {
-      for (const [terrainName, path] of Object.entries(manifest.tiles)) {
+      for (const [terrainName, pathOrPaths] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
-        if (terrain !== undefined) {
+        if (terrain === undefined) continue;
+
+        const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+        const proceduralBase = this.tiles.get(terrain)?.[0];
+
+        for (const path of paths) {
           this.totalToLoad++;
-          const proceduralBase = this.tiles.get(terrain);
           promises.push(
             this.loadImage(path).then((img) => {
               if (img) {
-                this.tiles.set(terrain, this.compositeAiTile(img, proceduralBase));
+                const composited = this.compositeAiTile(img, proceduralBase);
+                if (!this.tiles.has(terrain)) {
+                  this.tiles.set(terrain, []);
+                }
+                this.tiles.get(terrain)!.push(composited);
                 this.loadedCount++;
               }
             }),
@@ -493,7 +528,7 @@ export class AssetManager {
       const ctx = canvas.getContext("2d")!;
       this.drawIsoDiamond(ctx, colors.base);
       this.addTileNoise(ctx, colors.detail, colors.noise, terrain);
-      this.tiles.set(terrain, canvas);
+      this.tiles.set(terrain, [canvas]);
     }
   }
 

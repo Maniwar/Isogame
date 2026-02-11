@@ -1,7 +1,16 @@
 """Prompt templates for isometric tile generation.
 
-Supports both individual tile generation and tile-set sheet generation
-(multiple variants in a single image for consistency).
+Supports three modes:
+1. Individual tile generation (legacy, one API call per tile)
+2. Tile-set sheet generation (multiple variants in a single row)
+3. Terrain variant sheet generation (2×2 grid of 4 variants per terrain,
+   consistent style in one API call via gemini-3-pro-image-preview at 1K)
+
+For water, generates 4 animation frames showing progressive wave movement,
+enabling animated water tiles at runtime.
+
+All terrain tiles use soft-edge blending at diamond borders for seamless
+transitions with any neighboring terrain type.
 """
 
 # Base style preamble injected into every tile prompt
@@ -50,6 +59,199 @@ TERRAIN_FEATURE_TEMPLATE = (
     "Variation #{variant_num}. "
     "No text, no labels, no watermarks."
 )
+
+# ---------------------------------------------------------------------------
+# Terrain Variant Sheet — 4 variants per terrain in a 2×2 grid (1024×1024)
+# ---------------------------------------------------------------------------
+
+TERRAIN_VARIANT_SHEET_PREAMBLE = (
+    "Create an isometric TERRAIN VARIANT SHEET in the style of classic Fallout 2. "
+    "Top-down 3/4 isometric perspective. "
+    "Muted, desaturated post-apocalyptic color palette: earthy browns, "
+    "rust oranges, dusty yellows, faded greens. "
+    "Detailed pixel art with a gritty, weathered feel. "
+)
+
+TERRAIN_VARIANT_SHEET_TEMPLATE = (
+    "{preamble}"
+    "Generate a TERRAIN VARIANT SHEET with 4 isometric tile variants.\n\n"
+    "TERRAIN TYPE: {terrain_name} — {description}\n\n"
+    "IMAGE SIZE: 1024 × 1024 pixels.\n"
+    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "Each cell contains ONE isometric diamond tile:\n"
+    "- The diamond shape is approximately 512 wide × 256 tall (2:1 ratio)\n"
+    "- Centered within its 512×512 cell\n"
+    "- Pure GREEN (#00FF00) background behind and around each diamond\n\n"
+    "All 4 tiles are the SAME terrain type but with DIFFERENT visual details:\n"
+    "  Cell 1 (top-left): {v1}\n"
+    "  Cell 2 (top-right): {v2}\n"
+    "  Cell 3 (bottom-left): {v3}\n"
+    "  Cell 4 (bottom-right): {v4}\n\n"
+    "CRITICAL RULES:\n"
+    "- Each tile is a perfect isometric DIAMOND (2:1 width-to-height ratio)\n"
+    "- Same color palette and base material across all 4 tiles\n"
+    "- DIFFERENT details: crack patterns, debris, texture, slight color shifts\n"
+    "- SEAMLESS EDGES: The outer 20%% of each diamond edge MUST fade to a soft,\n"
+    "  neutral earth tone (muted tan/brown) so tiles blend with ANY neighbor\n"
+    "- Concentrate rich texture detail in the CENTER of each diamond\n"
+    "- Flat ground viewed from above at roughly 30 degrees\n"
+    "- Pure bright GREEN (#00FF00) background everywhere outside the diamonds\n"
+    "- NO text, NO labels, NO watermarks, NO grid lines\n"
+)
+
+WATER_ANIMATION_SHEET_TEMPLATE = (
+    "{preamble}"
+    "Generate an ANIMATED WATER TILE SHEET with 4 animation frames.\n\n"
+    "WATER STYLE: {description}\n\n"
+    "IMAGE SIZE: 1024 × 1024 pixels.\n"
+    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "Each cell contains ONE isometric diamond water tile:\n"
+    "- Diamond shape: approximately 512 wide × 256 tall (2:1 ratio)\n"
+    "- Centered within its 512×512 cell\n"
+    "- Pure GREEN (#00FF00) background behind and around each diamond\n\n"
+    "The 4 frames show a LOOPING water animation sequence:\n"
+    "  Frame 1 (top-left): Calm water, subtle small ripples beginning to form\n"
+    "  Frame 2 (top-right): Ripples spreading, gentle wave movement visible\n"
+    "  Frame 3 (bottom-left): Waves at peak, surface most disturbed, light reflections shift\n"
+    "  Frame 4 (bottom-right): Waves receding, settling back toward calm\n\n"
+    "CRITICAL RULES:\n"
+    "- Each frame is a perfect isometric DIAMOND (2:1 width-to-height ratio)\n"
+    "- SAME water color and style in all 4 frames — only the ripple/wave pattern changes\n"
+    "- Changes between frames should be SUBTLE but VISIBLE for smooth animation\n"
+    "- The animation must LOOP: frame 4 should transition smoothly back to frame 1\n"
+    "- SEAMLESS EDGES: diamond edges fade to allow blending with adjacent land tiles\n"
+    "- Pure bright GREEN (#00FF00) background outside each diamond\n"
+    "- NO text, NO labels, NO watermarks\n"
+)
+
+# ---------------------------------------------------------------------------
+# Terrain archetypes — defines each terrain type with 4 variant descriptions
+# Key maps to game Terrain enum name. Used by generate_tile_sheets().
+# ---------------------------------------------------------------------------
+
+TERRAIN_ARCHETYPES = [
+    {
+        "key": "sand",
+        "terrain_name": "Sand",
+        "description": "Sandy wasteland terrain, wind-swept and sun-bleached",
+        "variants": [
+            "Fine wind-blown sand with subtle dune ripples and tiny shadow lines",
+            "Sand with scattered small pebbles and bleached bone fragments",
+            "Coarser granular sand with visible wind-carved patterns",
+            "Flat compacted sand with faint erosion channels and dust patches",
+        ],
+    },
+    {
+        "key": "dirt",
+        "terrain_name": "Dirt",
+        "description": "Hard-packed brown earth, dry and dusty",
+        "variants": [
+            "Smooth hard-packed dirt with hairline surface cracks",
+            "Dirt with small embedded rocks and dried root traces",
+            "Uneven dirt surface with slight mounding and footprints",
+            "Dry dirt with scattered dust patches and minor erosion lines",
+        ],
+    },
+    {
+        "key": "cracked-earth",
+        "terrain_name": "CrackedEarth",
+        "description": "Severely dried and cracked earth, deep fissures in parched ground",
+        "variants": [
+            "Large irregular cracks forming a mosaic of dried mud plates",
+            "Dense network of fine cracks with curling edges on the plates",
+            "Deep wide fissures with shadows visible in the cracks",
+            "Cracked earth with scattered dust and small debris in the gaps",
+        ],
+    },
+    {
+        "key": "rubble",
+        "terrain_name": "Rubble",
+        "description": "Broken concrete and brick rubble from demolished buildings",
+        "variants": [
+            "Large concrete chunks with visible rebar and broken edges",
+            "Mixed brick and concrete fragments with dust and mortar",
+            "Fine rubble and gravel with scattered larger pieces",
+            "Rubble with faded paint fragments and rusted metal scraps",
+        ],
+    },
+    {
+        "key": "road",
+        "terrain_name": "Road",
+        "description": "Cracked asphalt road surface, worn and deteriorating",
+        "variants": [
+            "Dark asphalt with a network of surface cracks and patching",
+            "Broken road with potholes exposing dirt underneath",
+            "Faded road with a barely visible center line marking",
+            "Asphalt with weeds pushing through cracks and oil stains",
+        ],
+    },
+    {
+        "key": "concrete",
+        "terrain_name": "Concrete",
+        "description": "Indoor/settlement concrete floor, stained and cracked",
+        "variants": [
+            "Smooth gray concrete with water stains and hairline cracks",
+            "Concrete with expansion joints and slight discoloration",
+            "Worn concrete with scuff marks and embedded gravel spots",
+            "Stained concrete with rust marks from old machinery",
+        ],
+    },
+    {
+        "key": "grass",
+        "terrain_name": "Grass",
+        "description": "Sparse, dying grass patches on dry earth",
+        "variants": [
+            "Thin brown-green grass tufts scattered on bare dirt",
+            "Denser but dying grass with yellow-brown patches",
+            "Sparse grass blades with exposed dry earth between clumps",
+            "Dead grass mat with a few green survivors poking through",
+        ],
+    },
+]
+
+WATER_ARCHETYPE = {
+    "key": "water",
+    "terrain_name": "Water",
+    "description": (
+        "Irradiated wasteland water — murky dark blue-green with a subtle "
+        "toxic glow. Semi-opaque surface with floating debris specks. "
+        "Slightly luminescent green tinge from radiation contamination."
+    ),
+}
+
+
+def build_terrain_variant_sheet_prompt(archetype: dict, config: dict) -> str:
+    """Build a prompt for generating a 2×2 terrain variant sheet (1024×1024).
+
+    Each of the 4 cells contains one isometric diamond tile variant.
+    All variants from the same API call ensures consistent style.
+    """
+    return TERRAIN_VARIANT_SHEET_TEMPLATE.format(
+        preamble=TERRAIN_VARIANT_SHEET_PREAMBLE,
+        terrain_name=archetype["terrain_name"],
+        description=archetype["description"],
+        v1=archetype["variants"][0],
+        v2=archetype["variants"][1],
+        v3=archetype["variants"][2],
+        v4=archetype["variants"][3],
+    )
+
+
+def build_water_animation_sheet_prompt(config: dict) -> str:
+    """Build a prompt for generating a 2×2 animated water tile sheet (1024×1024).
+
+    The 4 cells are animation frames (not variants), creating a looping
+    water surface animation. The game cycles through these at runtime.
+    """
+    return WATER_ANIMATION_SHEET_TEMPLATE.format(
+        preamble=TERRAIN_VARIANT_SHEET_PREAMBLE,
+        description=WATER_ARCHETYPE["description"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy prompts (kept for backwards compatibility)
+# ---------------------------------------------------------------------------
 
 # --- Tile Set Sheet (all variants in one image) ---
 

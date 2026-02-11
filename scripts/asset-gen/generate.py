@@ -56,6 +56,10 @@ from prompts.tiles import (
     build_terrain_prompt,
     build_tileset_prompt,
     build_itemset_prompt,
+    build_terrain_variant_sheet_prompt,
+    build_water_animation_sheet_prompt,
+    TERRAIN_ARCHETYPES,
+    WATER_ARCHETYPE,
 )
 from prompts.characters import (
     build_character_prompt,
@@ -255,6 +259,63 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
                     save_image(image, output_path)
                     generated += 1
                 rate_limit(rpm)
+
+    return generated
+
+
+def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
+                         reference_images: list) -> int:
+    """Generate terrain variant sheets — 4 variants per terrain in a 2×2 grid.
+
+    Each terrain type produces a single 1024×1024 image containing 4 isometric
+    diamond tile variants.  Water gets a special animation sheet with 4 frames.
+    Uses image_size="1K" for 1024×1024 output.
+    """
+    model = config["api"]["model"]
+    rpm = config["api"]["requests_per_minute"]
+    generated = 0
+
+    sheets_dir = OUTPUT_DIR / "tiles" / "sheets"
+
+    print(f"\n--- Generating terrain variant sheets ({len(TERRAIN_ARCHETYPES)} terrain + water) ---")
+
+    # Generate each terrain type's 4-variant sheet
+    for archetype in TERRAIN_ARCHETYPES:
+        key = archetype["key"]
+        filename = f"{key}-sheet.png"
+        output_path = sheets_dir / filename
+
+        prompt = build_terrain_variant_sheet_prompt(archetype, config)
+
+        if dry_run:
+            print(f"  [DRY RUN] {filename} (4 variants, 1024×1024, image_size=1K)")
+            print(f"    Prompt: {prompt[:200]}...")
+            generated += 1
+            continue
+
+        print(f"  Generating: {filename} (4 variants of {archetype['terrain_name']})")
+        image = generate_image(client, prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, output_path)
+            generated += 1
+        rate_limit(rpm)
+
+    # Generate animated water sheet (4 animation frames)
+    water_filename = "water-sheet.png"
+    water_path = sheets_dir / water_filename
+    water_prompt = build_water_animation_sheet_prompt(config)
+
+    if dry_run:
+        print(f"  [DRY RUN] {water_filename} (4 anim frames, 1024×1024, image_size=1K)")
+        print(f"    Prompt: {water_prompt[:200]}...")
+        generated += 1
+    else:
+        print(f"  Generating: {water_filename} (4 animation frames)")
+        image = generate_image(client, water_prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, water_path)
+            generated += 1
+        rate_limit(rpm)
 
     return generated
 
@@ -485,14 +546,15 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 # Weapons are now generated as part of character sprite sheets (weapon variants).
 CATEGORY_MAP = {
     "tiles": generate_tiles,
+    "tile_sheets": generate_tile_sheets,
     "characters": generate_characters,
     "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
 }
 
-# Default categories when --category=all (excludes deprecated weapons)
-DEFAULT_CATEGORIES = ["tiles", "characters", "items", "portraits"]
+# Default categories when --category=all (excludes deprecated weapons and legacy tiles)
+DEFAULT_CATEGORIES = ["tile_sheets", "characters", "items", "portraits"]
 
 
 def main():
