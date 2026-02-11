@@ -606,8 +606,15 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
         detected_dirs = ALL_DIRECTIONS[:actual_cols]
     print(f"    Direction mapping: {detected_dirs}")
 
-    # Map actual rows → animation names (first N of REAL_ANIMATIONS)
-    detected_anims = REAL_ANIMATIONS[:actual_rows]
+    # Map actual rows → animation names.
+    # For ≤4 rows, use legacy mapping (idle, walk_1, walk_2, attack_2) since
+    # legacy sheets and Gemini's typical 4-row output put attack in row 4.
+    # For 5+ rows, use the first N of REAL_ANIMATIONS.
+    if actual_rows <= 4:
+        detected_anims = LEGACY_4ROW_ANIMATIONS[:actual_rows]
+    else:
+        detected_anims = REAL_ANIMATIONS[:actual_rows]
+    print(f"    Animation mapping: {detected_anims}")
 
     # ---- Pass 1: Measure all content bboxes to find uniform scale ----
     # This ensures the character stays the same size across ALL animation frames.
