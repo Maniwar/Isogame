@@ -1,22 +1,16 @@
 """Prompt templates for character sprite sheet generation.
 
-Generates a 4×4 sprite sheet per character inside a 1024×1024 image:
-  4 columns = 4 viewing directions (front, front-left, back, back-left)
-  4 rows    = 4 animation poses   (idle, walk A, walk B, attack)
-  = 16 frames per character, each in a 256×256 cell
+Generates a full 8×8 sprite sheet per character inside a 2048×2048 image:
+  8 columns = 8 viewing directions (S, SW, W, NW, N, NE, E, SE)
+  8 rows    = 8 animation poses   (idle, walk×4, attack×2, hit)
+  = 64 frames per character, each in a 256×256 cell
 
-The reprocessor fills the remaining directions (SE, E, NE, W) via mirroring,
-and the missing animations (walk_3, walk_4, attack_1, hit) via fallbacks,
-producing the full 8×8 = 64 frames the game engine expects.
+Uses gemini-3-pro-image-preview with image_size="2K" for native 2048×2048
+output. This model supports "thinking" for better layout adherence and can
+produce up to 4096×4096 if image_size="4K" is configured.
 
-Why 4 columns, not 8:
-  Gemini outputs 1024×1024 images. Cramming 8 columns into that produces
-  tiny 128px-wide cells with too little detail.  4 columns at 256×256 gives
-  the AI enough space per cell, and mirroring covers the other 4 directions.
-
-Why 4 rows, not 8:
-  Asking for 8 distinct poses overwhelms the AI — it produces duplicates.
-  4 rows covers the essential poses: idle, two walk phases, and attack.
+All 8 directions and 8 animations are generated natively — no mirroring
+or animation fallbacks needed.
 
 Weapon variant system:
 - Each character base can be combined with different weapons
@@ -37,41 +31,22 @@ CHAR_STYLE_PREAMBLE = (
 # Direction & animation constants
 # ---------------------------------------------------------------------------
 
-# What we ASK Gemini to generate (4 directions, 4 animations).
-# Gemini outputs 1024×1024 → 4×4 grid → 256×256 per cell — enough detail.
-GENERATED_DIRECTIONS = ["S", "SW", "N", "NW"]
-GENERATED_ANIMATIONS = ["idle", "walk_1", "walk_2", "attack_2"]
-
-# Visual descriptions for the 4 generated directions.
-# Describes what the VIEWER SEES, not abstract compass labels.
-GENERATED_DIRECTION_LABELS = {
-    "S":  "FRONT VIEW — character faces directly toward the camera, full face visible",
-    "SW": "FRONT-LEFT 3/4 — character turned 45° to their right, left shoulder toward camera",
-    "N":  "BACK VIEW — character faces directly away from camera, back of head visible",
-    "NW": "BACK-LEFT 3/4 — character turned 135° away, showing back and left shoulder",
-}
-
-# Visual descriptions for the 4 generated animation rows.
-GENERATED_ANIMATION_LABELS = {
-    "idle":     "STANDING IDLE — relaxed stance, weapon held at side or lowered",
-    "walk_1":   "WALK STEP A — LEFT foot forward, body leaning into the stride",
-    "walk_2":   "WALK STEP B — RIGHT foot forward, body leaning into the stride",
-    "attack_2": "ATTACK — weapon actively striking forward or firing",
-}
-
-# Full 8-direction / 8-animation sets for the GAME ENGINE.
-# The reprocessor fills these from the 4×4 generated grid via mirroring + fallbacks.
-SHEET_DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
-SHEET_ANIMATIONS = [
+# All 8 directions and 8 animations are generated natively at 2048×2048.
+# gemini-3-pro-image-preview with image_size="2K" → 8×8 grid → 256×256 per cell.
+DIRECTIONS = ["S", "SW", "W", "NW", "N", "NE", "E", "SE"]
+ANIMATIONS = [
     "idle", "walk_1", "walk_2", "walk_3", "walk_4",
     "attack_1", "attack_2", "hit",
 ]
 
-# Aliases used by other modules
-DIRECTIONS = SHEET_DIRECTIONS
-ANIMATIONS = SHEET_ANIMATIONS
+# Aliases for backwards compatibility with other modules
+GENERATED_DIRECTIONS = DIRECTIONS
+GENERATED_ANIMATIONS = ANIMATIONS
+SHEET_DIRECTIONS = DIRECTIONS
+SHEET_ANIMATIONS = ANIMATIONS
 
-# Full direction labels (for legacy single-direction prompts)
+# Visual descriptions for all 8 directions.
+# Describes what the VIEWER SEES, not abstract compass labels.
 DIRECTION_LABELS = {
     "S":  "FRONT VIEW — character faces directly toward the viewer, full face visible",
     "SW": "FRONT-LEFT 3/4 VIEW — character turned 45° to their right, left shoulder toward viewer",
@@ -83,7 +58,7 @@ DIRECTION_LABELS = {
     "SE": "FRONT-RIGHT 3/4 VIEW — character turned 45° to their left, right shoulder toward viewer",
 }
 
-# Full animation labels (for reference)
+# Visual descriptions for all 8 animation rows.
 ANIMATION_LABELS = {
     "idle":     "standing idle, weapon held at ready (lowered or holstered), weight evenly balanced",
     "walk_1":   "walking pose: LEFT foot FORWARD (contact), body leaning slightly forward, weapon in hand",
@@ -95,41 +70,44 @@ ANIMATION_LABELS = {
     "hit":      "HIT REACTION: recoiling from damage, body leaning back, staggered, pain expression",
 }
 
-# --- Sprite sheet prompt (4×4 grid, 1024×1024) ---
+# Backwards-compatible aliases (all 8 are now generated natively)
+GENERATED_DIRECTION_LABELS = DIRECTION_LABELS
+GENERATED_ANIMATION_LABELS = ANIMATION_LABELS
+
+# --- Sprite sheet prompt (8×8 grid, 2048×2048 via image_size="2K") ---
 
 SPRITESHEET_TEMPLATE = (
     "{preamble}"
     "Generate a CHARACTER SPRITE SHEET for: {name}\n"
     "{description}\n\n"
-    "IMAGE SIZE: 1024 × 1024 pixels.\n"
-    "GRID: 4 columns × 4 rows = 16 cells, each exactly 256 × 256 pixels.\n\n"
-    "The grid must look like this (4 columns, 4 rows):\n"
-    "┌─────────────┬─────────────┬─────────────┬─────────────┐\n"
-    "│ Idle, Front  │ Idle, F-L   │ Idle, Back  │ Idle, B-L   │\n"
-    "├─────────────┼─────────────┼─────────────┼─────────────┤\n"
-    "│ WalkA, Front │ WalkA, F-L  │ WalkA, Back │ WalkA, B-L  │\n"
-    "├─────────────┼─────────────┼─────────────┼─────────────┤\n"
-    "│ WalkB, Front │ WalkB, F-L  │ WalkB, Back │ WalkB, B-L  │\n"
-    "├─────────────┼─────────────┼─────────────┼─────────────┤\n"
-    "│ Attack,Front │ Attack, F-L │ Attack, Back│ Attack, B-L │\n"
-    "└─────────────┴─────────────┴─────────────┴─────────────┘\n\n"
-    "COLUMNS (left to right) — 4 viewing angles of the SAME character:\n"
-    "  Column 1 — FRONT: Character faces directly toward the camera. Full face visible.\n"
-    "  Column 2 — FRONT-LEFT: Character rotated 45°. Left shoulder comes toward camera.\n"
-    "  Column 3 — BACK: Character faces away from camera. Back of head and body visible.\n"
-    "  Column 4 — BACK-LEFT: Character rotated 135° away. Back and left shoulder visible.\n\n"
-    "ROWS (top to bottom) — 4 poses:\n"
-    "  Row 1 — IDLE: Standing still. {idle_desc}.\n"
-    "  Row 2 — WALK STEP A: Mid-stride, LEFT foot forward, body leaning slightly.\n"
-    "  Row 3 — WALK STEP B: Mid-stride, RIGHT foot forward, body leaning slightly.\n"
-    "  Row 4 — ATTACK: {attack_desc}.\n\n"
+    "IMAGE SIZE: 2048 × 2048 pixels.\n"
+    "GRID: 8 columns × 8 rows = 64 cells, each exactly 256 × 256 pixels.\n\n"
+    "COLUMNS (left to right) — 8 viewing angles, rotating clockwise:\n"
+    "  Col 1 — FRONT: Character faces directly toward the camera. Full face visible.\n"
+    "  Col 2 — FRONT-LEFT 3/4: Turned 45° to their right. Left shoulder toward camera.\n"
+    "  Col 3 — LEFT PROFILE: Character's left side facing camera. Full side silhouette.\n"
+    "  Col 4 — BACK-LEFT 3/4: Turned 135° away. Back and left shoulder visible.\n"
+    "  Col 5 — BACK: Faces away from camera. Back of head and body visible.\n"
+    "  Col 6 — BACK-RIGHT 3/4: Turned 135° the other way. Back and right shoulder.\n"
+    "  Col 7 — RIGHT PROFILE: Character's right side facing camera. Full side silhouette.\n"
+    "  Col 8 — FRONT-RIGHT 3/4: Turned 45° to their left. Right shoulder toward camera.\n\n"
+    "ROWS (top to bottom) — 8 animation poses:\n"
+    "  Row 1 — IDLE: Standing still, relaxed. {idle_desc}.\n"
+    "  Row 2 — WALK 1: LEFT foot forward (contact position), body leaning slightly forward.\n"
+    "  Row 3 — WALK 2: RIGHT foot forward (contact position), body leaning slightly forward.\n"
+    "  Row 4 — WALK 3: Mid-stride passing position, body upright, feet close together.\n"
+    "  Row 5 — WALK 4: Mid-stride passing (opposite), body upright, transitioning.\n"
+    "  Row 6 — ATTACK WIND-UP: Weapon drawn back or raised, body coiled, preparing to strike.\n"
+    "  Row 7 — ATTACK STRIKE: {attack_desc}.\n"
+    "  Row 8 — HIT REACTION: Recoiling from damage, body leaning back, staggered.\n\n"
     "IMPORTANT RULES:\n"
-    "- The image is EXACTLY 1024×1024. Each of the 16 cells is EXACTLY 256×256.\n"
+    "- The image is EXACTLY 2048×2048 pixels. Each of the 64 cells is 256×256.\n"
     "- Leave 4–8 pixels of green gap between cells so they are clearly separated.\n"
-    "- The character fills ~80%% of each cell's height, centered in the cell.\n"
-    "- The SAME character in ALL 16 cells — identical outfit, weapon, build, colors.\n"
-    "- Only the POSE (row) and VIEWING ANGLE (column) change.\n"
-    "- Walk Step A and Walk Step B MUST show clearly DIFFERENT leg positions.\n"
+    "- The character fills ~80%% of each cell's height, centered horizontally.\n"
+    "- The SAME character in ALL 64 cells — identical outfit, weapon, build, colors.\n"
+    "- Only the POSE (row) and VIEWING ANGLE (column) change between cells.\n"
+    "- Walk poses MUST show clearly DIFFERENT leg positions from each other.\n"
+    "- Attack wind-up and attack strike MUST be visibly different poses.\n"
     "- Pure bright GREEN (#00FF00) background in every cell and between cells.\n"
     "- NO scenery, NO ground shadows, NO text, NO labels, NO watermarks.\n"
     "- If a reference image is provided, match face, hair, outfit, and colors exactly.\n"
@@ -312,14 +290,13 @@ def build_spritesheet_prompt(
     weapon_idle_desc: str = "weapon held at side, relaxed",
     weapon_attack_desc: str = "weapon swung or fired forward",
 ) -> str:
-    """Build a prompt for generating a 4×4 character sprite sheet.
+    """Build a prompt for generating a full 8×8 character sprite sheet.
 
-    The sheet has 4 rows (idle, walk_1, walk_2, attack)
-    × 4 columns (S, SW, N, NW) = 16 frames.
-    The reprocessor mirrors SW→SE, NW→NE, and falls back for W/E,
-    producing the full 8×8 the game engine expects.
+    The sheet has 8 rows (idle, walk_1-4, attack_1-2, hit)
+    × 8 columns (S, SW, W, NW, N, NE, E, SE) = 64 frames.
 
-    Targets 1024×1024 image (Gemini's native output size).
+    Uses gemini-3-pro-image-preview with image_size="2K" for native
+    2048×2048 output (256×256 per cell).
     """
     return SPRITESHEET_TEMPLATE.format(
         preamble=CHAR_STYLE_PREAMBLE,

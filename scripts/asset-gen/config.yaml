@@ -57,33 +57,22 @@ tiles:
 sprites:
   base_width: 64         # Final frame width after post-processing
   base_height: 96        # Final frame height (taller than wide for characters)
-  sheet_size: 1024       # 1024x1024 images — Gemini's native output size
-  sheet_cols: 4          # 4 direction columns (S, SW, N, NW)
-  sheet_rows: 4          # 4 animation rows (idle, walk_1, walk_2, attack_2)
-  # Cell size = 1024/4 × 1024/4 = 256×256 per cell
-  # The reprocessor fills the remaining 4 directions via mirroring (SW→SE, NW→NE)
-  # and the remaining 4 animations via fallbacks (walk_3→walk_1, attack_1→idle, etc.)
-  # producing the full 8×8 = 64 frames the game engine expects.
-  generated_animations:  # What we ask Gemini to generate (4 rows)
+  sheet_size: 2048       # 2048x2048 images via gemini-3-pro-image-preview at 2K
+  sheet_cols: 8          # 8 direction columns (full 360° rotation)
+  sheet_rows: 8          # 8 animation rows (64 frames total per character)
+  image_size: "2K"       # API parameter: "1K" (1024), "2K" (2048), or "4K" (4096)
+  # Cell size = 2048/8 × 2048/8 = 256×256 per cell
+  # All 8 directions and 8 animations generated natively — no mirroring needed.
+  animations:
     - "idle"             # Row 1: Standing still, weapon at ready
     - "walk_1"           # Row 2: Left foot forward (contact)
-    - "walk_2"           # Row 3: Right foot forward (contact)
-    - "attack_2"         # Row 4: Strike, weapon extended / firing
-  generated_directions:  # What we ask Gemini to generate (4 columns)
-    - "S"                # Front view
-    - "SW"               # Front-left 3/4
-    - "N"                # Back view
-    - "NW"               # Back-left 3/4
-  full_animations:       # Full 8-animation set the game engine expects
-    - "idle"
-    - "walk_1"
-    - "walk_2"
-    - "walk_3"
-    - "walk_4"
-    - "attack_1"
-    - "attack_2"
-    - "hit"
-  full_directions:       # Full 8-direction set the game engine expects
+    - "walk_2"           # Row 3: Mid-stride passing position
+    - "walk_3"           # Row 4: Right foot forward (contact)
+    - "walk_4"           # Row 5: Mid-stride passing (opposite)
+    - "attack_1"         # Row 6: Wind-up, weapon drawn back
+    - "attack_2"         # Row 7: Strike, weapon extended / firing
+    - "hit"              # Row 8: Hit reaction / stagger
+  directions:            # All 8 directions generated — no mirroring needed
     - "S"
     - "SW"
     - "W"
@@ -107,7 +96,7 @@ portraits:
 
 # Gemini API settings
 api:
-  model: "gemini-2.5-flash-image"  # Native image generation model
+  model: "gemini-3-pro-image-preview"  # Supports 2K/4K output with image_size param
   requests_per_minute: 10        # Rate limiting
   retry_attempts: 3
   retry_delay_seconds: 5

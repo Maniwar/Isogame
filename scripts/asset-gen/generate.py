@@ -91,6 +91,7 @@ def generate_image(
     prompt: str,
     model: str,
     reference_images: list | None = None,
+    image_size: str | None = None,
 ) -> Image.Image | None:
     """
     Call Gemini to generate a single image from a text prompt.
@@ -100,6 +101,9 @@ def generate_image(
         prompt: The text prompt describing the image.
         model: Model name to use.
         reference_images: Optional list of PIL Images to use as style references.
+        image_size: Output resolution tier — "1K", "2K", or "4K".
+                    Supported by gemini-3-pro-image-preview and imagen-4.
+                    If None, the model uses its default (typically 1K).
 
     Returns:
         A PIL Image on success, or None on failure.
@@ -120,14 +124,25 @@ def generate_image(
     retry_attempts = config.get("api", {}).get("retry_attempts", 3)
     retry_delay = config.get("api", {}).get("retry_delay_seconds", 5)
 
+    # Build image config with resolution tier if specified
+    image_config = None
+    if image_size:
+        image_config = types.ImageConfig(
+            image_size=image_size,
+        )
+
     for attempt in range(1, retry_attempts + 1):
         try:
+            gen_config = types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+            )
+            if image_config:
+                gen_config.image_config = image_config
+
             response = client.models.generate_content(
                 model=model,
                 contents=contents,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                ),
+                config=gen_config,
             )
 
             # Extract image from response parts
@@ -248,11 +263,9 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                         reference_images: list, use_sheets: bool = True) -> int:
     """Generate character sprites — either as full sprite sheets or individual images.
 
-    When use_sheets=True (default), generates one 4×4 sprite sheet per character:
-    4 animation rows (idle, walk_1, walk_2, attack) × 4 direction columns
-    (S, SW, N, NW) = 16 frames per sheet at 1024×1024 (256×256 per cell).
-    The reprocessor fills the remaining directions via mirroring and animations
-    via fallbacks to produce the full 8×8 = 64 frames the game engine expects.
+    When use_sheets=True (default), generates one 8×8 sprite sheet per character:
+    8 animation rows × 8 direction columns = 64 frames per sheet.
+    Uses gemini-3-pro-image-preview at 2K (2048×2048) for 256×256 per cell.
 
     For characters with multiple weapon variants (e.g., player_pistol, player_rifle),
     the first variant's sheet is passed as a reference image to subsequent variants
@@ -260,6 +273,7 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["sprites"].get("image_size")
     generated = 0
 
     # Track generated sheets per base character for cross-referencing
@@ -286,8 +300,12 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 weapon_attack_desc=char.get("weapon_attack_desc", "weapon swung or fired forward"),
             )
 
+            sheet_size = config["sprites"].get("sheet_size", 2048)
+            n_cols = config["sprites"].get("sheet_cols", 8)
+            n_rows = config["sprites"].get("sheet_rows", 8)
+
             if dry_run:
-                print(f"    [DRY RUN] {filename} (4 anims x 4 dirs = 16 frames → reprocessor fills 8x8)")
+                print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
                 if base_key in base_reference_sheets:
                     print(f"    + using {base_key} reference sheet for consistency")
                 print(f"    Prompt: {prompt[:200]}...")
@@ -300,8 +318,8 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 print(f"    + using {base_key} reference sheet for character consistency")
                 char_refs.append(base_reference_sheets[base_key])
 
-            print(f"    Generating sprite sheet: {filename}")
-            image = generate_image(client, prompt, model, char_refs if char_refs else None)
+            print(f"    Generating sprite sheet: {filename} ({sheet_size}×{sheet_size}px)")
+            image = generate_image(client, prompt, model, char_refs if char_refs else None, image_size=image_size)
             if image:
                 save_image(image, output_path)
                 generated += 1
@@ -342,16 +360,20 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
                      reference_images: list) -> int:
     """Generate weapon overlay sprite sheets.
 
-    Each weapon gets a 4×4 sprite sheet (1024×1024, 256×256 per cell)
+    Each weapon gets an 8×8 sprite sheet (2048×2048, 256×256 per cell)
     showing only the weapon + hands, designed to overlay on character sprites.
-    The reprocessor fills the remaining directions/animations to produce 8×8.
 
     NOTE: Weapon overlays are currently unused — the game uses weapon-variant
     character sprites instead. Kept for potential future use.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["sprites"].get("image_size")
     generated = 0
+
+    sheet_size = config["sprites"].get("sheet_size", 2048)
+    n_cols = config["sprites"].get("sheet_cols", 8)
+    n_rows = config["sprites"].get("sheet_rows", 8)
 
     print(f"\n--- Generating weapon overlay sprites ({len(WEAPON_ARCHETYPES)} weapons) ---")
 
@@ -372,13 +394,13 @@ def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
         )
 
         if dry_run:
-            print(f"    [DRY RUN] {filename} (4 anims x 4 dirs = 16 frames → reprocessor fills 8x8)")
+            print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
             print(f"    Prompt: {prompt[:200]}...")
             generated += 1
             continue
 
-        print(f"    Generating weapon sheet: {filename}")
-        image = generate_image(client, prompt, model, reference_images)
+        print(f"    Generating weapon sheet: {filename} ({sheet_size}×{sheet_size}px)")
+        image = generate_image(client, prompt, model, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
