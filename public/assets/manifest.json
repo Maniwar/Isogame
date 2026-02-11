@@ -1,13 +1,53 @@
 {
   "tiles": {
-    "Road": "/assets/tiles/asphalt-broken-01.png",
-    "Concrete": "/assets/tiles/concrete-floor-01.png",
-    "CrackedEarth": "/assets/tiles/cracked-earth-01.png",
-    "Grass": "/assets/tiles/dead-grass-01.png",
-    "Rubble": "/assets/tiles/rubble-01.png",
-    "Sand": "/assets/tiles/sand-01.png",
-    "Water": "/assets/tiles/water-puddle-01.png",
-    "Dirt": "/assets/tiles/dirt-01.png"
+    "Road": [
+      "/assets/tiles/road-01.png",
+      "/assets/tiles/road-02.png",
+      "/assets/tiles/road-03.png",
+      "/assets/tiles/road-04.png"
+    ],
+    "Concrete": [
+      "/assets/tiles/concrete-01.png",
+      "/assets/tiles/concrete-02.png",
+      "/assets/tiles/concrete-03.png",
+      "/assets/tiles/concrete-04.png"
+    ],
+    "CrackedEarth": [
+      "/assets/tiles/cracked-earth-01.png",
+      "/assets/tiles/cracked-earth-02.png",
+      "/assets/tiles/cracked-earth-03.png",
+      "/assets/tiles/cracked-earth-04.png"
+    ],
+    "Grass": [
+      "/assets/tiles/grass-01.png",
+      "/assets/tiles/grass-02.png",
+      "/assets/tiles/grass-03.png",
+      "/assets/tiles/grass-04.png"
+    ],
+    "Rubble": [
+      "/assets/tiles/rubble-01.png",
+      "/assets/tiles/rubble-02.png",
+      "/assets/tiles/rubble-03.png",
+      "/assets/tiles/rubble-04.png"
+    ],
+    "Sand": [
+      "/assets/tiles/sand-01.png",
+      "/assets/tiles/sand-02.png",
+      "/assets/tiles/sand-03.png",
+      "/assets/tiles/sand-04.png"
+    ],
+    "Water": [
+      "/assets/tiles/water-01.png",
+      "/assets/tiles/water-02.png",
+      "/assets/tiles/water-03.png",
+      "/assets/tiles/water-04.png"
+    ],
+    "Dirt": [
+      "/assets/tiles/dirt-01.png",
+      "/assets/tiles/dirt-02.png",
+      "/assets/tiles/dirt-03.png",
+      "/assets/tiles/dirt-04.png"
+    ]
   },
   "objects": {
     "brick-wall": "/assets/objects/brick-wall-01.png",
