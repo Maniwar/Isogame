@@ -800,12 +800,15 @@ export class Game {
   // ── Drawing ──
 
   private draw() {
-    const { ctx } = this.canvas.getContext("2d")
-      ? { ctx: this.canvas.getContext("2d")! }
-      : { ctx: null as never };
+    const ctx = this.canvas.getContext("2d")!;
 
     this.renderer.render(this.state);
+
+    // Defensive reset: ensure clean state for all UI drawing.
+    // Renderer.render() already resets these, but this guards against
+    // any future changes or edge cases in the render pipeline.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
 
     this.hud.draw(ctx, this.state, this.canvas.width, this.canvas.height);
 

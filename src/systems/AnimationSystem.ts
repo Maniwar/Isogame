@@ -19,7 +19,7 @@ import { Entity, AnimationName, GameState } from "../types";
  */
 
 /** Walk cycle frame keys — contact-only cycle (skip mid-stride frames
- *  walk_2/walk_4 which have extreme leg spread that looks like splitting).
+ *  walk_2/walk_4 which have exaggerated leg spread in AI-generated art).
  *  Each frame is repeated to maintain the same 600ms stride duration. */
 const WALK_FRAMES = ["walk_1", "walk_1", "walk_3", "walk_3"];
 

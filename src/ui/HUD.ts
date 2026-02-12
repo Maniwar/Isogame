@@ -191,8 +191,9 @@ export class HUD {
       ctx.fillText(`Time: ${timeStr}`, screenW - 200, 48);
     }
 
-    // Controls hint (top-left) — only on desktop
-    if (!this.isTouchDevice) {
+    // Controls hint (top-left) — only on desktop, hidden during combat
+    // (combat mode has its own header with keybinding hints)
+    if (!this.isTouchDevice && state.phase !== "combat") {
       ctx.fillStyle = "rgba(212, 196, 160, 0.5)";
       ctx.font = "10px monospace";
       ctx.textAlign = "left";

@@ -139,7 +139,11 @@ export class Renderer {
     // Draw VFX (projectiles, damage numbers) — in world space
     this.drawVFX(state.vfx);
 
-    // Reset transform for UI
+    // Reset all canvas state for UI drawing — prevents world-space text
+    // properties (font, textAlign) and alpha from leaking into UI code.
+    ctx.globalAlpha = 1;
+    ctx.textAlign = "left";
+    ctx.font = "10px monospace";
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
@@ -419,6 +423,12 @@ export class Renderer {
 
     if (sprite) {
       ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
+    } else {
+      // Fallback: draw a simple colored shape if no sprite found
+      ctx.fillStyle = entity.isPlayer ? "#40c040" : entity.isHostile ? "#b83030" : "#d4c4a0";
+      ctx.beginPath();
+      ctx.ellipse(finalDrawX, finalDrawY - 10, 8, 16, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Characters are generated with weapons built into their sprite sheets.
@@ -429,6 +439,7 @@ export class Renderer {
 
     // Draw name tag — skip player (visible in HUD), only show NPCs
     if (!entity.isPlayer) {
+      ctx.save();
       ctx.font = "8px monospace";
       ctx.textAlign = "center";
 
@@ -438,6 +449,7 @@ export class Renderer {
       ctx.fillRect(drawX - nameWidth / 2 - 3, labelY - 9, nameWidth + 6, 12);
       ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
       ctx.fillText(entity.name, drawX, labelY);
+      ctx.restore();
     }
 
     // Health bar (always show in combat, or when damaged)
@@ -460,6 +472,8 @@ export class Renderer {
     const wx = (entity.pos.x - entity.pos.y) * TILE_HALF_W;
     const wy = (entity.pos.x + entity.pos.y) * TILE_HALF_H;
 
+    ctx.save();
+
     // Flat body shape (knocked down, faded)
     ctx.globalAlpha = 0.6;
     ctx.fillStyle = "#5C4A3A";
@@ -476,21 +490,25 @@ export class Renderer {
     ctx.beginPath();
     ctx.ellipse(wx, wy + 2, 14, 6, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 1;
 
     // Loot indicator — pulsing bag icon
     if (entity.inventory.length > 0) {
+      ctx.globalAlpha = 1;
       const pulse = Math.sin(Date.now() / 400) * 0.3 + 0.7;
       ctx.fillStyle = `rgba(196, 112, 58, ${pulse})`;
       ctx.font = "bold 9px monospace";
       ctx.textAlign = "center";
       ctx.fillText("[LOOT]", wx, wy - 14);
     }
+
+    ctx.restore();
   }
 
   private drawVFX(vfxList: VFX[]) {
     const { ctx } = this;
+    if (vfxList.length === 0) return;
 
+    ctx.save();
     for (const vfx of vfxList) {
       const progress = 1 - vfx.timeLeft / vfx.duration;
       const alpha = Math.min(1, vfx.timeLeft / (vfx.duration * 0.3));
@@ -657,6 +675,7 @@ export class Renderer {
         }
       }
     }
+    ctx.restore();
   }
 
   private drawGroundItem(pos: TilePos, itemId: string) {
