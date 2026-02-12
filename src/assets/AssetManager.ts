@@ -501,8 +501,8 @@ export class AssetManager {
   /**
    * Post-load normalization: for each sprite key, compute a single scale
    * factor from the idle-S reference frame and apply it uniformly to ALL
-   * frames. This ensures consistent character proportions across walk/attack
-   * frames (per-frame scaling distorts proportions when content bounds vary).
+   * frames. Normalizes both up AND down so all characters render at a
+   * consistent size on screen.
    */
   private normalizeCharacterSprites() {
     for (const [spriteKey, animData] of this.animFrames) {
@@ -518,11 +518,22 @@ export class AssetManager {
       const sh = refFrame instanceof HTMLCanvasElement
         ? refFrame.height
         : (refFrame as HTMLImageElement).naturalHeight || (refFrame as HTMLImageElement).height;
-      const targetH = sh * 0.82;
-      const rawScale = targetH / refH;
-      if (rawScale < 1.08) continue; // Already large enough
+      const sw = refFrame instanceof HTMLCanvasElement
+        ? refFrame.width
+        : (refFrame as HTMLImageElement).naturalWidth || (refFrame as HTMLImageElement).width;
 
-      const scale = Math.min(1.5, rawScale);
+      // Target: content should fill 85% of frame height so all characters
+      // are the same size on screen regardless of how much padding is in the PNG.
+      const targetH = sh * 0.85;
+      const rawScale = targetH / refH;
+
+      // Skip if already within 5% of target (avoid unnecessary reprocessing)
+      if (rawScale > 0.95 && rawScale < 1.05) continue;
+
+      // Clamp scale to avoid overflow: ensure scaled content fits within frame
+      const refW = this.measureContentWidth(refFrame);
+      const maxScaleW = refW > 0 ? (sw * 0.95) / refW : 2.0;
+      const scale = Math.min(1.5, maxScaleW, Math.max(0.6, rawScale));
 
       // Apply the SAME scale to every animation frame for this sprite key
       for (const [, dirMap] of animData) {
@@ -570,6 +581,34 @@ export class AssetManager {
       }
     }
     return maxY > minY ? maxY - minY + 1 : 0;
+  }
+
+  /** Measure the width of non-transparent content in a sprite */
+  private measureContentWidth(frame: DrawTarget): number {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+    if (sw === 0 || sh === 0) return 0;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(frame, 0, 0);
+
+    let data: ImageData;
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return 0; }
+
+    let minX = sw, maxX = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    return maxX > minX ? maxX - minX + 1 : 0;
   }
 
   /** Rescale a sprite by extracting the content region, scaling it, and
