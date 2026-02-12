@@ -541,6 +541,9 @@ export class AssetManager {
     }
   }
 
+  /** Alpha threshold for content detection — low enough to catch anti-aliased edges */
+  private static readonly ALPHA_THRESH = 10;
+
   /** Measure the height of non-transparent content in a sprite */
   private measureContentHeight(frame: DrawTarget): number {
     const sw = frame instanceof HTMLCanvasElement
@@ -560,7 +563,7 @@ export class AssetManager {
     let minY = sh, maxY = 0;
     for (let y = 0; y < sh; y++) {
       for (let x = 0; x < sw; x++) {
-        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
         }
@@ -569,7 +572,10 @@ export class AssetManager {
     return maxY > minY ? maxY - minY + 1 : 0;
   }
 
-  /** Rescale a sprite using per-frame content bounds for positioning but a shared scale factor */
+  /** Rescale a sprite by extracting the content region, scaling it, and
+   *  placing it centered + bottom-anchored in a fresh canvas.
+   *  Previous version scaled the ENTIRE image, causing clipping when the
+   *  scaled dimensions exceeded the canvas (e.g. 64*1.23 = 79 > 64). */
   private rescaleSprite(frame: DrawTarget, scale: number): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
       ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
@@ -587,7 +593,7 @@ export class AssetManager {
     let minY = sh, maxY = 0, minX = sw, maxX = 0;
     for (let y = 0; y < sh; y++) {
       for (let x = 0; x < sw; x++) {
-        if (data.data[(y * sw + x) * 4 + 3] > 20) {
+        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
           if (x < minX) minX = x;
@@ -597,15 +603,28 @@ export class AssetManager {
     }
     if (minY >= maxY || minX >= maxX) return temp;
 
-    const contentCX = (minX + maxX) / 2;
+    // Content region dimensions
+    const contentW = maxX - minX + 1;
+    const contentH = maxY - minY + 1;
+
+    // Scaled content dimensions
+    const scaledW = contentW * scale;
+    const scaledH = contentH * scale;
+
     const result = this.createCanvas(sw, sh);
     const ctx = result.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
 
-    // Anchor feet at bottom, center horizontally
-    const offsetY = (sh - 4) - maxY * scale;
-    const offsetX = (sw / 2) - contentCX * scale;
-    ctx.drawImage(frame as CanvasImageSource, offsetX, offsetY, sw * scale, sh * scale);
+    // Place scaled content: centered horizontally, feet anchored at bottom (sh - 4)
+    const destX = (sw - scaledW) / 2;
+    const destY = (sh - 4) - scaledH;
+
+    // Draw only the content region from the source, scaled into the output
+    ctx.drawImage(
+      frame as CanvasImageSource,
+      minX, minY, contentW, contentH,   // source: content region only
+      destX, destY, scaledW, scaledH    // dest: scaled and positioned
+    );
     return result;
   }
 
