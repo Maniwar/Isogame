@@ -384,7 +384,7 @@ export class Renderer {
       ctx.strokeStyle = `rgba(184, 48, 48, ${pulse})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(drawX, drawY - 14, 20, 0, Math.PI * 2);
+      ctx.arc(drawX, drawY - 20, 26, 0, Math.PI * 2);
       ctx.stroke();
 
       // Red target marker on tile
@@ -410,9 +410,9 @@ export class Renderer {
 
     // Fixed display size for all entities — keeps characters the same size
     // regardless of whether the source sprite is AI (64x96) or procedural (24x36).
-    // Sized for Fallout 2-like proportions: ~62% tile width, ~1.9 tiles tall.
-    const sw = 40;
-    const sh = 60;
+    // Sized for Fallout 2-like proportions: ~81% tile width, ~2.4 tiles tall.
+    const sw = 52;
+    const sh = 78;
 
     // Walking bob: subtle vertical bounce synced to the stride cycle.
     // One full sine wave per 4-slot walk cycle (~600ms) — not per frame.
@@ -444,14 +444,11 @@ export class Renderer {
     const spriteTop = finalDrawY - sh + TILE_HALF_H;
 
     if (sprite) {
-      // Disable bilinear filtering for sprites: nearest-neighbor prevents
-      // dark halos from blending opaque content with transparent black
-      // (Canvas 2D premultiplies alpha, so alpha=0 pixels are always black
-      // in the blend regardless of their RGB values).
-      // Also gives clean pixel-art aesthetic matching Fallout 2 style.
-      ctx.imageSmoothingEnabled = false;
+      // Bilinear filtering is correct here: at default zoom=2 + mobile DPR,
+      // sprites are always upscaled (64x96 → 200+ physical px), so bilinear
+      // gives smooth results. The pipeline ensures binary alpha (no semi-
+      // transparent fringe), so premultiplied alpha halos are not an issue.
       ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
-      ctx.imageSmoothingEnabled = true;
     } else {
       // Fallback: draw a simple colored shape if no sprite found
       ctx.fillStyle = entity.isPlayer ? "#40c040" : entity.isHostile ? "#b83030" : "#d4c4a0";
@@ -470,7 +467,7 @@ export class Renderer {
     // Also skip if the tag would overlap the top-right HUD panel (map name/time).
     if (!entity.isPlayer) {
       ctx.save();
-      ctx.font = "8px monospace";
+      ctx.font = "9px monospace";
       ctx.textAlign = "center";
 
       const nameWidth = ctx.measureText(entity.name).width;
