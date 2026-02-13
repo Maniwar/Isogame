@@ -471,7 +471,6 @@ export class Renderer {
       ctx.textAlign = "center";
 
       const nameWidth = ctx.measureText(entity.name).width;
-<<<<<<< HEAD
       const halfTagW = nameWidth / 2 + 3;
 
       // Convert name tag bounding box to screen (CSS) pixel space
