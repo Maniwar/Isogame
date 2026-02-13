@@ -83,13 +83,13 @@ export class Game {
 
     window.addEventListener("resize", () => {
       this.renderer.resize();
-      this.hud.initTouchButtons(this.canvas.width, this.canvas.height);
+      this.hud.initTouchButtons(this.renderer.cssWidth, this.renderer.cssHeight);
     });
   }
 
   async init() {
     this.renderer.resize();
-    this.hud.initTouchButtons(this.canvas.width, this.canvas.height);
+    this.hud.initTouchButtons(this.renderer.cssWidth, this.renderer.cssHeight);
     await this.assets.init();
 
     const map = this.mapSystem.generateWastelandMap(40, 40);
@@ -728,8 +728,8 @@ export class Game {
 
   private handleBodyPartPanelClick(screenX: number, screenY: number): boolean {
     const { state } = this;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.renderer.cssWidth;
+    const h = this.renderer.cssHeight;
     const parts: BodyPart[] = ["head", "torso", "left_arm", "right_arm", "left_leg", "right_leg"];
 
     const cols = 2;
@@ -767,7 +767,7 @@ export class Game {
   private handleQueuePanelClick(screenX: number, screenY: number): boolean {
     const { state } = this;
     if (state.combatExecuting) return false;
-    const w = this.canvas.width;
+    const w = this.renderer.cssWidth;
     const isMobile = Input.isTouchDevice();
     const maxW = isMobile ? w - 100 : w - 20;
     const queueW = Math.min(280, maxW);
@@ -804,19 +804,18 @@ export class Game {
 
     this.renderer.render(this.state);
 
-    // Defensive reset: ensure clean state for all UI drawing.
-    // Renderer.render() already resets these, but this guards against
-    // any future changes or edge cases in the render pipeline.
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Defensive reset: DPR scale so all UI code uses CSS-pixel coordinates.
+    const dpr = this.renderer.dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.globalAlpha = 1;
 
-    this.hud.draw(ctx, this.state, this.canvas.width, this.canvas.height);
+    this.hud.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight);
 
     if (this.state.phase === "dialogue") {
-      this.dialogueUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this, this.assets);
+      this.dialogueUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this, this.assets);
     }
     if (this.state.phase === "inventory" || this.state.showInventory) {
-      this.inventoryUI.draw(ctx, this.state, this.canvas.width, this.canvas.height, this);
+      this.inventoryUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this);
     }
     if (this.state.phase === "combat") {
       this.drawCombatUI(ctx);
@@ -828,8 +827,8 @@ export class Game {
 
   private drawCombatUI(ctx: CanvasRenderingContext2D) {
     const { state } = this;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.renderer.cssWidth;
+    const h = this.renderer.cssHeight;
     const isTouchDev = Input.isTouchDevice();
 
     // Top bar — narrower on mobile to avoid minimap overlap
@@ -1090,8 +1089,8 @@ export class Game {
     const target = state.lootTarget;
     if (!target) return;
 
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.renderer.cssWidth;
+    const h = this.renderer.cssHeight;
     const pw = Math.min(350, w - 20);
     const itemH = 32;
     const headerH = 50;
@@ -1245,8 +1244,8 @@ export class Game {
     const handler = (clientX: number, clientY: number) => {
       const { state } = this;
       if (!state.lootTarget) return;
-      const w = this.canvas.width;
-      const h = this.canvas.height;
+      const w = this.renderer.cssWidth;
+      const h = this.renderer.cssHeight;
       const pw = Math.min(350, w - 20);
       const itemH = 32;
       const headerH = 50;

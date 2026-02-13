@@ -499,46 +499,86 @@ export class AssetManager {
   }
 
   /**
-   * Post-load normalization: for each sprite key, compute a single scale
-   * factor from the idle-S reference frame and apply it uniformly to ALL
-   * frames. This ensures consistent character proportions across walk/attack
-   * frames (per-frame scaling distorts proportions when content bounds vary).
+   * Post-load normalization: normalize EVERY frame independently so that
+   * each frame's content fills exactly 85% of the frame height.
+   * This fixes Gemini-generated sprites that have inconsistent content
+   * sizes across animations (e.g. raider attack frames much smaller than idle).
    */
   private normalizeCharacterSprites() {
     for (const [spriteKey, animData] of this.animFrames) {
-      const idleDir = animData.get("idle");
-      if (!idleDir) continue;
-
-      const refFrame = idleDir.get("S" as Direction) ?? [...idleDir.values()][0];
-      if (!refFrame) continue;
-
-      const refH = this.measureContentHeight(refFrame);
-      if (refH <= 0) continue;
-
-      const sh = refFrame instanceof HTMLCanvasElement
-        ? refFrame.height
-        : (refFrame as HTMLImageElement).naturalHeight || (refFrame as HTMLImageElement).height;
-      const targetH = sh * 0.82;
-      const rawScale = targetH / refH;
-      if (rawScale < 1.08) continue; // Already large enough
-
-      const scale = Math.min(1.5, rawScale);
-
-      // Apply the SAME scale to every animation frame for this sprite key
+      // Normalize every animation frame independently
       for (const [, dirMap] of animData) {
         for (const [dir, frame] of dirMap) {
-          dirMap.set(dir, this.rescaleSprite(frame, scale));
+          dirMap.set(dir, this.normalizeFrame(frame));
         }
       }
-
       // Also normalize static sprites for this key
       const staticMap = this.sprites.get(spriteKey);
       if (staticMap) {
         for (const [dir, frame] of staticMap) {
-          staticMap.set(dir, this.rescaleSprite(frame, scale));
+          staticMap.set(dir, this.normalizeFrame(frame));
         }
       }
     }
+  }
+
+  /**
+   * Normalize a single frame: measure its content, compute scale to reach
+   * 85% of frame height, clean transparent pixels, and rescale.
+   */
+  private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+    if (sw === 0 || sh === 0) return this.cleanTransparentPixels(frame);
+
+    const contentH = this.measureContentHeight(frame);
+    if (contentH <= 0) return this.cleanTransparentPixels(frame);
+
+    const targetH = sh * 0.85;
+    const rawScale = targetH / contentH;
+
+    // Skip rescaling if already within 5% of target, but still clean pixels
+    if (rawScale > 0.95 && rawScale < 1.05) {
+      return this.cleanTransparentPixels(frame);
+    }
+
+    // Clamp scale to sane range
+    const contentW = this.measureContentWidth(frame);
+    const maxScaleW = contentW > 0 ? (sw * 0.95) / contentW : 2.0;
+    const scale = Math.min(1.5, maxScaleW, Math.max(0.5, rawScale));
+
+    return this.rescaleSprite(frame, scale);
+  }
+
+  /**
+   * Zero out RGB channels where alpha=0. Prevents bilinear interpolation
+   * from creating dark halos at sprite edges (transparent pixels in
+   * Gemini PNGs have non-zero RGB leftover data).
+   */
+  private cleanTransparentPixels(frame: DrawTarget): HTMLCanvasElement {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+
+    const canvas = this.createCanvas(sw, sh);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(frame as CanvasImageSource, 0, 0);
+
+    try {
+      const data = ctx.getImageData(0, 0, sw, sh);
+      const d = data.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) {
+          d[i] = d[i + 1] = d[i + 2] = 0;
+        }
+      }
+      ctx.putImageData(data, 0, 0);
+    } catch { /* CORS — return as-is */ }
+
+    return canvas;
   }
 
   /** Alpha threshold for content detection — low enough to catch anti-aliased edges */
@@ -570,6 +610,34 @@ export class AssetManager {
       }
     }
     return maxY > minY ? maxY - minY + 1 : 0;
+  }
+
+  /** Measure the width of non-transparent content in a sprite */
+  private measureContentWidth(frame: DrawTarget): number {
+    const sw = frame instanceof HTMLCanvasElement
+      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+    const sh = frame instanceof HTMLCanvasElement
+      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+    if (sw === 0 || sh === 0) return 0;
+
+    const temp = this.createCanvas(sw, sh);
+    const tempCtx = temp.getContext("2d")!;
+    tempCtx.drawImage(frame, 0, 0);
+
+    let data: ImageData;
+    try { data = tempCtx.getImageData(0, 0, sw, sh); }
+    catch { return 0; }
+
+    let minX = sw, maxX = 0;
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    return maxX > minX ? maxX - minX + 1 : 0;
   }
 
   /** Rescale a sprite by extracting the content region, scaling it, and
@@ -613,7 +681,8 @@ export class AssetManager {
 
     const result = this.createCanvas(sw, sh);
     const ctx = result.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
 
     // Place scaled content: centered horizontally, feet anchored at bottom (sh - 4)
     const destX = (sw - scaledW) / 2;
@@ -625,6 +694,19 @@ export class AssetManager {
       minX, minY, contentW, contentH,   // source: content region only
       destX, destY, scaledW, scaledH    // dest: scaled and positioned
     );
+
+    // Clean transparent pixels to prevent bilinear dark halos
+    try {
+      const outData = ctx.getImageData(0, 0, sw, sh);
+      const d = outData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) {
+          d[i] = d[i + 1] = d[i + 2] = 0;
+        }
+      }
+      ctx.putImageData(outData, 0, 0);
+    } catch { /* CORS — skip */ }
+
     return result;
   }
 

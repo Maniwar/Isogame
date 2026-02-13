@@ -106,14 +106,15 @@ export class Camera {
     return this.worldToTile(this.screenToWorld(screen));
   }
 
-  /** Apply camera transform to canvas context (includes shake) */
-  applyTransform(ctx: CanvasRenderingContext2D) {
+  /** Apply camera transform to canvas context (includes shake and DPR) */
+  applyTransform(ctx: CanvasRenderingContext2D, dpr = 1) {
     const sx = this.shakeOffsetX;
     const sy = this.shakeOffsetY;
+    const scale = this.zoom * dpr;
     ctx.setTransform(
-      this.zoom, 0, 0, this.zoom,
-      -(this.x + sx) * this.zoom,
-      -(this.y + sy) * this.zoom,
+      scale, 0, 0, scale,
+      -(this.x + sx) * scale,
+      -(this.y + sy) * scale,
     );
   }
 }

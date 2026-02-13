@@ -49,6 +49,12 @@ export class Renderer {
   private canvas: HTMLCanvasElement;
   private hoveredTile: TilePos | null = null;
 
+  /** Device pixel ratio — used to render at physical resolution */
+  dpr = 1;
+  /** CSS-pixel viewport dimensions (use for all coordinate logic) */
+  cssWidth = 800;
+  cssHeight = 600;
+
   constructor(
     canvas: HTMLCanvasElement,
     camera: Camera,
@@ -68,34 +74,46 @@ export class Renderer {
   }
 
   resize() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
-    this.camera.resize(this.canvas.width, this.canvas.height);
+    this.dpr = window.devicePixelRatio || 1;
+    this.cssWidth = window.innerWidth;
+    this.cssHeight = window.innerHeight;
+
+    // Set canvas buffer to physical resolution so there's a 1:1 mapping
+    // between buffer pixels and display pixels — eliminates CSS-level
+    // upscaling that can cause dark fringing on transparent sprite edges.
+    this.canvas.width = Math.floor(this.cssWidth * this.dpr);
+    this.canvas.height = Math.floor(this.cssHeight * this.dpr);
+
+    // Camera works in CSS-pixel coordinates
+    this.camera.resize(this.cssWidth, this.cssHeight);
     this.ctx.imageSmoothingEnabled = false;
   }
 
   render(state: GameState) {
-    const { ctx } = this;
+    const { ctx, dpr } = this;
 
-    // Clear
+    // Clear at physical resolution (identity, no DPR scale)
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#1e1e16";
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Apply camera
-    this.camera.applyTransform(ctx);
+    // Apply camera (incorporates DPR so world coords map to physical pixels)
+    this.camera.applyTransform(ctx, dpr);
 
-    // Determine visible tile range for culling
+    // Determine visible tile range for culling (uses CSS pixel viewport)
     const tl = this.camera.screenToTile({ x: 0, y: 0 });
     const br = this.camera.screenToTile({
-      x: this.canvas.width,
-      y: this.canvas.height,
+      x: this.cssWidth,
+      y: this.cssHeight,
     });
     const pad = 3;
     const minX = Math.max(0, tl.x - pad);
     const minY = Math.max(0, tl.y - pad);
     const maxX = Math.min(state.map.width - 1, br.x + pad);
     const maxY = Math.min(state.map.height - 1, br.y + pad);
+
+    // Enable bilinear scaling for all AI-generated art (tiles + sprites)
+    ctx.imageSmoothingEnabled = true;
 
     // Draw tiles (painter's order: back to front)
     for (let y = minY; y <= maxY; y++) {
@@ -139,12 +157,11 @@ export class Renderer {
     // Draw VFX (projectiles, damage numbers) — in world space
     this.drawVFX(state.vfx);
 
-    // Reset all canvas state for UI drawing — prevents world-space text
-    // properties (font, textAlign) and alpha from leaking into UI code.
+    // Reset for UI drawing — DPR scale so HUD code uses CSS-pixel coordinates.
     ctx.globalAlpha = 1;
     ctx.textAlign = "left";
     ctx.font = "10px monospace";
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
   private drawTile(x: number, y: number, tile: Tile, state?: GameState) {
@@ -437,18 +454,38 @@ export class Renderer {
     // Label position — above sprite top
     const labelY = spriteTop - 4;
 
-    // Draw name tag — skip player (visible in HUD), only show NPCs
+    // Draw name tag — skip player (visible in HUD), only show NPCs.
+    // Also skip if the tag would overlap the top-right HUD panel (map name/time).
     if (!entity.isPlayer) {
       ctx.save();
       ctx.font = "8px monospace";
       ctx.textAlign = "center";
 
-      // Semi-transparent background for readability
       const nameWidth = ctx.measureText(entity.name).width;
-      ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
-      ctx.fillRect(drawX - nameWidth / 2 - 3, labelY - 9, nameWidth + 6, 12);
-      ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
-      ctx.fillText(entity.name, drawX, labelY);
+      const halfTagW = nameWidth / 2 + 3;
+
+      // Convert name tag bounding box to screen (CSS) pixel space
+      const cam = this.camera;
+      const tagScreenLeft = (drawX - halfTagW - cam.x - cam.shakeOffsetX) * cam.zoom;
+      const tagScreenRight = (drawX + halfTagW - cam.x - cam.shakeOffsetX) * cam.zoom;
+      const tagScreenTop = (labelY - 9 - cam.y - cam.shakeOffsetY) * cam.zoom;
+      const tagScreenBottom = (labelY + 3 - cam.y - cam.shakeOffsetY) * cam.zoom;
+
+      // HUD title panel bounds in CSS pixels (top-right corner)
+      const hudLeft = this.cssWidth - 215;
+      const hudTop = 5;
+      const hudRight = this.cssWidth - 5;
+      const hudBottom = 65;
+
+      const overlapsHUD = tagScreenRight > hudLeft && tagScreenLeft < hudRight
+                       && tagScreenBottom > hudTop && tagScreenTop < hudBottom;
+
+      if (!overlapsHUD) {
+        ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
+        ctx.fillRect(drawX - halfTagW, labelY - 9, nameWidth + 6, 12);
+        ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
+        ctx.fillText(entity.name, drawX, labelY);
+      }
       ctx.restore();
     }
 

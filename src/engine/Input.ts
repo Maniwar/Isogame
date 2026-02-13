@@ -149,9 +149,11 @@ export class Input {
 
   private touchPos(t: Touch): ScreenPos {
     const rect = this.canvas.getBoundingClientRect();
+    // Return CSS-pixel coordinates (not physical pixels).
+    // All game UI and camera code works in CSS-pixel space.
     return {
-      x: (t.clientX - rect.left) * (this.canvas.width / rect.width),
-      y: (t.clientY - rect.top) * (this.canvas.height / rect.height),
+      x: t.clientX - rect.left,
+      y: t.clientY - rect.top,
     };
   }
 
