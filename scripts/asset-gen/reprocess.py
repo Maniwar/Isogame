@@ -145,6 +145,79 @@ def remove_green_bg(image: Image.Image) -> Image.Image:
     return Image.fromarray(arr, "RGBA")
 
 
+def fill_interior_holes(image: Image.Image, threshold: int = 30) -> Image.Image:
+    """Fill interior transparent holes in a sprite using flood-fill.
+
+    AI-generated sprites often have internal transparent pixels (holes)
+    where the background bleeds through the character body after green
+    removal.  This function:
+      1. Flood-fills from all border pixels to mark "exterior" transparency
+      2. Any remaining transparent pixel is an interior hole — fills it
+         with the average color of opaque neighbors
+      3. Runs multiple passes to propagate fill inward for large holes
+
+    This is the same algorithm used in the game's runtime cleanTransparentPixels,
+    but applied at asset-build time so sprites ship clean.
+    """
+    arr = np.array(image.convert("RGBA")).copy()
+    h, w = arr.shape[:2]
+    alpha = arr[:, :, 3]
+
+    # Step 1: Flood-fill from border to mark exterior transparent pixels
+    exterior = np.zeros((h, w), dtype=bool)
+    queue = []
+
+    # Seed with all transparent border pixels
+    for x in range(w):
+        if alpha[0, x] < threshold:
+            queue.append((0, x))
+        if alpha[h - 1, x] < threshold:
+            queue.append((h - 1, x))
+    for y in range(1, h - 1):
+        if alpha[y, 0] < threshold:
+            queue.append((y, 0))
+        if alpha[y, w - 1] < threshold:
+            queue.append((y, w - 1))
+
+    while queue:
+        cy, cx = queue.pop()
+        if exterior[cy, cx]:
+            continue
+        exterior[cy, cx] = True
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not exterior[ny, nx] and alpha[ny, nx] < threshold:
+                queue.append((ny, nx))
+
+    # Step 2: Fill interior holes (multiple passes for large holes)
+    for pass_num in range(5):
+        filled = False
+        for y in range(h):
+            for x in range(w):
+                if alpha[y, x] < threshold and not exterior[y, x]:
+                    # Interior hole — average opaque neighbors
+                    r_sum, g_sum, b_sum, count = 0, 0, 0, 0
+                    for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1),
+                                   (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                        ny, nx = y + dy, x + dx
+                        if 0 <= ny < h and 0 <= nx < w and alpha[ny, nx] >= threshold:
+                            r_sum += int(arr[ny, nx, 0])
+                            g_sum += int(arr[ny, nx, 1])
+                            b_sum += int(arr[ny, nx, 2])
+                            count += 1
+                    if count > 0:
+                        arr[y, x, 0] = r_sum // count
+                        arr[y, x, 1] = g_sum // count
+                        arr[y, x, 2] = b_sum // count
+                        arr[y, x, 3] = 255
+                        alpha[y, x] = 255
+                        filled = True
+        if not filled:
+            break
+
+    return Image.fromarray(arr, "RGBA")
+
+
 def defringe(image: Image.Image, passes: int = 2, dark_threshold: int = 35) -> Image.Image:
     """Remove dark fringe pixels around content edges.
 
@@ -753,6 +826,10 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                 if frame is None:
                     frame = Image.new("RGBA", (SPRITE_W, SPRITE_H), (0, 0, 0, 0))
 
+            # Fill interior holes BEFORE palette reduction (uses raw colors
+            # for better neighbor averaging)
+            frame = fill_interior_holes(frame, threshold=30)
+
             # Palette reduction
             if apply_palette:
                 frame = reduce_palette(frame)
@@ -763,6 +840,9 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                 frame_arr[:, :, 3] < 30, 0, 255
             ).astype(np.uint8)
             frame = Image.fromarray(frame_arr, "RGBA")
+
+            # Fill any new holes created by palette reduction + alpha threshold
+            frame = fill_interior_holes(frame, threshold=30)
 
             # Remove dark fringe pixels at content edges
             frame = defringe(frame, passes=2, dark_threshold=35)

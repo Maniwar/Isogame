@@ -529,49 +529,13 @@ export class AssetManager {
   }
 
   /**
-   * Normalize a single frame: measure content height, upscale undersized frames
-   * to fill 85% of the canvas. NEVER downscale — this prevents north-facing
-   * sprite splitting, border artifacts, and hole creation from bounding-box
-   * extraction + repositioning.
+   * Normalize a single frame: zero out transparent pixel RGB to prevent
+   * bilinear dark halos when the renderer scales sprites.
+   *
+   * Interior hole filling and content normalization are handled by the
+   * asset pipeline (reprocess.py) at build time.
    */
   private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
-    const sw = frame instanceof HTMLCanvasElement
-      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
-    const sh = frame instanceof HTMLCanvasElement
-      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
-    if (sw === 0 || sh === 0) return this.cleanTransparentPixels(frame);
-
-    const contentH = this.measureContentHeight(frame);
-    if (contentH <= 0) return this.cleanTransparentPixels(frame);
-
-    const targetH = sh * 0.85;
-
-    // NEVER downscale — frames that already fill ≥85% of canvas are left alone.
-    // This prevents: north-facing split (weapons above head inflate bounding box),
-    // holes from bilinear downscaling, and border artifacts from content extraction.
-    if (contentH >= targetH) {
-      return this.cleanTransparentPixels(frame);
-    }
-
-    // Only upscale genuinely undersized frames (e.g., attack at 68% fill)
-    const scale = targetH / contentH;
-    if (scale > 1.5) return this.cleanTransparentPixels(frame); // safety cap
-
-    return this.rescaleSpriteUniform(frame, scale);
-  }
-
-  /**
-   * Clean sprite frame: fill interior transparent holes, then zero out
-   * exterior transparent pixel RGB to prevent bilinear dark halos.
-   *
-   * AI-generated sprites often have internal transparent holes where the
-   * terrain shows through the character body. We fix this by:
-   * 1. Flood-fill from all border pixels to mark "exterior" transparency
-   * 2. Any remaining transparent pixel is an "interior hole" — fill it
-   *    with the average color of its opaque neighbors
-   * 3. Zero RGB on exterior transparent pixels to prevent dark halos
-   */
-  private cleanTransparentPixels(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
       ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
     const sh = frame instanceof HTMLCanvasElement
@@ -584,99 +548,13 @@ export class AssetManager {
     try {
       const data = ctx.getImageData(0, 0, sw, sh);
       const d = data.data;
-      const thresh = AssetManager.ALPHA_THRESH;
-
-      // Step 1: Flood-fill from border to mark exterior transparent pixels
-      const exterior = new Uint8Array(sw * sh);
-      const queue: number[] = [];
-
-      // Seed with all transparent border pixels
-      for (let x = 0; x < sw; x++) {
-        if (d[(x) * 4 + 3] < thresh) queue.push(x);                         // top row
-        if (d[((sh - 1) * sw + x) * 4 + 3] < thresh) queue.push((sh - 1) * sw + x); // bottom row
-      }
-      for (let y = 1; y < sh - 1; y++) {
-        if (d[(y * sw) * 4 + 3] < thresh) queue.push(y * sw);               // left col
-        if (d[(y * sw + sw - 1) * 4 + 3] < thresh) queue.push(y * sw + sw - 1); // right col
-      }
-
-      while (queue.length > 0) {
-        const idx = queue.pop()!;
-        if (exterior[idx]) continue;
-        exterior[idx] = 1;
-        const x = idx % sw;
-        const y = (idx - x) / sw;
-        if (x > 0     && !exterior[idx - 1]  && d[(idx - 1) * 4 + 3] < thresh) queue.push(idx - 1);
-        if (x < sw - 1 && !exterior[idx + 1] && d[(idx + 1) * 4 + 3] < thresh) queue.push(idx + 1);
-        if (y > 0      && !exterior[idx - sw] && d[(idx - sw) * 4 + 3] < thresh) queue.push(idx - sw);
-        if (y < sh - 1 && !exterior[idx + sw] && d[(idx + sw) * 4 + 3] < thresh) queue.push(idx + sw);
-      }
-
-      // Step 2: Fill interior holes with average of opaque neighbors
-      for (let y = 0; y < sh; y++) {
-        for (let x = 0; x < sw; x++) {
-          const idx = y * sw + x;
-          if (d[idx * 4 + 3] < thresh && !exterior[idx]) {
-            // Interior hole — fill with average opaque neighbor color
-            let r = 0, g = 0, b = 0, count = 0;
-            for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-              const nx = x + dx, ny = y + dy;
-              if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
-                const nIdx = (ny * sw + nx) * 4;
-                if (d[nIdx + 3] >= thresh) {
-                  r += d[nIdx]; g += d[nIdx + 1]; b += d[nIdx + 2]; count++;
-                }
-              }
-            }
-            if (count > 0) {
-              d[idx * 4]     = Math.round(r / count);
-              d[idx * 4 + 1] = Math.round(g / count);
-              d[idx * 4 + 2] = Math.round(b / count);
-              d[idx * 4 + 3] = 255;
-            }
-          }
+      // Zero RGB on transparent pixels to prevent dark halos from bilinear interpolation
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
+          d[i] = d[i + 1] = d[i + 2] = 0;
+          d[i + 3] = 0;
         }
       }
-
-      // Run hole fill a second pass to catch holes that had no opaque neighbors
-      // in the first pass (large holes fill inward from edges)
-      for (let pass = 0; pass < 3; pass++) {
-        let filled = false;
-        for (let y = 0; y < sh; y++) {
-          for (let x = 0; x < sw; x++) {
-            const idx = y * sw + x;
-            if (d[idx * 4 + 3] < thresh && !exterior[idx]) {
-              let r = 0, g = 0, b = 0, count = 0;
-              for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-                const nx = x + dx, ny = y + dy;
-                if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
-                  const nIdx = (ny * sw + nx) * 4;
-                  if (d[nIdx + 3] >= thresh) {
-                    r += d[nIdx]; g += d[nIdx + 1]; b += d[nIdx + 2]; count++;
-                  }
-                }
-              }
-              if (count > 0) {
-                d[idx * 4]     = Math.round(r / count);
-                d[idx * 4 + 1] = Math.round(g / count);
-                d[idx * 4 + 2] = Math.round(b / count);
-                d[idx * 4 + 3] = 255;
-                filled = true;
-              }
-            }
-          }
-        }
-        if (!filled) break;
-      }
-
-      // Step 3: Clean exterior transparent pixels (zero RGB to prevent dark halos)
-      for (let i = 0; i < sw * sh; i++) {
-        if (d[i * 4 + 3] < thresh && exterior[i]) {
-          d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 0;
-          d[i * 4 + 3] = 0;
-        }
-      }
-
       ctx.putImageData(data, 0, 0);
     } catch { /* CORS — return as-is */ }
 
@@ -685,120 +563,6 @@ export class AssetManager {
 
   /** Alpha threshold for content detection — low enough to catch anti-aliased edges */
   private static readonly ALPHA_THRESH = 10;
-
-  /** Measure the height of non-transparent content in a sprite */
-  private measureContentHeight(frame: DrawTarget): number {
-    const sw = frame instanceof HTMLCanvasElement
-      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
-    const sh = frame instanceof HTMLCanvasElement
-      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
-    if (sw === 0 || sh === 0) return 0;
-
-    const temp = this.createCanvas(sw, sh);
-    const tempCtx = temp.getContext("2d")!;
-    tempCtx.drawImage(frame, 0, 0);
-
-    let data: ImageData;
-    try { data = tempCtx.getImageData(0, 0, sw, sh); }
-    catch { return 0; }
-
-    let minY = sh, maxY = 0;
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-    }
-    return maxY > minY ? maxY - minY + 1 : 0;
-  }
-
-
-  /**
-   * Rescale a sprite UNIFORMLY — scales the entire image (not just extracted
-   * content) to preserve all internal structure. Anchored at the bottom-center
-   * of the content so feet stay planted.
-   *
-   * This avoids the problems of the old content-extraction approach:
-   * - No edge clipping (borders)
-   * - No internal gap amplification (north-facing split)
-   * - No sub-pixel hole creation from downscaling
-   */
-  private rescaleSpriteUniform(frame: DrawTarget, scale: number): HTMLCanvasElement {
-    const sw = frame instanceof HTMLCanvasElement
-      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
-    const sh = frame instanceof HTMLCanvasElement
-      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
-
-    // Measure content bounds for anchoring
-    const temp = this.createCanvas(sw, sh);
-    const tempCtx = temp.getContext("2d")!;
-    tempCtx.drawImage(frame, 0, 0);
-
-    let data: ImageData;
-    try { data = tempCtx.getImageData(0, 0, sw, sh); }
-    catch { return temp; }
-
-    let minY = sh, maxY = 0, minX = sw, maxX = 0;
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-        }
-      }
-    }
-    if (minY >= maxY || minX >= maxX) return temp;
-
-    const result = this.createCanvas(sw, sh);
-    const ctx = result.getContext("2d")!;
-    ctx.imageSmoothingEnabled = true;
-    (ctx as any).imageSmoothingQuality = "high";
-
-    // Scale the ENTIRE image uniformly (preserves all internal structure)
-    const scaledW = sw * scale;
-    const scaledH = sh * scale;
-
-    // Anchor: content bottom at (sh - 2), content center at (sw / 2)
-    const contentBottomScaled = maxY * scale;
-    let dy = (sh - 2) - contentBottomScaled;
-    const contentCenterXScaled = ((minX + maxX) / 2) * scale;
-    let dx = sw / 2 - contentCenterXScaled;
-
-    // Prevent clipping: ensure scaled content stays within canvas bounds
-    const contentTopScaled = dy + minY * scale;
-    if (contentTopScaled < 0) {
-      dy -= contentTopScaled; // push down so content top is at y=0
-    }
-    const contentLeftScaled = dx + minX * scale;
-    if (contentLeftScaled < 0) {
-      dx -= contentLeftScaled; // push right so content left is at x=0
-    }
-    const contentRightScaled = dx + maxX * scale;
-    if (contentRightScaled > sw) {
-      dx -= (contentRightScaled - sw); // push left so content right fits
-    }
-
-    ctx.drawImage(frame as CanvasImageSource, dx, dy, scaledW, scaledH);
-
-    // Clean transparent pixels to prevent bilinear dark halos
-    try {
-      const outData = ctx.getImageData(0, 0, sw, sh);
-      const d = outData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
-          d[i] = d[i + 1] = d[i + 2] = 0;
-          d[i + 3] = 0;
-        }
-      }
-      ctx.putImageData(outData, 0, 0);
-    } catch { /* CORS — skip */ }
-
-    return result;
-  }
 
   // -----------------------------------------------------------------------
   // Procedural fallback generation
