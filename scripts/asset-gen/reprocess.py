@@ -510,6 +510,66 @@ def detect_grid_auto(sheet: Image.Image) -> tuple:
     return cells, actual_rows, actual_cols
 
 
+def strip_row_bleed(arr: np.ndarray, min_gap: int = 5) -> np.ndarray:
+    """Remove disconnected fragments from adjacent sprite sheet rows.
+
+    When characters' feet extend beyond cell boundaries, the grid slicer
+    includes leaked pixels from the row above/below.  These appear as small
+    disconnected fragments separated by a transparent gap from the main
+    character body.
+
+    Strategy: find horizontal gaps (runs of fully-transparent rows) in the
+    alpha channel.  If a gap exists, keep only the tallest contiguous
+    component (the actual character).
+
+    Args:
+        arr: RGBA numpy array (H, W, 4)
+        min_gap: minimum consecutive transparent rows to qualify as a gap
+
+    Returns:
+        RGBA array with leaked fragments zeroed out.
+    """
+    alpha = arr[:, :, 3]
+    rows_any = np.any(alpha > 10, axis=1)
+
+    # Find contiguous runs of content rows
+    components = []  # list of (start_row, end_row, height)
+    in_run = False
+    run_start = 0
+    for i, has_content in enumerate(rows_any):
+        if has_content and not in_run:
+            in_run = True
+            run_start = i
+        elif not has_content and in_run:
+            in_run = False
+            components.append((run_start, i, i - run_start))
+    if in_run:
+        components.append((run_start, len(rows_any), len(rows_any) - run_start))
+
+    if len(components) <= 1:
+        return arr  # single component or empty, nothing to strip
+
+    # Check if there's a real gap (min_gap transparent rows) between components
+    has_real_gap = False
+    for i in range(len(components) - 1):
+        gap = components[i + 1][0] - components[i][1]
+        if gap >= min_gap:
+            has_real_gap = True
+            break
+
+    if not has_real_gap:
+        return arr  # components are close together, likely one character
+
+    # Keep the bottom-most component (the main character body).
+    # Leaked content from adjacent rows is always at the top of the cell
+    # (feet/legs from the row above extending past the grid boundary).
+    bottom_comp = components[-1]
+    result = arr.copy()
+    # Zero out everything above the bottom component
+    result[:bottom_comp[0], :, 3] = 0
+    return result
+
+
 def measure_content_bbox(region: Image.Image) -> tuple:
     """Remove green bg from a cell and return (cleaned_image, content_w, content_h).
 
@@ -517,6 +577,8 @@ def measure_content_bbox(region: Image.Image) -> tuple:
     """
     clean = remove_green_bg(region)
     arr = np.array(clean)
+    arr = strip_row_bleed(arr)
+    clean = Image.fromarray(arr, "RGBA")
     alpha = arr[:, :, 3]
     mask = alpha > 10
     if not mask.any():
@@ -546,9 +608,11 @@ def extract_sprite_frame(region: Image.Image, target_w: int, target_h: int,
                       character instead of computing per-frame. This ensures
                       the character stays the same size across animation frames.
     """
-    # Remove green bg from this cell
+    # Remove green bg from this cell, then strip leaked pixels from adjacent rows
     clean = remove_green_bg(region)
     arr = np.array(clean)
+    arr = strip_row_bleed(arr)
+    clean = Image.fromarray(arr, "RGBA")
     alpha = arr[:, :, 3]
 
     # Find content bounding box
@@ -682,10 +746,25 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
     Returns frame metadata dict for manifest.
     """
     sheet = Image.open(sheet_path).convert("RGBA")
-    grid, actual_rows, actual_cols = detect_grid_auto(sheet)
+    _, actual_rows, actual_cols = detect_grid_auto(sheet)
 
     print(f"    Grid detected: {actual_cols} cols x {actual_rows} rows "
           f"(expected 8x8, image {sheet.size[0]}x{sheet.size[1]})")
+
+    # Use even grid divisions instead of auto-detected boundaries.
+    # Auto-detected boundaries follow green separator lines, which can
+    # include leaked feet/legs from adjacent rows as part of the cell,
+    # making it impossible to detect and strip the bleed.  Even divisions
+    # create clean cut lines where leaked content is separated by a gap.
+    sw, sh = sheet.size
+    cell_w = sw // actual_cols
+    cell_h = sh // actual_rows
+    grid = []
+    for r in range(actual_rows):
+        row_cells = []
+        for c in range(actual_cols):
+            row_cells.append((c * cell_w, r * cell_h, cell_w, cell_h))
+        grid.append(row_cells)
 
     # Map actual columns → direction names based on what the AI actually produces.
     # AI models generate a front-to-back rotation, NOT the prompt's column order.
