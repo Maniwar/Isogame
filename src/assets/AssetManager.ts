@@ -561,9 +561,15 @@ export class AssetManager {
   }
 
   /**
-   * Zero out RGB channels where alpha=0. Prevents bilinear interpolation
-   * from creating dark halos at sprite edges (transparent pixels in
-   * Gemini PNGs have non-zero RGB leftover data).
+   * Clean sprite frame: fill interior transparent holes, then zero out
+   * exterior transparent pixel RGB to prevent bilinear dark halos.
+   *
+   * AI-generated sprites often have internal transparent holes where the
+   * terrain shows through the character body. We fix this by:
+   * 1. Flood-fill from all border pixels to mark "exterior" transparency
+   * 2. Any remaining transparent pixel is an "interior hole" — fill it
+   *    with the average color of its opaque neighbors
+   * 3. Zero RGB on exterior transparent pixels to prevent dark halos
    */
   private cleanTransparentPixels(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
@@ -578,12 +584,99 @@ export class AssetManager {
     try {
       const data = ctx.getImageData(0, 0, sw, sh);
       const d = data.data;
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
-          d[i] = d[i + 1] = d[i + 2] = 0;
-          d[i + 3] = 0;
+      const thresh = AssetManager.ALPHA_THRESH;
+
+      // Step 1: Flood-fill from border to mark exterior transparent pixels
+      const exterior = new Uint8Array(sw * sh);
+      const queue: number[] = [];
+
+      // Seed with all transparent border pixels
+      for (let x = 0; x < sw; x++) {
+        if (d[(x) * 4 + 3] < thresh) queue.push(x);                         // top row
+        if (d[((sh - 1) * sw + x) * 4 + 3] < thresh) queue.push((sh - 1) * sw + x); // bottom row
+      }
+      for (let y = 1; y < sh - 1; y++) {
+        if (d[(y * sw) * 4 + 3] < thresh) queue.push(y * sw);               // left col
+        if (d[(y * sw + sw - 1) * 4 + 3] < thresh) queue.push(y * sw + sw - 1); // right col
+      }
+
+      while (queue.length > 0) {
+        const idx = queue.pop()!;
+        if (exterior[idx]) continue;
+        exterior[idx] = 1;
+        const x = idx % sw;
+        const y = (idx - x) / sw;
+        if (x > 0     && !exterior[idx - 1]  && d[(idx - 1) * 4 + 3] < thresh) queue.push(idx - 1);
+        if (x < sw - 1 && !exterior[idx + 1] && d[(idx + 1) * 4 + 3] < thresh) queue.push(idx + 1);
+        if (y > 0      && !exterior[idx - sw] && d[(idx - sw) * 4 + 3] < thresh) queue.push(idx - sw);
+        if (y < sh - 1 && !exterior[idx + sw] && d[(idx + sw) * 4 + 3] < thresh) queue.push(idx + sw);
+      }
+
+      // Step 2: Fill interior holes with average of opaque neighbors
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          const idx = y * sw + x;
+          if (d[idx * 4 + 3] < thresh && !exterior[idx]) {
+            // Interior hole — fill with average opaque neighbor color
+            let r = 0, g = 0, b = 0, count = 0;
+            for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+              const nx = x + dx, ny = y + dy;
+              if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                const nIdx = (ny * sw + nx) * 4;
+                if (d[nIdx + 3] >= thresh) {
+                  r += d[nIdx]; g += d[nIdx + 1]; b += d[nIdx + 2]; count++;
+                }
+              }
+            }
+            if (count > 0) {
+              d[idx * 4]     = Math.round(r / count);
+              d[idx * 4 + 1] = Math.round(g / count);
+              d[idx * 4 + 2] = Math.round(b / count);
+              d[idx * 4 + 3] = 255;
+            }
+          }
         }
       }
+
+      // Run hole fill a second pass to catch holes that had no opaque neighbors
+      // in the first pass (large holes fill inward from edges)
+      for (let pass = 0; pass < 3; pass++) {
+        let filled = false;
+        for (let y = 0; y < sh; y++) {
+          for (let x = 0; x < sw; x++) {
+            const idx = y * sw + x;
+            if (d[idx * 4 + 3] < thresh && !exterior[idx]) {
+              let r = 0, g = 0, b = 0, count = 0;
+              for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                  const nIdx = (ny * sw + nx) * 4;
+                  if (d[nIdx + 3] >= thresh) {
+                    r += d[nIdx]; g += d[nIdx + 1]; b += d[nIdx + 2]; count++;
+                  }
+                }
+              }
+              if (count > 0) {
+                d[idx * 4]     = Math.round(r / count);
+                d[idx * 4 + 1] = Math.round(g / count);
+                d[idx * 4 + 2] = Math.round(b / count);
+                d[idx * 4 + 3] = 255;
+                filled = true;
+              }
+            }
+          }
+        }
+        if (!filled) break;
+      }
+
+      // Step 3: Clean exterior transparent pixels (zero RGB to prevent dark halos)
+      for (let i = 0; i < sw * sh; i++) {
+        if (d[i * 4 + 3] < thresh && exterior[i]) {
+          d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 0;
+          d[i * 4 + 3] = 0;
+        }
+      }
+
       ctx.putImageData(data, 0, 0);
     } catch { /* CORS — return as-is */ }
 
@@ -671,9 +764,23 @@ export class AssetManager {
 
     // Anchor: content bottom at (sh - 2), content center at (sw / 2)
     const contentBottomScaled = maxY * scale;
-    const dy = (sh - 2) - contentBottomScaled;
+    let dy = (sh - 2) - contentBottomScaled;
     const contentCenterXScaled = ((minX + maxX) / 2) * scale;
-    const dx = sw / 2 - contentCenterXScaled;
+    let dx = sw / 2 - contentCenterXScaled;
+
+    // Prevent clipping: ensure scaled content stays within canvas bounds
+    const contentTopScaled = dy + minY * scale;
+    if (contentTopScaled < 0) {
+      dy -= contentTopScaled; // push down so content top is at y=0
+    }
+    const contentLeftScaled = dx + minX * scale;
+    if (contentLeftScaled < 0) {
+      dx -= contentLeftScaled; // push right so content left is at x=0
+    }
+    const contentRightScaled = dx + maxX * scale;
+    if (contentRightScaled > sw) {
+      dx -= (contentRightScaled - sw); // push left so content right fits
+    }
 
     ctx.drawImage(frame as CanvasImageSource, dx, dy, scaledW, scaledH);
 
