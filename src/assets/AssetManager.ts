@@ -139,6 +139,11 @@ export class AssetManager {
    * the hash ensures interior tiles and border tiles get consistently
    * different variants, creating natural visual patterns.
    */
+  /** Number of tile variants for a terrain (1 = procedural only, >1 = has AI tiles) */
+  getTileVariantCount(terrain: Terrain): number {
+    return this.tiles.get(terrain)?.length ?? 0;
+  }
+
   getTile(terrain: Terrain, tileX = 0, tileY = 0, neighborSig = 0): DrawTarget | undefined {
     const variants = this.tiles.get(terrain);
     if (!variants || variants.length === 0) return undefined;
@@ -471,7 +476,8 @@ export class AssetManager {
   private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
     const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
     if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
     return canvas;
@@ -523,8 +529,10 @@ export class AssetManager {
   }
 
   /**
-   * Normalize a single frame: measure its content, compute scale to reach
-   * 85% of frame height, clean transparent pixels, and rescale.
+   * Normalize a single frame: measure content height, upscale undersized frames
+   * to fill 85% of the canvas. NEVER downscale — this prevents north-facing
+   * sprite splitting, border artifacts, and hole creation from bounding-box
+   * extraction + repositioning.
    */
   private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
@@ -537,19 +545,19 @@ export class AssetManager {
     if (contentH <= 0) return this.cleanTransparentPixels(frame);
 
     const targetH = sh * 0.85;
-    const rawScale = targetH / contentH;
 
-    // Skip rescaling if already within 5% of target, but still clean pixels
-    if (rawScale > 0.95 && rawScale < 1.05) {
+    // NEVER downscale — frames that already fill ≥85% of canvas are left alone.
+    // This prevents: north-facing split (weapons above head inflate bounding box),
+    // holes from bilinear downscaling, and border artifacts from content extraction.
+    if (contentH >= targetH) {
       return this.cleanTransparentPixels(frame);
     }
 
-    // Clamp scale to sane range
-    const contentW = this.measureContentWidth(frame);
-    const maxScaleW = contentW > 0 ? (sw * 0.95) / contentW : 2.0;
-    const scale = Math.min(1.5, maxScaleW, Math.max(0.5, rawScale));
+    // Only upscale genuinely undersized frames (e.g., attack at 68% fill)
+    const scale = targetH / contentH;
+    if (scale > 1.5) return this.cleanTransparentPixels(frame); // safety cap
 
-    return this.rescaleSprite(frame, scale);
+    return this.rescaleSpriteUniform(frame, scale);
   }
 
   /**
@@ -571,8 +579,9 @@ export class AssetManager {
       const data = ctx.getImageData(0, 0, sw, sh);
       const d = data.data;
       for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] === 0) {
+        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
           d[i] = d[i + 1] = d[i + 2] = 0;
+          d[i + 3] = 0;
         }
       }
       ctx.putImageData(data, 0, 0);
@@ -612,44 +621,24 @@ export class AssetManager {
     return maxY > minY ? maxY - minY + 1 : 0;
   }
 
-  /** Measure the width of non-transparent content in a sprite */
-  private measureContentWidth(frame: DrawTarget): number {
-    const sw = frame instanceof HTMLCanvasElement
-      ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
-    const sh = frame instanceof HTMLCanvasElement
-      ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
-    if (sw === 0 || sh === 0) return 0;
 
-    const temp = this.createCanvas(sw, sh);
-    const tempCtx = temp.getContext("2d")!;
-    tempCtx.drawImage(frame, 0, 0);
-
-    let data: ImageData;
-    try { data = tempCtx.getImageData(0, 0, sw, sh); }
-    catch { return 0; }
-
-    let minX = sw, maxX = 0;
-    for (let y = 0; y < sh; y++) {
-      for (let x = 0; x < sw; x++) {
-        if (data.data[(y * sw + x) * 4 + 3] > AssetManager.ALPHA_THRESH) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-        }
-      }
-    }
-    return maxX > minX ? maxX - minX + 1 : 0;
-  }
-
-  /** Rescale a sprite by extracting the content region, scaling it, and
-   *  placing it centered + bottom-anchored in a fresh canvas.
-   *  Previous version scaled the ENTIRE image, causing clipping when the
-   *  scaled dimensions exceeded the canvas (e.g. 64*1.23 = 79 > 64). */
-  private rescaleSprite(frame: DrawTarget, scale: number): HTMLCanvasElement {
+  /**
+   * Rescale a sprite UNIFORMLY — scales the entire image (not just extracted
+   * content) to preserve all internal structure. Anchored at the bottom-center
+   * of the content so feet stay planted.
+   *
+   * This avoids the problems of the old content-extraction approach:
+   * - No edge clipping (borders)
+   * - No internal gap amplification (north-facing split)
+   * - No sub-pixel hole creation from downscaling
+   */
+  private rescaleSpriteUniform(frame: DrawTarget, scale: number): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
       ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
     const sh = frame instanceof HTMLCanvasElement
       ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
 
+    // Measure content bounds for anchoring
     const temp = this.createCanvas(sw, sh);
     const tempCtx = temp.getContext("2d")!;
     tempCtx.drawImage(frame, 0, 0);
@@ -671,37 +660,31 @@ export class AssetManager {
     }
     if (minY >= maxY || minX >= maxX) return temp;
 
-    // Content region dimensions
-    const contentW = maxX - minX + 1;
-    const contentH = maxY - minY + 1;
-
-    // Scaled content dimensions
-    const scaledW = contentW * scale;
-    const scaledH = contentH * scale;
-
     const result = this.createCanvas(sw, sh);
     const ctx = result.getContext("2d")!;
     ctx.imageSmoothingEnabled = true;
     (ctx as any).imageSmoothingQuality = "high";
 
-    // Place scaled content: centered horizontally, feet anchored at bottom (sh - 4)
-    const destX = (sw - scaledW) / 2;
-    const destY = (sh - 4) - scaledH;
+    // Scale the ENTIRE image uniformly (preserves all internal structure)
+    const scaledW = sw * scale;
+    const scaledH = sh * scale;
 
-    // Draw only the content region from the source, scaled into the output
-    ctx.drawImage(
-      frame as CanvasImageSource,
-      minX, minY, contentW, contentH,   // source: content region only
-      destX, destY, scaledW, scaledH    // dest: scaled and positioned
-    );
+    // Anchor: content bottom at (sh - 2), content center at (sw / 2)
+    const contentBottomScaled = maxY * scale;
+    const dy = (sh - 2) - contentBottomScaled;
+    const contentCenterXScaled = ((minX + maxX) / 2) * scale;
+    const dx = sw / 2 - contentCenterXScaled;
+
+    ctx.drawImage(frame as CanvasImageSource, dx, dy, scaledW, scaledH);
 
     // Clean transparent pixels to prevent bilinear dark halos
     try {
       const outData = ctx.getImageData(0, 0, sw, sh);
       const d = outData.data;
       for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] === 0) {
+        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
           d[i] = d[i + 1] = d[i + 2] = 0;
+          d[i + 3] = 0;
         }
       }
       ctx.putImageData(outData, 0, 0);

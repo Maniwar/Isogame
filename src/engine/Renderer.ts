@@ -65,8 +65,7 @@ export class Renderer {
     this.camera = camera;
     this.assets = assets;
 
-    // Disable smoothing for crisp pixel art
-    this.ctx.imageSmoothingEnabled = false;
+    // Smoothing is enabled per-frame in render() before drawing
   }
 
   setHoveredTile(tile: TilePos | null) {
@@ -86,7 +85,6 @@ export class Renderer {
 
     // Camera works in CSS-pixel coordinates
     this.camera.resize(this.cssWidth, this.cssHeight);
-    this.ctx.imageSmoothingEnabled = false;
   }
 
   render(state: GameState) {
@@ -112,8 +110,10 @@ export class Renderer {
     const maxX = Math.min(state.map.width - 1, br.x + pad);
     const maxY = Math.min(state.map.height - 1, br.y + pad);
 
-    // Enable bilinear scaling for all AI-generated art (tiles + sprites)
+    // Defensive reset: ensure clean state at frame start
+    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
 
     // Draw tiles (painter's order: back to front)
     for (let y = minY; y <= maxY; y++) {
@@ -169,74 +169,80 @@ export class Renderer {
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
-    // Fill a base diamond with blended neighbor colors for smooth transitions.
-    // Uses all 8 neighbors (cardinal + diagonal) for smoother terrain blending.
-    // Each sector of the diamond blends toward its adjacent tile's color.
     const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
-    if (baseColor) {
-      // Get all 8 neighbor terrain colors
-      const nTop = this.getNeighborTerrainColor(x, y - 1, state) ?? baseColor;
-      const nRight = this.getNeighborTerrainColor(x + 1, y, state) ?? baseColor;
-      const nBottom = this.getNeighborTerrainColor(x, y + 1, state) ?? baseColor;
-      const nLeft = this.getNeighborTerrainColor(x - 1, y, state) ?? baseColor;
-      const nTopRight = this.getNeighborTerrainColor(x + 1, y - 1, state) ?? baseColor;
-      const nBottomRight = this.getNeighborTerrainColor(x + 1, y + 1, state) ?? baseColor;
-      const nBottomLeft = this.getNeighborTerrainColor(x - 1, y + 1, state) ?? baseColor;
-      const nTopLeft = this.getNeighborTerrainColor(x - 1, y - 1, state) ?? baseColor;
+    const hasAiTiles = assets.getTileVariantCount(tile.terrain) > 1;
 
-      // If all neighbors are the same terrain, use a fast solid fill
-      if (nTop === baseColor && nRight === baseColor &&
-          nBottom === baseColor && nLeft === baseColor &&
-          nTopRight === baseColor && nBottomRight === baseColor &&
-          nBottomLeft === baseColor && nTopLeft === baseColor) {
+    if (baseColor) {
+      if (hasAiTiles) {
+        // AI tiles already include the diamond shape. Use a simple solid fill
+        // at exact dimensions as a gap-filler for anti-aliased edges only.
         ctx.fillStyle = baseColor;
         ctx.beginPath();
-        ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
-        ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
-        ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
-        ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
+        ctx.moveTo(wx, wy - TILE_HALF_H);
+        ctx.lineTo(wx + TILE_HALF_W, wy);
+        ctx.lineTo(wx, wy + TILE_HALF_H);
+        ctx.lineTo(wx - TILE_HALF_W, wy);
         ctx.closePath();
         ctx.fill();
       } else {
-        // 8-sector gradient blend: draw 8 triangles from center to each edge,
-        // blending with both cardinal and diagonal neighbor colors
-        const cx = wx;
-        const cy = wy;
-        const top = { x: wx, y: wy - TILE_HALF_H - 0.5 };
-        const right = { x: wx + TILE_HALF_W + 0.5, y: wy };
-        const bottom = { x: wx, y: wy + TILE_HALF_H + 0.5 };
-        const left = { x: wx - TILE_HALF_W - 0.5, y: wy };
-        // Diamond midpoints (corners of the iso diamond where diagonals meet edges)
-        const topRight = { x: wx + TILE_HALF_W * 0.5 + 0.25, y: wy - TILE_HALF_H * 0.5 - 0.25 };
-        const bottomRight = { x: wx + TILE_HALF_W * 0.5 + 0.25, y: wy + TILE_HALF_H * 0.5 + 0.25 };
-        const bottomLeft = { x: wx - TILE_HALF_W * 0.5 - 0.25, y: wy + TILE_HALF_H * 0.5 + 0.25 };
-        const topLeft = { x: wx - TILE_HALF_W * 0.5 - 0.25, y: wy - TILE_HALF_H * 0.5 - 0.25 };
+        // Procedural tiles: use 8-sector gradient blend for smooth transitions
+        const nTop = this.getNeighborTerrainColor(x, y - 1, state) ?? baseColor;
+        const nRight = this.getNeighborTerrainColor(x + 1, y, state) ?? baseColor;
+        const nBottom = this.getNeighborTerrainColor(x, y + 1, state) ?? baseColor;
+        const nLeft = this.getNeighborTerrainColor(x - 1, y, state) ?? baseColor;
+        const nTopRight = this.getNeighborTerrainColor(x + 1, y - 1, state) ?? baseColor;
+        const nBottomRight = this.getNeighborTerrainColor(x + 1, y + 1, state) ?? baseColor;
+        const nBottomLeft = this.getNeighborTerrainColor(x - 1, y + 1, state) ?? baseColor;
+        const nTopLeft = this.getNeighborTerrainColor(x - 1, y - 1, state) ?? baseColor;
 
-        const drawSector = (p1: {x: number, y: number}, p2: {x: number, y: number}, neighborCol: string) => {
-          const midColor = this.blendColors(baseColor, neighborCol, 0.35);
-          ctx.fillStyle = midColor;
+        if (nTop === baseColor && nRight === baseColor &&
+            nBottom === baseColor && nLeft === baseColor &&
+            nTopRight === baseColor && nBottomRight === baseColor &&
+            nBottomLeft === baseColor && nTopLeft === baseColor) {
+          ctx.fillStyle = baseColor;
           ctx.beginPath();
-          ctx.moveTo(cx, cy);
-          ctx.lineTo(p1.x, p1.y);
-          ctx.lineTo(p2.x, p2.y);
+          ctx.moveTo(wx, wy - TILE_HALF_H);
+          ctx.lineTo(wx + TILE_HALF_W, wy);
+          ctx.lineTo(wx, wy + TILE_HALF_H);
+          ctx.lineTo(wx - TILE_HALF_W, wy);
           ctx.closePath();
           ctx.fill();
-        };
+        } else {
+          const cx = wx;
+          const cy = wy;
+          const top = { x: wx, y: wy - TILE_HALF_H };
+          const right = { x: wx + TILE_HALF_W, y: wy };
+          const bottom = { x: wx, y: wy + TILE_HALF_H };
+          const left = { x: wx - TILE_HALF_W, y: wy };
+          const topRight = { x: wx + TILE_HALF_W * 0.5, y: wy - TILE_HALF_H * 0.5 };
+          const bottomRight = { x: wx + TILE_HALF_W * 0.5, y: wy + TILE_HALF_H * 0.5 };
+          const bottomLeft = { x: wx - TILE_HALF_W * 0.5, y: wy + TILE_HALF_H * 0.5 };
+          const topLeft = { x: wx - TILE_HALF_W * 0.5, y: wy - TILE_HALF_H * 0.5 };
 
-        // 8 sectors, clockwise from top
-        drawSector(top, topRight, this.blendColors(nTop, nTopRight, 0.5));
-        drawSector(topRight, right, this.blendColors(nTopRight, nRight, 0.5));
-        drawSector(right, bottomRight, this.blendColors(nRight, nBottomRight, 0.5));
-        drawSector(bottomRight, bottom, this.blendColors(nBottomRight, nBottom, 0.5));
-        drawSector(bottom, bottomLeft, this.blendColors(nBottom, nBottomLeft, 0.5));
-        drawSector(bottomLeft, left, this.blendColors(nBottomLeft, nLeft, 0.5));
-        drawSector(left, topLeft, this.blendColors(nLeft, nTopLeft, 0.5));
-        drawSector(topLeft, top, this.blendColors(nTopLeft, nTop, 0.5));
+          const drawSector = (p1: {x: number, y: number}, p2: {x: number, y: number}, neighborCol: string) => {
+            const midColor = this.blendColors(baseColor, neighborCol, 0.35);
+            ctx.fillStyle = midColor;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.closePath();
+            ctx.fill();
+          };
+
+          drawSector(top, topRight, this.blendColors(nTop, nTopRight, 0.5));
+          drawSector(topRight, right, this.blendColors(nTopRight, nRight, 0.5));
+          drawSector(right, bottomRight, this.blendColors(nRight, nBottomRight, 0.5));
+          drawSector(bottomRight, bottom, this.blendColors(nBottomRight, nBottom, 0.5));
+          drawSector(bottom, bottomLeft, this.blendColors(nBottom, nBottomLeft, 0.5));
+          drawSector(bottomLeft, left, this.blendColors(nBottomLeft, nLeft, 0.5));
+          drawSector(left, topLeft, this.blendColors(nLeft, nTopLeft, 0.5));
+          drawSector(topLeft, top, this.blendColors(nTopLeft, nTop, 0.5));
+        }
       }
     }
 
-    // Content-aware variant selection: compute neighbor terrain signature
-    // so tiles at terrain borders get consistently different variants
+    // Content-aware variant selection
     let neighborSig = 0;
     if (state) {
       const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -255,7 +261,6 @@ export class Renderer {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
     }
 
-    // Draw tile object if present
     if (tile.object) {
       const obj = assets.getObject(tile.object);
       if (obj) {
