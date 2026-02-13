@@ -112,6 +112,9 @@ export class Renderer {
     const maxX = Math.min(state.map.width - 1, br.x + pad);
     const maxY = Math.min(state.map.height - 1, br.y + pad);
 
+    // Enable bilinear scaling for all AI-generated art (tiles + sprites)
+    ctx.imageSmoothingEnabled = true;
+
     // Draw tiles (painter's order: back to front)
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
@@ -136,9 +139,6 @@ export class Renderer {
       this.drawGroundItem(item.pos, item.itemId);
     }
 
-    // Switch to smooth scaling for character sprites (AI-generated detailed art)
-    ctx.imageSmoothingEnabled = true;
-
     // Draw dead entities (corpses) — flat, faded, with loot indicator
     const corpses = state.entities.filter((e) => e.dead && e.inventory.length > 0);
     for (const corpse of corpses) {
@@ -156,9 +156,6 @@ export class Renderer {
 
     // Draw VFX (projectiles, damage numbers) — in world space
     this.drawVFX(state.vfx);
-
-    // Restore crisp rendering for any subsequent tile/object draws
-    ctx.imageSmoothingEnabled = false;
 
     // Reset for UI drawing — DPR scale so HUD code uses CSS-pixel coordinates.
     ctx.globalAlpha = 1;
