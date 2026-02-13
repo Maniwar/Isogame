@@ -444,7 +444,14 @@ export class Renderer {
     const spriteTop = finalDrawY - sh + TILE_HALF_H;
 
     if (sprite) {
+      // Disable bilinear filtering for sprites: nearest-neighbor prevents
+      // dark halos from blending opaque content with transparent black
+      // (Canvas 2D premultiplies alpha, so alpha=0 pixels are always black
+      // in the blend regardless of their RGB values).
+      // Also gives clean pixel-art aesthetic matching Fallout 2 style.
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
+      ctx.imageSmoothingEnabled = true;
     } else {
       // Fallback: draw a simple colored shape if no sprite found
       ctx.fillStyle = entity.isPlayer ? "#40c040" : entity.isHostile ? "#b83030" : "#d4c4a0";

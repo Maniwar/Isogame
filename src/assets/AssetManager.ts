@@ -529,11 +529,13 @@ export class AssetManager {
   }
 
   /**
-   * Normalize a single frame: zero out transparent pixel RGB to prevent
-   * bilinear dark halos when the renderer scales sprites.
+   * Normalize a single frame: clamp semi-transparent pixels to binary alpha.
    *
-   * Interior hole filling and content normalization are handled by the
-   * asset pipeline (reprocess.py) at build time.
+   * Canvas 2D uses premultiplied alpha internally, so alpha-bleeding (setting
+   * RGB on alpha=0 pixels) doesn't survive — the browser premultiplies to
+   * (0,0,0,0) regardless. Instead, we use binary alpha and the Renderer
+   * disables imageSmoothingEnabled when drawing sprites to eliminate bilinear
+   * dark halos entirely (nearest-neighbor = no edge blending).
    */
   private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
@@ -548,11 +550,14 @@ export class AssetManager {
     try {
       const data = ctx.getImageData(0, 0, sw, sh);
       const d = data.data;
-      // Zero RGB on transparent pixels to prevent dark halos from bilinear interpolation
+      // Binary alpha: fully opaque or fully transparent (no semi-transparent edges
+      // that create dark fringe when the renderer scales sprites)
       for (let i = 0; i < d.length; i += 4) {
         if (d[i + 3] < AssetManager.ALPHA_THRESH) {
           d[i] = d[i + 1] = d[i + 2] = 0;
           d[i + 3] = 0;
+        } else {
+          d[i + 3] = 255;
         }
       }
       ctx.putImageData(data, 0, 0);
