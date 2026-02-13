@@ -652,7 +652,8 @@ export class AssetManager {
 
     const result = this.createCanvas(sw, sh);
     const ctx = result.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
 
     // Place scaled content: centered horizontally, feet anchored at bottom (sh - 4)
     const destX = (sw - scaledW) / 2;

@@ -136,6 +136,9 @@ export class Renderer {
       this.drawGroundItem(item.pos, item.itemId);
     }
 
+    // Switch to smooth scaling for character sprites (AI-generated detailed art)
+    ctx.imageSmoothingEnabled = true;
+
     // Draw dead entities (corpses) — flat, faded, with loot indicator
     const corpses = state.entities.filter((e) => e.dead && e.inventory.length > 0);
     for (const corpse of corpses) {
@@ -153,6 +156,9 @@ export class Renderer {
 
     // Draw VFX (projectiles, damage numbers) — in world space
     this.drawVFX(state.vfx);
+
+    // Restore crisp rendering for any subsequent tile/object draws
+    ctx.imageSmoothingEnabled = false;
 
     // Reset for UI drawing — DPR scale so HUD code uses CSS-pixel coordinates.
     ctx.globalAlpha = 1;
@@ -454,27 +460,36 @@ export class Renderer {
     // Draw name tag — skip player (visible in HUD), only show NPCs.
     // Also skip if the tag would overlap the top-right HUD panel (map name/time).
     if (!entity.isPlayer) {
+      ctx.save();
+      ctx.font = "8px monospace";
+      ctx.textAlign = "center";
+
+      const nameWidth = ctx.measureText(entity.name).width;
+      const halfTagW = nameWidth / 2 + 3;
+
+      // Convert name tag bounding box to screen (CSS) pixel space
       const cam = this.camera;
-      const screenTagX = (drawX - cam.x - cam.shakeOffsetX) * cam.zoom;
-      const screenTagY = (labelY - cam.y - cam.shakeOffsetY) * cam.zoom;
-      const hudRight = this.cssWidth - 10;
-      const hudLeft = this.cssWidth - 210;
-      const hudBottom = 60;
-      const overlapsHUD = screenTagX > hudLeft && screenTagX < hudRight
-                       && screenTagY > 0 && screenTagY < hudBottom;
+      const tagScreenLeft = (drawX - halfTagW - cam.x - cam.shakeOffsetX) * cam.zoom;
+      const tagScreenRight = (drawX + halfTagW - cam.x - cam.shakeOffsetX) * cam.zoom;
+      const tagScreenTop = (labelY - 9 - cam.y - cam.shakeOffsetY) * cam.zoom;
+      const tagScreenBottom = (labelY + 3 - cam.y - cam.shakeOffsetY) * cam.zoom;
+
+      // HUD title panel bounds in CSS pixels (top-right corner)
+      const hudLeft = this.cssWidth - 215;
+      const hudTop = 5;
+      const hudRight = this.cssWidth - 5;
+      const hudBottom = 65;
+
+      const overlapsHUD = tagScreenRight > hudLeft && tagScreenLeft < hudRight
+                       && tagScreenBottom > hudTop && tagScreenTop < hudBottom;
 
       if (!overlapsHUD) {
-        ctx.save();
-        ctx.font = "8px monospace";
-        ctx.textAlign = "center";
-
-        const nameWidth = ctx.measureText(entity.name).width;
         ctx.fillStyle = "rgba(20, 20, 16, 0.6)";
-        ctx.fillRect(drawX - nameWidth / 2 - 3, labelY - 9, nameWidth + 6, 12);
+        ctx.fillRect(drawX - halfTagW, labelY - 9, nameWidth + 6, 12);
         ctx.fillStyle = entity.isHostile ? "#b83030" : "#d4c4a0";
         ctx.fillText(entity.name, drawX, labelY);
-        ctx.restore();
       }
+      ctx.restore();
     }
 
     // Health bar (always show in combat, or when damaged)
