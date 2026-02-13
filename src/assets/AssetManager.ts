@@ -529,13 +529,13 @@ export class AssetManager {
   }
 
   /**
-   * Normalize a single frame: clamp semi-transparent pixels to binary alpha.
-   *
-   * Canvas 2D uses premultiplied alpha internally, so alpha-bleeding (setting
-   * RGB on alpha=0 pixels) doesn't survive — the browser premultiplies to
-   * (0,0,0,0) regardless. Instead, we use binary alpha and the Renderer
-   * disables imageSmoothingEnabled when drawing sprites to eliminate bilinear
-   * dark halos entirely (nearest-neighbor = no edge blending).
+   * Normalize a single frame:
+   * 1. Measure content height to decide if upscaling is needed.
+   * 2. Frames that already fill ≥85% of canvas height → leave alone (prevents
+   *    north-facing split, holes, and border artifacts from unnecessary rescaling).
+   * 3. Undersized frames (e.g. attack at 68% fill) → upscale uniformly so all
+   *    animation frames display at a consistent size.
+   * 4. Clean transparent pixels (binary alpha).
    */
   private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
@@ -543,6 +543,123 @@ export class AssetManager {
     const sh = frame instanceof HTMLCanvasElement
       ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
 
+    const contentH = this.measureContentHeight(frame, sw, sh);
+    if (contentH <= 0) return this.cleanTransparentPixels(frame, sw, sh);
+
+    const targetH = sh * 0.85;
+
+    // NEVER downscale — prevents north-facing split, holes, and border artifacts
+    if (contentH >= targetH) {
+      return this.cleanTransparentPixels(frame, sw, sh);
+    }
+
+    // Only upscale undersized frames (e.g., attack frames at 68% fill)
+    const scale = targetH / contentH;
+    if (scale > 1.5) return this.cleanTransparentPixels(frame, sw, sh); // safety cap
+
+    return this.rescaleSpriteUniform(frame, sw, sh, scale);
+  }
+
+  /**
+   * Measure the height of opaque content in a frame by scanning for the
+   * topmost and bottommost rows with alpha >= ALPHA_THRESH.
+   */
+  private measureContentHeight(frame: DrawTarget, sw: number, sh: number): number {
+    const tmp = this.createCanvas(sw, sh);
+    const ctx = tmp.getContext("2d")!;
+    ctx.drawImage(frame as CanvasImageSource, 0, 0);
+
+    try {
+      const data = ctx.getImageData(0, 0, sw, sh).data;
+      let minY = sh, maxY = 0;
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          if (data[(y * sw + x) * 4 + 3] >= AssetManager.ALPHA_THRESH) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            break; // found opaque pixel in this row, move to next
+          }
+        }
+      }
+      if (minY > maxY) return 0;
+      return maxY - minY + 1;
+    } catch {
+      return sh; // CORS — assume full height
+    }
+  }
+
+  /**
+   * Scale the ENTIRE source image uniformly, anchoring at the bottom-center
+   * of the content. This preserves all internal structure — gaps stay
+   * proportional, edges aren't clipped, no repositioning artifacts.
+   */
+  private rescaleSpriteUniform(
+    frame: DrawTarget, sw: number, sh: number, scale: number
+  ): HTMLCanvasElement {
+    // Measure content bounds for anchoring
+    const tmp = this.createCanvas(sw, sh);
+    const tmpCtx = tmp.getContext("2d")!;
+    tmpCtx.drawImage(frame as CanvasImageSource, 0, 0);
+
+    let minX = sw, maxX = 0, minY = sh, maxY = 0;
+    try {
+      const data = tmpCtx.getImageData(0, 0, sw, sh).data;
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          if (data[(y * sw + x) * 4 + 3] >= AssetManager.ALPHA_THRESH) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+    } catch {
+      return this.cleanTransparentPixels(frame, sw, sh); // CORS fallback
+    }
+
+    if (minX > maxX) return this.cleanTransparentPixels(frame, sw, sh);
+
+    const result = this.createCanvas(sw, sh);
+    const ctx = result.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+
+    // Scale entire image uniformly (preserves ALL internal structure)
+    const scaledW = sw * scale;
+    const scaledH = sh * scale;
+
+    // Anchor: content bottom at (sh - 2), content center at (sw / 2)
+    const contentBottomScaled = maxY * scale;
+    const dy = (sh - 2) - contentBottomScaled;
+    const contentCenterXScaled = ((minX + maxX) / 2) * scale;
+    const dx = sw / 2 - contentCenterXScaled;
+
+    ctx.drawImage(frame as CanvasImageSource, dx, dy, scaledW, scaledH);
+
+    // Clean transparent pixels on the result
+    try {
+      const data = ctx.getImageData(0, 0, sw, sh);
+      const d = data.data;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
+          d[i] = d[i + 1] = d[i + 2] = 0;
+          d[i + 3] = 0;
+        } else {
+          d[i + 3] = 255;
+        }
+      }
+      ctx.putImageData(data, 0, 0);
+    } catch { /* CORS */ }
+
+    return result;
+  }
+
+  /**
+   * Clean transparent pixels: binary alpha (fully opaque or fully transparent).
+   * Prevents dark fringe from premultiplied alpha when the renderer scales sprites.
+   */
+  private cleanTransparentPixels(frame: DrawTarget, sw: number, sh: number): HTMLCanvasElement {
     const canvas = this.createCanvas(sw, sh);
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(frame as CanvasImageSource, 0, 0);
@@ -550,8 +667,6 @@ export class AssetManager {
     try {
       const data = ctx.getImageData(0, 0, sw, sh);
       const d = data.data;
-      // Binary alpha: fully opaque or fully transparent (no semi-transparent edges
-      // that create dark fringe when the renderer scales sprites)
       for (let i = 0; i < d.length; i += 4) {
         if (d[i + 3] < AssetManager.ALPHA_THRESH) {
           d[i] = d[i + 1] = d[i + 2] = 0;
