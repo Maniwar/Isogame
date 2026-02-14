@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Auto-deploy after asset generation completes.
+  # The generate workflow pushes with github-actions[bot] which does NOT
+  # trigger on:push events, so we need this explicit workflow_run trigger.
+  workflow_run:
+    workflows: ["Generate Game Assets (Gemini)"]
+    types: [completed]
 
 permissions:
   contents: read
@@ -17,8 +23,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Skip deploy if the generate workflow failed or was cancelled
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
+      # Always check out latest main (important for workflow_run trigger
+      # where the default ref may not include the just-pushed assets)
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
