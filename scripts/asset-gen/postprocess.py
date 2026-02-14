@@ -197,6 +197,163 @@ def cleanup_transparency(image: Image.Image, threshold: int = 10) -> Image.Image
     return Image.fromarray(arr, "RGBA")
 
 
+def fill_interior_holes(image: Image.Image) -> Image.Image:
+    """Fill transparent holes inside character sprites.
+
+    AI-generated sprites often have interior transparent pixels (30-50% of the
+    character bounding box) which makes tiles visible through the character.
+
+    Algorithm:
+    1. Build a binary alpha mask (opaque vs transparent)
+    2. Apply morphological closing (dilate then erode) to seal thin gaps
+       between body parts (legs, arms, etc.) that would let the flood fill
+       leak into the interior
+    3. Flood-fill from border on the closed mask to find the exterior
+    4. Any pixel that is transparent in the original AND inside the closed
+       silhouette is an interior hole
+    5. Fill holes by iterative dilation from neighboring opaque pixels
+    """
+    if image.mode != "RGBA":
+        return image
+
+    arr = np.array(image, dtype=np.uint8).copy()
+    alpha = arr[:, :, 3]
+    h, w = alpha.shape
+
+    # Build binary mask: True = opaque
+    opaque = alpha > 0
+
+    if not opaque.any():
+        return image
+
+    # Morphological closing: dilate then erode the opaque mask.
+    # This seals thin gaps (1-3px) between body parts that would otherwise
+    # allow the flood fill to leak into the character interior.
+    close_radius = 3
+    closed = opaque.copy()
+
+    # Dilate: expand opaque regions
+    for _ in range(close_radius):
+        dilated = closed.copy()
+        if h > 1:
+            dilated[1:, :] |= closed[:-1, :]
+            dilated[:-1, :] |= closed[1:, :]
+        if w > 1:
+            dilated[:, 1:] |= closed[:, :-1]
+            dilated[:, :-1] |= closed[:, 1:]
+        closed = dilated
+
+    # Erode: shrink back (but gaps stay sealed)
+    for _ in range(close_radius):
+        eroded = closed.copy()
+        if h > 1:
+            eroded[1:, :] &= closed[:-1, :]
+            eroded[:-1, :] &= closed[1:, :]
+        if w > 1:
+            eroded[:, 1:] &= closed[:, :-1]
+            eroded[:, :-1] &= closed[:, 1:]
+        closed = eroded
+
+    # Flood-fill from border on the CLOSED mask to find exterior
+    from collections import deque
+    exterior = np.zeros((h, w), dtype=bool)
+    queue = deque()
+
+    # Seed from all border transparent pixels (on closed mask)
+    for y in range(h):
+        if not closed[y, 0]:
+            exterior[y, 0] = True
+            queue.append((y, 0))
+        if not closed[y, w - 1]:
+            exterior[y, w - 1] = True
+            queue.append((y, w - 1))
+    for x in range(1, w - 1):
+        if not closed[0, x]:
+            exterior[0, x] = True
+            queue.append((0, x))
+        if not closed[h - 1, x]:
+            exterior[h - 1, x] = True
+            queue.append((h - 1, x))
+
+    # BFS flood fill on closed mask
+    while queue:
+        cy, cx = queue.popleft()
+        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            ny, nx = cy + dy, cx + dx
+            if 0 <= ny < h and 0 <= nx < w and not exterior[ny, nx] and not closed[ny, nx]:
+                exterior[ny, nx] = True
+                queue.append((ny, nx))
+
+    # Interior holes: transparent in ORIGINAL and NOT exterior in closed mask
+    interior = ~opaque & ~exterior
+    hole_count = int(np.sum(interior))
+    if hole_count == 0:
+        return image
+
+    # Fill holes by iterative nearest-neighbor dilation.
+    # Each iteration expands opaque pixels into adjacent hole pixels,
+    # copying the average color of neighboring opaque pixels.
+    filled = arr.copy()
+    remaining = interior.copy()
+
+    for _ in range(max(h, w)):
+        if not remaining.any():
+            break
+
+        # Find hole pixels adjacent to filled pixels
+        filled_mask = filled[:, :, 3] > 0
+        neighbors = np.zeros_like(remaining)
+        if h > 1:
+            neighbors[1:, :] |= filled_mask[:-1, :]
+            neighbors[:-1, :] |= filled_mask[1:, :]
+        if w > 1:
+            neighbors[:, 1:] |= filled_mask[:, :-1]
+            neighbors[:, :-1] |= filled_mask[:, 1:]
+
+        # Pixels to fill this iteration: holes with at least one opaque neighbor
+        to_fill = remaining & neighbors
+        if not to_fill.any():
+            break
+
+        # For each pixel to fill, average the colors of opaque neighbors
+        ys, xs = np.nonzero(to_fill)
+        for y, x in zip(ys, xs):
+            colors = []
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < h and 0 <= nx < w and filled[ny, nx, 3] > 0:
+                    colors.append(filled[ny, nx, :3].astype(np.int32))
+            if colors:
+                avg = np.mean(colors, axis=0).astype(np.uint8)
+                filled[y, x, :3] = avg
+                filled[y, x, 3] = 255
+
+        remaining[to_fill] = False
+
+    # Any remaining isolated holes: fill with nearest opaque pixel
+    if remaining.any():
+        ys, xs = np.nonzero(remaining)
+        for y, x in zip(ys, xs):
+            for radius in range(1, max(h, w)):
+                found = False
+                for dy in range(-radius, radius + 1):
+                    for dx in range(-radius, radius + 1):
+                        if abs(dy) != radius and abs(dx) != radius:
+                            continue
+                        ny, nx = y + dy, x + dx
+                        if 0 <= ny < h and 0 <= nx < w and filled[ny, nx, 3] > 0:
+                            filled[y, x, :3] = filled[ny, nx, :3]
+                            filled[y, x, 3] = 255
+                            found = True
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+
+    return Image.fromarray(filled, "RGBA")
+
+
 def assemble_spritesheet(
     frames: list[Image.Image],
     columns: int | None = None,
@@ -258,11 +415,21 @@ def find_content_bbox(image: Image.Image, threshold: int = 10) -> tuple[int, int
     return (left, top, right, bottom)
 
 
-def extract_and_center(region: Image.Image, target_w: int, target_h: int) -> Image.Image:
+def extract_and_center(region: Image.Image, target_w: int, target_h: int,
+                       unified_bbox: tuple[int, int, int, int] | None = None) -> Image.Image:
     """Extract content from a region and place it bottom-center in a target-size canvas.
     Bottom-center anchoring keeps character feet at a consistent position
-    for correct placement on isometric tiles."""
-    bbox = find_content_bbox(region)
+    for correct placement on isometric tiles.
+
+    If unified_bbox is provided, crop to that region instead of auto-detecting.
+    This ensures all frames of a character use the same crop window for
+    consistent sizing and positioning across animation frames.
+    """
+    if unified_bbox is not None:
+        bbox = unified_bbox
+    else:
+        bbox = find_content_bbox(region)
+
     if bbox is None:
         return Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
 
@@ -432,7 +599,8 @@ def slice_spritesheet(
     1. Detects natural grid boundaries using alpha channel analysis
     2. Extracts each cell region
     3. Finds the actual character content within each cell
-    4. Centers the content in the target cell size
+    4. Centers the content bottom-center in the target cell size
+       (feet anchored at bottom for consistent isometric placement)
 
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
@@ -449,7 +617,7 @@ def slice_spritesheet(
             x, y, w, h = grid[r][c]
             # Extract the raw region from the sheet
             region = sheet.crop((x, y, x + w, y + h))
-            # Find content and center it in target cell
+            # Find content and center it bottom-center in target cell
             frame = extract_and_center(region, cell_w, cell_h)
             row_frames.append(frame)
         frames.append(row_frames)
@@ -465,6 +633,9 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     are tuned to catch that range while preserving brown/tan character
     details.  This runs BEFORE palette reduction so the raw Gemini colors
     are still present.
+
+    Also catches near-uniform background colors by looking for large
+    contiguous regions of similar color along the image borders.
     """
     arr = np.array(image.convert("RGBA"))
     r = arr[:, :, 0].astype(np.int16)
@@ -474,6 +645,29 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     # Using int16 to avoid overflow when multiplying.
     is_green = (g > 100) & (g > r + 20) & (g > b + 30)
     arr[is_green, 3] = 0
+
+    # Second pass: detect dominant border color and remove it.
+    # Some sheets have a non-standard green that passes RGB checks
+    # but also have near-uniform background colors that should be removed.
+    h, w = arr.shape[:2]
+    border_pixels = np.concatenate([
+        arr[0, :, :3],         # top row
+        arr[h-1, :, :3],       # bottom row
+        arr[:, 0, :3],         # left col
+        arr[:, w-1, :3],       # right col
+    ], axis=0).astype(np.float32)
+
+    if len(border_pixels) > 0:
+        # Find median border color
+        median_color = np.median(border_pixels, axis=0)
+        # Remove pixels within a tolerance of the median border color
+        diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
+        is_bg = diff < 40  # 40 = Euclidean distance tolerance
+        # Only apply if the border color is significantly present (>30% of image)
+        bg_fraction = np.sum(is_bg) / (h * w)
+        if bg_fraction > 0.30:
+            arr[is_bg, 3] = 0
+
     return Image.fromarray(arr, "RGBA")
 
 
@@ -595,6 +789,7 @@ def slice_and_save_character_sheet(
 
             # Post-process each frame
             frame = cleanup_transparency(frame)
+            frame = fill_interior_holes(frame)
             if apply_palette:
                 palette_img = build_palette_image(config)
                 frame = reduce_palette(frame, palette_img)

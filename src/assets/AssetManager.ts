@@ -575,62 +575,257 @@ export class AssetManager {
   }
 
   /**
-   * Post-load normalization: normalize EVERY frame independently so that
-   * each frame's content fills exactly 85% of the frame height.
-   * This fixes Gemini-generated sprites that have inconsistent content
-   * sizes across animations (e.g. raider attack frames much smaller than idle).
+   * Post-load normalization: fill interior holes and apply per-character
+   * consistent scaling so all animation frames have the same size.
+   *
+   * For each character sprite key:
+   * 1. Fill interior transparent holes (prevents tiles showing through characters)
+   * 2. Find the maximum content height across ALL frames for this character
+   * 3. Use that as the reference to compute a single uniform scale factor
+   * 4. Apply the same scale to all frames for visual consistency
    */
   private normalizeCharacterSprites() {
     for (const [spriteKey, animData] of this.animFrames) {
-      // Normalize every animation frame independently
+      // Phase 1: Fill interior holes in all frames
       for (const [, dirMap] of animData) {
         for (const [dir, frame] of dirMap) {
-          dirMap.set(dir, this.normalizeFrame(frame));
+          dirMap.set(dir, this.fillInteriorHoles(frame));
         }
       }
-      // Also normalize static sprites for this key
       const staticMap = this.sprites.get(spriteKey);
       if (staticMap) {
         for (const [dir, frame] of staticMap) {
-          staticMap.set(dir, this.normalizeFrame(frame));
+          staticMap.set(dir, this.fillInteriorHoles(frame));
+        }
+      }
+
+      // Phase 2: Compute the reference content height from the LARGEST frame
+      // (typically idle) so all frames share the same scale factor.
+      let maxContentH = 0;
+      let refSh = 0;
+      for (const [, dirMap] of animData) {
+        for (const [, frame] of dirMap) {
+          const sw = frame instanceof HTMLCanvasElement
+            ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+          const sh = frame instanceof HTMLCanvasElement
+            ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+          const ch = this.measureContentHeight(frame, sw, sh);
+          if (ch > maxContentH) {
+            maxContentH = ch;
+            refSh = sh;
+          }
+        }
+      }
+
+      // Phase 3: Compute a single scale factor from the reference
+      if (maxContentH <= 0 || refSh <= 0) continue;
+      const targetH = refSh * 0.85;
+      let scale = 1;
+      if (maxContentH < targetH) {
+        scale = targetH / maxContentH;
+        if (scale > 1.5) scale = 1; // safety cap
+      }
+
+      // Phase 4: Apply the same scale to ALL frames for this character
+      if (scale > 1) {
+        for (const [, dirMap] of animData) {
+          for (const [dir, frame] of dirMap) {
+            const sw = frame instanceof HTMLCanvasElement
+              ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+            const sh = frame instanceof HTMLCanvasElement
+              ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+            dirMap.set(dir, this.rescaleSpriteUniform(frame, sw, sh, scale));
+          }
+        }
+        if (staticMap) {
+          for (const [dir, frame] of staticMap) {
+            const sw = frame instanceof HTMLCanvasElement
+              ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+            const sh = frame instanceof HTMLCanvasElement
+              ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+            staticMap.set(dir, this.rescaleSpriteUniform(frame, sw, sh, scale));
+          }
+        }
+      } else {
+        // No scaling needed — just copy to canvas for consistent DrawTarget type
+        for (const [, dirMap] of animData) {
+          for (const [dir, frame] of dirMap) {
+            if (!(frame instanceof HTMLCanvasElement)) {
+              const sw = (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+              const sh = (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+              dirMap.set(dir, this.copyToCanvas(frame, sw, sh));
+            }
+          }
+        }
+        if (staticMap) {
+          for (const [dir, frame] of staticMap) {
+            if (!(frame instanceof HTMLCanvasElement)) {
+              const sw = (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
+              const sh = (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
+              staticMap.set(dir, this.copyToCanvas(frame, sw, sh));
+            }
+          }
         }
       }
     }
   }
 
   /**
-   * Normalize a single frame: NO pixel manipulation.
+   * Fill interior transparent holes in a sprite frame.
    *
-   * Previous versions used binary alpha clamping (alpha < threshold → 0,
-   * else → 255) which destroyed semi-transparent shading and created visible
-   * holes in character sprites. The renderer uses bilinear smoothing with
-   * proper premultiplied alpha, so dark halos are not an issue — sprites
-   * can be used as-is from the Gemini pipeline.
+   * AI-generated sprites often have transparent pixels inside the character
+   * silhouette (30-50% of the bounding box), making tiles visible through
+   * the character.
    *
-   * Only upscales genuinely undersized frames (attack frames at <85% fill)
-   * to keep animation sizes consistent.
+   * Uses morphological closing (dilate then erode) to seal thin gaps between
+   * body parts before flood-filling from the border. This prevents the flood
+   * fill from leaking through thin gaps between legs/arms.
    */
-  private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
+  private fillInteriorHoles(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
       ? frame.width : (frame as HTMLImageElement).naturalWidth || (frame as HTMLImageElement).width;
     const sh = frame instanceof HTMLCanvasElement
       ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
 
-    const contentH = this.measureContentHeight(frame, sw, sh);
-    if (contentH <= 0) return this.copyToCanvas(frame, sw, sh);
+    const canvas = this.createCanvas(sw, sh);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(frame as CanvasImageSource, 0, 0);
 
-    const targetH = sh * 0.85;
+    try {
+      const imageData = ctx.getImageData(0, 0, sw, sh);
+      const data = imageData.data;
+      const total = sw * sh;
 
-    // Frames that already fill ≥85% of canvas height → use as-is
-    if (contentH >= targetH) {
-      return this.copyToCanvas(frame, sw, sh);
+      // Build alpha mask
+      const opaque = new Uint8Array(total);
+      for (let i = 0; i < total; i++) {
+        opaque[i] = data[i * 4 + 3] > 0 ? 1 : 0;
+      }
+
+      // Morphological closing: dilate then erode (radius=3)
+      // Seals thin gaps between body parts so flood fill doesn't leak inside
+      const CLOSE_RADIUS = 3;
+      let closed = new Uint8Array(opaque);
+
+      for (let step = 0; step < CLOSE_RADIUS; step++) {
+        const next = new Uint8Array(closed);
+        for (let i = 0; i < total; i++) {
+          if (closed[i]) continue;
+          const y = (i / sw) | 0;
+          const x = i % sw;
+          if ((y > 0 && closed[i - sw]) ||
+              (y < sh - 1 && closed[i + sw]) ||
+              (x > 0 && closed[i - 1]) ||
+              (x < sw - 1 && closed[i + 1])) {
+            next[i] = 1;
+          }
+        }
+        closed = next;
+      }
+      for (let step = 0; step < CLOSE_RADIUS; step++) {
+        const next = new Uint8Array(closed);
+        for (let i = 0; i < total; i++) {
+          if (!closed[i]) continue;
+          const y = (i / sw) | 0;
+          const x = i % sw;
+          if ((y > 0 && !closed[i - sw]) ||
+              (y < sh - 1 && !closed[i + sw]) ||
+              (x > 0 && !closed[i - 1]) ||
+              (x < sw - 1 && !closed[i + 1])) {
+            next[i] = 0;
+          }
+        }
+        closed = next;
+      }
+
+      // Flood-fill from border on closed mask
+      const exterior = new Uint8Array(total);
+      const queue: number[] = [];
+
+      for (let y = 0; y < sh; y++) {
+        const l = y * sw, r = y * sw + sw - 1;
+        if (!closed[l]) { exterior[l] = 1; queue.push(l); }
+        if (!closed[r]) { exterior[r] = 1; queue.push(r); }
+      }
+      for (let x = 1; x < sw - 1; x++) {
+        const t = x, b = (sh - 1) * sw + x;
+        if (!closed[t]) { exterior[t] = 1; queue.push(t); }
+        if (!closed[b]) { exterior[b] = 1; queue.push(b); }
+      }
+
+      let head = 0;
+      while (head < queue.length) {
+        const idx = queue[head++];
+        const y = (idx / sw) | 0;
+        const x = idx % sw;
+        const nb = [
+          y > 0 ? idx - sw : -1,
+          y < sh - 1 ? idx + sw : -1,
+          x > 0 ? idx - 1 : -1,
+          x < sw - 1 ? idx + 1 : -1,
+        ];
+        for (const n of nb) {
+          if (n >= 0 && !exterior[n] && !closed[n]) {
+            exterior[n] = 1;
+            queue.push(n);
+          }
+        }
+      }
+
+      // Interior: transparent in original AND not exterior
+      let holeCount = 0;
+      for (let i = 0; i < total; i++) {
+        if (!opaque[i] && !exterior[i]) holeCount++;
+      }
+      if (holeCount === 0) return canvas;
+
+      // Fill holes by dilation from opaque neighbors
+      const filled = new Uint8Array(opaque);
+      const remaining = new Uint8Array(total);
+      for (let i = 0; i < total; i++) {
+        remaining[i] = (!opaque[i] && !exterior[i]) ? 1 : 0;
+      }
+
+      for (let iter = 0; iter < Math.max(sw, sh); iter++) {
+        const toFill: number[] = [];
+        for (let i = 0; i < total; i++) {
+          if (!remaining[i]) continue;
+          const y = (i / sw) | 0;
+          const x = i % sw;
+          if ((y > 0 && filled[i - sw]) ||
+              (y < sh - 1 && filled[i + sw]) ||
+              (x > 0 && filled[i - 1]) ||
+              (x < sw - 1 && filled[i + 1])) {
+            toFill.push(i);
+          }
+        }
+        if (toFill.length === 0) break;
+
+        for (const i of toFill) {
+          const y = (i / sw) | 0;
+          const x = i % sw;
+          let rS = 0, gS = 0, bS = 0, c = 0;
+          if (y > 0 && filled[i - sw]) { rS += data[(i - sw) * 4]; gS += data[(i - sw) * 4 + 1]; bS += data[(i - sw) * 4 + 2]; c++; }
+          if (y < sh - 1 && filled[i + sw]) { rS += data[(i + sw) * 4]; gS += data[(i + sw) * 4 + 1]; bS += data[(i + sw) * 4 + 2]; c++; }
+          if (x > 0 && filled[i - 1]) { rS += data[(i - 1) * 4]; gS += data[(i - 1) * 4 + 1]; bS += data[(i - 1) * 4 + 2]; c++; }
+          if (x < sw - 1 && filled[i + 1]) { rS += data[(i + 1) * 4]; gS += data[(i + 1) * 4 + 1]; bS += data[(i + 1) * 4 + 2]; c++; }
+          if (c > 0) {
+            data[i * 4] = (rS / c + 0.5) | 0;
+            data[i * 4 + 1] = (gS / c + 0.5) | 0;
+            data[i * 4 + 2] = (bS / c + 0.5) | 0;
+            data[i * 4 + 3] = 255;
+            filled[i] = 1;
+            remaining[i] = 0;
+          }
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    } catch {
+      // Canvas security error — return as-is
     }
 
-    // Only upscale undersized frames (e.g., attack frames at 68% fill)
-    const scale = targetH / contentH;
-    if (scale > 1.5) return this.copyToCanvas(frame, sw, sh); // safety cap
-
-    return this.rescaleSpriteUniform(frame, sw, sh, scale);
+    return canvas;
   }
 
   /** Copy a frame to a canvas without any pixel manipulation. */
