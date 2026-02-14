@@ -931,17 +931,106 @@ def process_portraits(config: dict, apply_palette: bool = True) -> int:
 # CLI
 # ---------------------------------------------------------------------------
 
+def process_terrain_textures(config: dict, apply_palette: bool = True) -> int:
+    """Process seamless rectangular terrain textures (preferred format).
+
+    These are large rectangular textures — NOT diamond-shaped.
+    The game engine uses them as CanvasPattern fills, clipping to diamond
+    shapes at render time. This produces a cohesive, continuous landscape
+    instead of individually stamped tiles.
+
+    Input: output/tiles/textures/{terrain}-texture.png (1024×1024)
+    Output: processed/tiles/textures/{terrain}-texture.png (256×256)
+    Water input: output/tiles/textures/water-texture.png (1024×1024, 2×2 grid)
+    Water output: 4 individual frames at 256×256 each
+
+    No diamond masking, no transparency — fully opaque rectangular images.
+    """
+    target_size = 256
+    processed = 0
+
+    textures_dir = OUTPUT_DIR / "tiles" / "textures"
+    dst_dir = PROCESSED_DIR / "tiles" / "textures"
+
+    if not textures_dir.exists():
+        return 0
+
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    texture_meta: dict[str, str | list[str]] = {}
+
+    for tex_path in sorted(textures_dir.glob("*-texture.png")):
+        key = tex_path.stem.replace("-texture", "")
+        print(f"  Processing terrain texture: {tex_path.name} ({key})")
+
+        img = Image.open(tex_path).convert("RGB")
+
+        if key == "water":
+            # Water: 2×2 grid of animation frames
+            sw, sh = img.size
+            cell_w = sw // 2
+            cell_h = sh // 2
+            frame_files = []
+
+            for idx in range(4):
+                row = idx // 2
+                col = idx % 2
+                x = col * cell_w
+                y = row * cell_h
+
+                cell = img.crop((x, y, x + cell_w, y + cell_h))
+                cell = cell.resize((target_size, target_size), Image.Resampling.LANCZOS)
+
+                if apply_palette:
+                    palette_img = build_palette_image(config)
+                    cell_rgba = cell.convert("RGBA")
+                    cell_rgba = reduce_palette(cell_rgba, palette_img)
+                    cell = cell_rgba.convert("RGB")
+
+                filename = f"water-{idx + 1:02d}.png"
+                cell.save(dst_dir / filename, "PNG")
+                frame_files.append(filename)
+                processed += 1
+
+            texture_meta["water"] = frame_files
+            print(f"    Water: {len(frame_files)} animation frames")
+        else:
+            # Standard terrain: single seamless texture
+            img = img.resize((target_size, target_size), Image.Resampling.LANCZOS)
+
+            if apply_palette:
+                palette_img = build_palette_image(config)
+                img_rgba = img.convert("RGBA")
+                img_rgba = reduce_palette(img_rgba, palette_img)
+                img = img_rgba.convert("RGB")
+
+            filename = f"{key}-texture.png"
+            img.save(dst_dir / filename, "PNG")
+            texture_meta[key] = filename
+            processed += 1
+
+    # Save metadata for deploy step
+    if texture_meta:
+        meta_path = PROCESSED_DIR / "tiles" / "_texture_meta.json"
+        meta_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(meta_path, "w") as f:
+            json.dump(texture_meta, f, indent=2)
+        print(f"\n  Texture metadata: {meta_path}")
+
+    return processed
+
+
 STEP_MAP = {
     "tiles": process_tiles,
     "tile_sheets": process_tile_sheets,
+    "terrain_textures": process_terrain_textures,
     "sprites": process_sprites,
     "weapons": process_weapons,
     "items": process_items,
     "portraits": process_portraits,
 }
 
-# Default categories when --category=all (excludes deprecated weapons and legacy tiles)
-DEFAULT_CATEGORIES = ["tile_sheets", "sprites", "items", "portraits"]
+# Default categories when --category=all
+DEFAULT_CATEGORIES = ["terrain_textures", "tile_sheets", "sprites", "items", "portraits"]
 
 
 def main():
