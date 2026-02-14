@@ -1003,5 +1003,20 @@
     "npc_sheriff": "/assets/portraits/sheriff-morgan.png",
     "npc_doc": "/assets/portraits/doc-hendricks.png",
     "npc_merchant": "/assets/portraits/scrap.png"
+  },
+  "terrain_textures": {
+    "Concrete": "/assets/tiles/concrete-texture.png",
+    "CrackedEarth": "/assets/tiles/cracked-earth-texture.png",
+    "Dirt": "/assets/tiles/dirt-texture.png",
+    "Grass": "/assets/tiles/grass-texture.png",
+    "Road": "/assets/tiles/road-texture.png",
+    "Rubble": "/assets/tiles/rubble-texture.png",
+    "Sand": "/assets/tiles/sand-texture.png",
+    "Water": [
+      "/assets/tiles/water-01.png",
+      "/assets/tiles/water-02.png",
+      "/assets/tiles/water-03.png",
+      "/assets/tiles/water-04.png"
+    ]
   }
 }
