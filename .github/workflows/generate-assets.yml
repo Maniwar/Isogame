@@ -11,7 +11,9 @@ on:
         type: choice
         options:
           - all
+          - terrain_textures
           - tiles
+          - tile_sheets
           - characters
           - items
           - portraits
@@ -121,12 +123,16 @@ jobs:
             python3 -c "
           import json
           m = json.load(open('public/assets/manifest.json'))
-          for section in ('sprites', 'animations', 'tiles', 'items', 'portraits'):
+          for section in ('terrain_textures', 'sprites', 'animations', 'tiles', 'items', 'portraits'):
               if section in m:
                   keys = list(m[section].keys())
                   if section == 'animations':
                       frames = sum(sum(len(d) for d in a.values()) for a in m[section].values())
                       print(f'{section}: {len(keys)} characters, {frames} total frames')
+                  elif section == 'terrain_textures':
+                      water = [k for k, v in m[section].items() if isinstance(v, list)]
+                      static = [k for k, v in m[section].items() if isinstance(v, str)]
+                      print(f'{section}: {len(static)} static + {len(water)} animated = {len(keys)} terrains')
                   else:
                       print(f'{section}: {len(keys)} entries')
           "
