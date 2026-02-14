@@ -164,29 +164,16 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  private tileRenderPathLogged = false;
-
   private drawTile(x: number, y: number, tile: Tile, state?: GameState) {
     const { ctx, assets } = this;
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Preferred path: pattern fill + diamond clip (only when AI terrain textures
-    // are loaded from the manifest). Procedural rectangular textures are always
-    // generated as fallback, but we only use pattern mode when real AI textures
-    // exist — otherwise we fall through to the legacy diamond tile path which
-    // includes AI diamond tiles from the manifest's "tiles" section.
-    const usePatternMode = assets.hasTerrainTextureMode();
-    const pattern = usePatternMode
-      ? assets.getTerrainPattern(tile.terrain, ctx)
-      : null;
-
-    if (!this.tileRenderPathLogged) {
-      this.tileRenderPathLogged = true;
-      const variants = assets.getTileVariantCount(tile.terrain);
-      console.log(`[Renderer] Tile render path: ${usePatternMode ? "PATTERN" : "LEGACY DIAMOND"}, terrain=${Terrain[tile.terrain]}, variants=${variants}`);
-    }
+    // Step 1: Always try pattern fill first — procedural textures are always
+    // generated, giving seamless terrain across tile boundaries.
+    // For water, patterns cycle through multiple animated frames.
+    const pattern = assets.getTerrainPattern(tile.terrain, ctx);
 
     if (pattern) {
       ctx.save();
@@ -201,7 +188,7 @@ export class Renderer {
       ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
       ctx.restore();
     } else {
-      // Fallback: legacy diamond tile rendering (procedural or old AI tiles)
+      // Fallback: solid color diamond if no pattern available
       const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
       if (baseColor) {
         ctx.fillStyle = baseColor;
@@ -213,23 +200,29 @@ export class Renderer {
         ctx.closePath();
         ctx.fill();
       }
+    }
 
-      let neighborSig = 0;
-      if (state) {
-        const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-        for (let i = 0; i < cardinalDirs.length; i++) {
-          const nx = x + cardinalDirs[i][0];
-          const ny = y + cardinalDirs[i][1];
-          const nTile = state.map.tiles[ny]?.[nx];
-          if (!nTile || nTile.terrain !== tile.terrain) {
-            neighborSig |= (1 << i);
+    // Step 2: Overlay AI diamond tiles on top (if loaded from manifest).
+    // Skip for water — water uses pattern-based animation instead of sprites.
+    if (tile.terrain !== Terrain.Water) {
+      const aiTileCount = assets.getTileVariantCount(tile.terrain);
+      if (aiTileCount > 1) {
+        let neighborSig = 0;
+        if (state) {
+          const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+          for (let i = 0; i < cardinalDirs.length; i++) {
+            const nx = x + cardinalDirs[i][0];
+            const ny = y + cardinalDirs[i][1];
+            const nTile = state.map.tiles[ny]?.[nx];
+            if (!nTile || nTile.terrain !== tile.terrain) {
+              neighborSig |= (1 << i);
+            }
           }
         }
-      }
-
-      const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
-      if (sprite) {
-        ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+        const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
+        if (sprite) {
+          ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+        }
       }
     }
 
