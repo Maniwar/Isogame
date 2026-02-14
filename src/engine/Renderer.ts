@@ -164,6 +164,8 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  private tileRenderPathLogged = false;
+
   private drawTile(x: number, y: number, tile: Tile, state?: GameState) {
     const { ctx, assets } = this;
     const wx = (x - y) * TILE_HALF_W;
@@ -175,9 +177,16 @@ export class Renderer {
     // generated as fallback, but we only use pattern mode when real AI textures
     // exist — otherwise we fall through to the legacy diamond tile path which
     // includes AI diamond tiles from the manifest's "tiles" section.
-    const pattern = assets.hasTerrainTextureMode()
+    const usePatternMode = assets.hasTerrainTextureMode();
+    const pattern = usePatternMode
       ? assets.getTerrainPattern(tile.terrain, ctx)
       : null;
+
+    if (!this.tileRenderPathLogged) {
+      this.tileRenderPathLogged = true;
+      const variants = assets.getTileVariantCount(tile.terrain);
+      console.log(`[Renderer] Tile render path: ${usePatternMode ? "PATTERN" : "LEGACY DIAMOND"}, terrain=${Terrain[tile.terrain]}, variants=${variants}`);
+    }
 
     if (pattern) {
       ctx.save();

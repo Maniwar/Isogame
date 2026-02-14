@@ -123,6 +123,12 @@ export class AssetManager {
             `[AssetManager] ${this.totalToLoad - this.loadedCount} assets failed to load`,
           );
         }
+        // Log tile variant details to diagnose loading issues
+        console.log(`[AssetManager] Terrain texture mode: ${this.hasTerrainTextures}`);
+        for (const [terrainVal, variants] of this.tiles) {
+          const name = Terrain[terrainVal] ?? terrainVal;
+          console.log(`[AssetManager] Tile variants for ${name}: ${variants.length} (1 procedural + ${variants.length - 1} AI)`);
+        }
         if (this.hasAnimations) {
           const animKeys = [...this.animFrames.keys()];
           console.log(`[AssetManager] Animation frames loaded for: ${animKeys.join(", ")}`);
