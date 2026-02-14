@@ -20,6 +20,7 @@ type DrawTarget = HTMLCanvasElement | HTMLImageElement;
 
 interface AssetManifest {
   tiles?: Record<string, string | string[]>;
+  terrain_textures?: Record<string, string | string[]>;
   sprites?: Record<string, Record<string, string>>;
   animations?: Record<string, Record<string, Record<string, string>>>;
   weapons?: Record<string, Record<string, Record<string, string>>>;
@@ -29,8 +30,20 @@ interface AssetManifest {
 }
 
 export class AssetManager {
-  /** Tile variants: each terrain type has an array of visual variants */
+  /** Legacy diamond tile variants (kept for backward compatibility) */
   private tiles = new Map<Terrain, DrawTarget[]>();
+  /**
+   * Rectangular terrain textures — the correct tile format.
+   * These are seamless tileable textures used as CanvasPattern fills.
+   * The renderer clips the continuous pattern to diamond shapes at draw time,
+   * so adjacent tiles share the same texture surface seamlessly.
+   */
+  private terrainTextures = new Map<Terrain, DrawTarget[]>();
+  /** Cached CanvasPattern objects for each terrain (created lazily) */
+  private terrainPatterns = new Map<Terrain, CanvasPattern>();
+  /** Whether terrain textures (rectangular) are available */
+  private hasTerrainTextures = false;
+
   private sprites = new Map<string, Map<Direction, DrawTarget>>();
   private objects = new Map<string, DrawTarget>();
   private items = new Map<string, DrawTarget>();
@@ -139,6 +152,37 @@ export class AssetManager {
    * the hash ensures interior tiles and border tiles get consistently
    * different variants, creating natural visual patterns.
    */
+  /** Whether rectangular terrain textures are loaded (pattern-fill mode) */
+  hasTerrainTextureMode(): boolean {
+    return this.hasTerrainTextures;
+  }
+
+  /**
+   * Get a CanvasPattern for a terrain type. The pattern tiles seamlessly
+   * in world space, so adjacent tiles show continuous terrain.
+   *
+   * For water, returns a time-varying pattern to animate the surface.
+   * Non-water patterns are cached for performance.
+   */
+  getTerrainPattern(terrain: Terrain, ctx: CanvasRenderingContext2D): CanvasPattern | null {
+    const textures = this.terrainTextures.get(terrain);
+    if (!textures || textures.length === 0) return null;
+
+    // Water animates — cycle through frames, no caching
+    if (terrain === Terrain.Water && textures.length > 1) {
+      const frameIndex = Math.floor(Date.now() / 500) % textures.length;
+      return ctx.createPattern(textures[frameIndex] as CanvasImageSource, "repeat");
+    }
+
+    // Other terrains: return cached pattern
+    const cached = this.terrainPatterns.get(terrain);
+    if (cached) return cached;
+
+    const pattern = ctx.createPattern(textures[0] as CanvasImageSource, "repeat");
+    if (pattern) this.terrainPatterns.set(terrain, pattern);
+    return pattern;
+  }
+
   /** Number of tile variants for a terrain (1 = procedural only, >1 = has AI tiles) */
   getTileVariantCount(terrain: Terrain): number {
     return this.tiles.get(terrain)?.length ?? 0;
@@ -281,9 +325,35 @@ export class AssetManager {
   private async loadFromManifest(manifest: AssetManifest) {
     const promises: Promise<void>[] = [];
 
-    // Tiles — supports both single path (legacy) and array of paths (variant system).
-    // AI tiles are pre-diamond-masked by postprocess.py.  Drawing the procedural
-    // tile first fills any edge gaps from clip anti-aliasing.
+    // Terrain textures — rectangular seamless textures used as CanvasPattern fills.
+    // This is the preferred format: the renderer clips patterns to diamond shapes
+    // at draw time, so adjacent tiles share continuous terrain surfaces.
+    if (manifest.terrain_textures) {
+      this.hasTerrainTextures = true;
+      for (const [terrainName, pathOrPaths] of Object.entries(manifest.terrain_textures)) {
+        const terrain = Terrain[terrainName as keyof typeof Terrain];
+        if (terrain === undefined) continue;
+
+        const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
+        if (!this.terrainTextures.has(terrain)) {
+          this.terrainTextures.set(terrain, []);
+        }
+
+        for (const path of paths) {
+          this.totalToLoad++;
+          promises.push(
+            this.loadImage(path).then((img) => {
+              if (img) {
+                this.terrainTextures.get(terrain)!.push(img);
+                this.loadedCount++;
+              }
+            }),
+          );
+        }
+      }
+    }
+
+    // Legacy diamond tiles — fallback for assets that haven't been regenerated.
     if (manifest.tiles) {
       for (const [terrainName, pathOrPaths] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
@@ -662,6 +732,9 @@ export class AssetManager {
     this.generateItems();
   }
 
+  /** Procedural terrain texture size — large enough for natural variation */
+  private static readonly PROC_TEX_SIZE = 128;
+
   private generateTiles() {
     const terrainColors: Record<Terrain, { base: string; detail: string; noise: string }> = {
       [Terrain.Sand]:        { base: "#b8a67c", detail: "#d4c4a0", noise: "#a0926a" },
@@ -673,8 +746,22 @@ export class AssetManager {
       [Terrain.Grass]:       { base: "#6b7b4a", detail: "#7a8b5a", noise: "#4a5b3a" },
       [Terrain.Water]:       { base: "#3a5a5a", detail: "#4a7070", noise: "#2a4a4a" },
     };
+
+    const sz = AssetManager.PROC_TEX_SIZE;
+
     for (const [terrainStr, colors] of Object.entries(terrainColors)) {
       const terrain = Number(terrainStr) as Terrain;
+
+      // Generate a rectangular seamless terrain texture (no diamond shape).
+      // The renderer uses this as a CanvasPattern fill clipped to diamonds.
+      const texCanvas = this.createCanvas(sz, sz);
+      const texCtx = texCanvas.getContext("2d")!;
+      texCtx.fillStyle = colors.base;
+      texCtx.fillRect(0, 0, sz, sz);
+      this.addTerrainTextureNoise(texCtx, sz, sz, colors.detail, colors.noise, terrain);
+      this.terrainTextures.set(terrain, [texCanvas]);
+
+      // Also generate legacy diamond tile for backward compatibility
       const canvas = this.createCanvas(TILE_W, TILE_H);
       const ctx = canvas.getContext("2d")!;
       this.drawIsoDiamond(ctx, colors.base);
@@ -683,6 +770,7 @@ export class AssetManager {
     }
   }
 
+  /** Draw a filled isometric diamond — no edge strokes for a clean look */
   private drawIsoDiamond(ctx: CanvasRenderingContext2D, color: string) {
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -692,18 +780,6 @@ export class AssetManager {
     ctx.lineTo(0, TILE_HALF_H);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(TILE_HALF_W, 0);
-    ctx.lineTo(TILE_W, TILE_HALF_H);
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.15)";
-    ctx.beginPath();
-    ctx.moveTo(0, TILE_HALF_H);
-    ctx.lineTo(TILE_HALF_W, TILE_H);
-    ctx.lineTo(TILE_W, TILE_HALF_H);
-    ctx.stroke();
   }
 
   private addTileNoise(ctx: CanvasRenderingContext2D, detail: string, noise: string, terrain: Terrain) {
@@ -869,6 +945,154 @@ export class AssetManager {
 
     ctx.globalAlpha = 1;
     ctx.restore();
+  }
+
+  /**
+   * Add noise/detail to a rectangular terrain texture.
+   * Unlike addTileNoise (which clips to a diamond), this fills the entire
+   * rectangular canvas so the texture tiles seamlessly as a CanvasPattern.
+   */
+  private addTerrainTextureNoise(
+    ctx: CanvasRenderingContext2D, w: number, h: number,
+    detail: string, noise: string, terrain: Terrain,
+  ) {
+    const rng = this.seededRng(terrain * 1000 + 77);
+
+    switch (terrain) {
+      case Terrain.Sand:
+        for (let i = 0; i < 20; i++) {
+          ctx.strokeStyle = detail;
+          ctx.lineWidth = 0.5;
+          ctx.globalAlpha = 0.15 + rng() * 0.1;
+          const y = rng() * h;
+          ctx.beginPath();
+          ctx.moveTo(rng() * w, y);
+          ctx.quadraticCurveTo(w * 0.5, y + 2 + rng() * 4, w - rng() * w * 0.2, y + rng() * 3);
+          ctx.stroke();
+        }
+        for (let i = 0; i < 20; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.1 + rng() * 0.15;
+          ctx.fillRect(rng() * w, rng() * h, 1, 1);
+        }
+        break;
+
+      case Terrain.Dirt:
+        for (let i = 0; i < 30; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.12 + rng() * 0.2;
+          const sz = 1 + rng() * 3;
+          ctx.beginPath();
+          ctx.ellipse(rng() * w, rng() * h, sz, sz * 0.6, rng() * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      case Terrain.CrackedEarth:
+        ctx.strokeStyle = noise;
+        ctx.lineWidth = 0.7;
+        ctx.globalAlpha = 0.45;
+        for (let i = 0; i < 10; i++) {
+          const sx = rng() * w;
+          const sy = rng() * h;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          for (let j = 0; j < 4; j++) {
+            ctx.lineTo(sx + (rng() - 0.3) * 30, sy + (rng() - 0.3) * 20);
+          }
+          ctx.stroke();
+        }
+        for (let i = 0; i < 15; i++) {
+          ctx.fillStyle = detail;
+          ctx.globalAlpha = 0.1 + rng() * 0.1;
+          ctx.fillRect(rng() * w, rng() * h, 1 + rng(), 1);
+        }
+        break;
+
+      case Terrain.Rubble:
+        for (let i = 0; i < 25; i++) {
+          ctx.fillStyle = rng() > 0.4 ? detail : noise;
+          ctx.globalAlpha = 0.15 + rng() * 0.25;
+          const sz = 1 + rng() * 4;
+          ctx.fillRect(rng() * w, rng() * h, sz, sz * (0.5 + rng() * 0.5));
+        }
+        break;
+
+      case Terrain.Road:
+        ctx.strokeStyle = "#b8a67c";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.2;
+        ctx.setLineDash([4, 8]);
+        ctx.beginPath();
+        ctx.moveTo(0, h / 2);
+        ctx.lineTo(w, h / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (let i = 0; i < 15; i++) {
+          ctx.fillStyle = noise;
+          ctx.globalAlpha = 0.08 + rng() * 0.1;
+          ctx.fillRect(rng() * w, rng() * h, 1 + rng() * 3, 1);
+        }
+        break;
+
+      case Terrain.Concrete:
+        ctx.strokeStyle = noise;
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.12;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.3, 0);
+        ctx.lineTo(w * 0.7, h);
+        ctx.stroke();
+        for (let i = 0; i < 12; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.08 + rng() * 0.1;
+          ctx.fillRect(rng() * w, rng() * h, 1 + rng(), 1);
+        }
+        break;
+
+      case Terrain.Grass:
+        ctx.strokeStyle = "#7a8b5a";
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.5;
+        for (let i = 0; i < 30; i++) {
+          const gx = rng() * w;
+          const gy = rng() * h;
+          ctx.beginPath();
+          ctx.moveTo(gx, gy);
+          ctx.lineTo(gx + (rng() - 0.5) * 4, gy - 2 - rng() * 5);
+          ctx.stroke();
+        }
+        for (let i = 0; i < 12; i++) {
+          ctx.fillStyle = detail;
+          ctx.globalAlpha = 0.1;
+          ctx.beginPath();
+          ctx.ellipse(rng() * w, rng() * h, 2 + rng() * 3, 1 + rng(), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+
+      case Terrain.Water:
+        ctx.strokeStyle = "#5a8a8a";
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 0.35;
+        for (let i = 0; i < 8; i++) {
+          const y = rng() * h;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.quadraticCurveTo(w * 0.5, y + 4 * (rng() - 0.5), w, y + rng() * 3);
+          ctx.stroke();
+        }
+        break;
+
+      default:
+        for (let i = 0; i < 25; i++) {
+          ctx.fillStyle = rng() > 0.5 ? detail : noise;
+          ctx.globalAlpha = 0.15 + rng() * 0.25;
+          ctx.fillRect(rng() * w, rng() * h, 1 + rng() * 2, 1 + rng() * 2);
+        }
+        break;
+    }
+    ctx.globalAlpha = 1;
   }
 
   private generateSprites() {

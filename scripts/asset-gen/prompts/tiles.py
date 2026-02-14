@@ -1,16 +1,16 @@
 """Prompt templates for isometric tile generation.
 
-Supports three modes:
-1. Individual tile generation (legacy, one API call per tile)
-2. Tile-set sheet generation (multiple variants in a single row)
-3. Terrain variant sheet generation (2×2 grid of 4 variants per terrain,
-   consistent style in one API call via gemini-3-pro-image-preview at 1K)
+Supports multiple modes:
+1. **Terrain texture generation (preferred)** — generates large seamless
+   rectangular terrain textures. The game engine clips these to diamond
+   shapes at render time using CanvasPattern fill, so adjacent tiles share
+   the same continuous surface. No diamond shapes in the assets.
+2. Terrain variant sheet generation (legacy) — 2×2 grid of diamond tiles
+3. Individual tile generation (legacy)
+4. Tile-set sheet generation (legacy)
 
-For water, generates 4 animation frames showing progressive wave movement,
+For water, generates 4 animation frames as seamless rectangular textures,
 enabling animated water tiles at runtime.
-
-All terrain tiles use soft-edge blending at diamond borders for seamless
-transitions with any neighboring terrain type.
 """
 
 # Base style preamble injected into every tile prompt
@@ -61,7 +61,95 @@ TERRAIN_FEATURE_TEMPLATE = (
 )
 
 # ---------------------------------------------------------------------------
-# Terrain Variant Sheet — 4 variants per terrain in a 2×2 grid (1024×1024)
+# Terrain Texture — seamless rectangular textures (preferred format)
+#
+# These are large, fully-opaque rectangular terrain surface images.
+# The game engine uses them as repeating CanvasPattern fills clipped
+# to isometric diamond shapes at render time. Because the pattern is
+# continuous across world space, adjacent tiles show adjacent parts of
+# the same texture — creating a cohesive landscape with no seams.
+# ---------------------------------------------------------------------------
+
+TERRAIN_TEXTURE_PREAMBLE = (
+    "Create a SEAMLESS TILEABLE terrain texture in the style of classic Fallout 2. "
+    "Viewed from a top-down 3/4 isometric perspective (~30 degrees). "
+    "Muted, desaturated post-apocalyptic color palette: earthy browns, "
+    "rust oranges, dusty yellows, faded greens. "
+    "Detailed pixel art with a gritty, weathered feel. "
+)
+
+TERRAIN_TEXTURE_TEMPLATE = (
+    "{preamble}"
+    "Generate a SEAMLESS TILEABLE terrain texture.\n\n"
+    "TERRAIN TYPE: {terrain_name} — {description}\n\n"
+    "IMAGE SIZE: 1024 × 1024 pixels.\n\n"
+    "The ENTIRE image must be filled with terrain surface — NO diamonds, "
+    "NO transparent areas, NO green backgrounds. This is a flat rectangular "
+    "texture that will be used as a repeating tile pattern.\n\n"
+    "CRITICAL RULES:\n"
+    "- SEAMLESS TILING: the left edge must match the right edge perfectly,\n"
+    "  and the top edge must match the bottom edge perfectly, so the texture\n"
+    "  can repeat infinitely without visible seams.\n"
+    "- Fill the ENTIRE 1024×1024 area with terrain surface detail.\n"
+    "- NO diamond shapes, NO transparent background, NO green background.\n"
+    "- Consistent isometric 3/4 perspective across the entire texture.\n"
+    "- Natural-looking variation: {detail_notes}\n"
+    "- The texture should look like a continuous patch of ground surface,\n"
+    "  as if you cut a window into a larger landscape.\n"
+    "- NO text, NO labels, NO watermarks, NO borders.\n"
+)
+
+WATER_TEXTURE_TEMPLATE = (
+    "{preamble}"
+    "Generate 4 SEAMLESS TILEABLE water animation frames.\n\n"
+    "WATER STYLE: {description}\n\n"
+    "IMAGE SIZE: 1024 × 1024 pixels.\n"
+    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "Each cell is a rectangular water surface texture (NOT a diamond).\n"
+    "The 4 frames show a LOOPING water animation sequence:\n"
+    "  Frame 1 (top-left): Calm water, subtle small ripples beginning\n"
+    "  Frame 2 (top-right): Ripples spreading, gentle wave movement\n"
+    "  Frame 3 (bottom-left): Waves at peak, surface most disturbed\n"
+    "  Frame 4 (bottom-right): Waves receding, settling back to calm\n\n"
+    "CRITICAL RULES:\n"
+    "- Each frame FILLS its entire 512×512 cell — NO diamonds, NO transparency\n"
+    "- Each frame must be SEAMLESSLY TILEABLE (edges match when repeated)\n"
+    "- SAME water color and style in all 4 frames — only ripple pattern changes\n"
+    "- Changes between frames should be SUBTLE but VISIBLE for smooth animation\n"
+    "- The animation must LOOP: frame 4 transitions smoothly back to frame 1\n"
+    "- NO text, NO labels, NO watermarks\n"
+)
+
+
+def build_terrain_texture_prompt(archetype: dict, config: dict) -> str:
+    """Build a prompt for generating a seamless rectangular terrain texture.
+
+    This is the preferred generation mode. The texture is a large, fully-opaque
+    rectangular image that tiles seamlessly. The game engine clips it to
+    isometric diamonds at render time.
+    """
+    return TERRAIN_TEXTURE_TEMPLATE.format(
+        preamble=TERRAIN_TEXTURE_PREAMBLE,
+        terrain_name=archetype["terrain_name"],
+        description=archetype["description"],
+        detail_notes=archetype.get("texture_notes", archetype["variants"][0]),
+    )
+
+
+def build_water_texture_prompt(config: dict) -> str:
+    """Build a prompt for generating seamless rectangular water animation frames.
+
+    The 4 cells are animation frames. Each is a seamlessly tileable rectangular
+    water surface (not a diamond).
+    """
+    return WATER_TEXTURE_TEMPLATE.format(
+        preamble=TERRAIN_TEXTURE_PREAMBLE,
+        description=WATER_ARCHETYPE["description"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy: Terrain Variant Sheet — 4 variants per terrain in a 2×2 grid (1024×1024)
 # ---------------------------------------------------------------------------
 
 TERRAIN_VARIANT_SHEET_PREAMBLE = (
@@ -134,6 +222,10 @@ TERRAIN_ARCHETYPES = [
         "key": "sand",
         "terrain_name": "Sand",
         "description": "Sandy wasteland terrain, wind-swept and sun-bleached",
+        "texture_notes": (
+            "Fine wind-blown sand with subtle dune ripples, tiny shadow lines, "
+            "scattered small pebbles, and faint erosion channels"
+        ),
         "variants": [
             "Fine wind-blown sand with subtle dune ripples and tiny shadow lines",
             "Sand with scattered small pebbles and bleached bone fragments",
@@ -145,6 +237,10 @@ TERRAIN_ARCHETYPES = [
         "key": "dirt",
         "terrain_name": "Dirt",
         "description": "Hard-packed brown earth, dry and dusty",
+        "texture_notes": (
+            "Smooth hard-packed dirt with hairline surface cracks, small embedded "
+            "rocks, dried root traces, and scattered dust patches"
+        ),
         "variants": [
             "Smooth hard-packed dirt with hairline surface cracks",
             "Dirt with small embedded rocks and dried root traces",
@@ -156,6 +252,10 @@ TERRAIN_ARCHETYPES = [
         "key": "cracked-earth",
         "terrain_name": "CrackedEarth",
         "description": "Severely dried and cracked earth, deep fissures in parched ground",
+        "texture_notes": (
+            "Large irregular cracks forming a mosaic of dried mud plates, "
+            "deep fissures with shadows, scattered dust and small debris"
+        ),
         "variants": [
             "Large irregular cracks forming a mosaic of dried mud plates",
             "Dense network of fine cracks with curling edges on the plates",
@@ -167,6 +267,10 @@ TERRAIN_ARCHETYPES = [
         "key": "rubble",
         "terrain_name": "Rubble",
         "description": "Broken concrete and brick rubble from demolished buildings",
+        "texture_notes": (
+            "Mix of concrete chunks with rebar, brick fragments, mortar dust, "
+            "gravel, faded paint fragments, and rusted metal scraps"
+        ),
         "variants": [
             "Large concrete chunks with visible rebar and broken edges",
             "Mixed brick and concrete fragments with dust and mortar",
@@ -178,6 +282,10 @@ TERRAIN_ARCHETYPES = [
         "key": "road",
         "terrain_name": "Road",
         "description": "Cracked asphalt road surface, worn and deteriorating",
+        "texture_notes": (
+            "Dark asphalt with a network of surface cracks, potholes, "
+            "faded markings, weeds pushing through cracks, and oil stains"
+        ),
         "variants": [
             "Dark asphalt with a network of surface cracks and patching",
             "Broken road with potholes exposing dirt underneath",
@@ -189,6 +297,10 @@ TERRAIN_ARCHETYPES = [
         "key": "concrete",
         "terrain_name": "Concrete",
         "description": "Indoor/settlement concrete floor, stained and cracked",
+        "texture_notes": (
+            "Smooth gray concrete with water stains, hairline cracks, "
+            "expansion joints, scuff marks, and rust discoloration"
+        ),
         "variants": [
             "Smooth gray concrete with water stains and hairline cracks",
             "Concrete with expansion joints and slight discoloration",
@@ -200,6 +312,10 @@ TERRAIN_ARCHETYPES = [
         "key": "grass",
         "terrain_name": "Grass",
         "description": "Sparse, dying grass patches on dry earth",
+        "texture_notes": (
+            "Thin brown-green grass tufts on bare dirt, dying yellow-brown "
+            "patches, sparse blades with exposed earth between clumps"
+        ),
         "variants": [
             "Thin brown-green grass tufts scattered on bare dirt",
             "Denser but dying grass with yellow-brown patches",

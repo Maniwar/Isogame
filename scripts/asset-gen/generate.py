@@ -58,6 +58,8 @@ from prompts.tiles import (
     build_itemset_prompt,
     build_terrain_variant_sheet_prompt,
     build_water_animation_sheet_prompt,
+    build_terrain_texture_prompt,
+    build_water_texture_prompt,
     TERRAIN_ARCHETYPES,
     WATER_ARCHETYPE,
 )
@@ -320,6 +322,66 @@ def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
+def generate_terrain_textures(client: genai.Client, config: dict, dry_run: bool,
+                              reference_images: list) -> int:
+    """Generate seamless rectangular terrain textures (preferred format).
+
+    Each terrain type produces a single 1024×1024 seamless tileable texture.
+    These are full rectangular images — no diamond shapes, no transparency.
+    The game engine uses them as repeating CanvasPattern fills clipped to
+    isometric diamonds at render time, creating a cohesive landscape.
+
+    Water produces a 2×2 grid of 4 animation frames (same sheet layout
+    as tile_sheets, but rectangular fills instead of diamonds).
+    """
+    model = config["api"]["model"]
+    rpm = config["api"]["requests_per_minute"]
+    generated = 0
+
+    textures_dir = OUTPUT_DIR / "tiles" / "textures"
+
+    print(f"\n--- Generating terrain textures ({len(TERRAIN_ARCHETYPES)} terrain + water) ---")
+
+    for archetype in TERRAIN_ARCHETYPES:
+        key = archetype["key"]
+        filename = f"{key}-texture.png"
+        output_path = textures_dir / filename
+
+        prompt = build_terrain_texture_prompt(archetype, config)
+
+        if dry_run:
+            print(f"  [DRY RUN] {filename} (1024×1024, seamless texture)")
+            print(f"    Prompt: {prompt[:200]}...")
+            generated += 1
+            continue
+
+        print(f"  Generating: {filename} ({archetype['terrain_name']})")
+        image = generate_image(client, prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, output_path)
+            generated += 1
+        rate_limit(rpm)
+
+    # Generate animated water texture (4 frames in 2×2 grid)
+    water_filename = "water-texture.png"
+    water_path = textures_dir / water_filename
+    water_prompt = build_water_texture_prompt(config)
+
+    if dry_run:
+        print(f"  [DRY RUN] {water_filename} (1024×1024, 4 frames)")
+        print(f"    Prompt: {water_prompt[:200]}...")
+        generated += 1
+    else:
+        print(f"  Generating: {water_filename} (4 animation frames)")
+        image = generate_image(client, water_prompt, model, reference_images, image_size="1K")
+        if image:
+            save_image(image, water_path)
+            generated += 1
+        rate_limit(rpm)
+
+    return generated
+
+
 def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                         reference_images: list, use_sheets: bool = True) -> int:
     """Generate character sprites — either as full sprite sheets or individual images.
@@ -547,14 +609,16 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 CATEGORY_MAP = {
     "tiles": generate_tiles,
     "tile_sheets": generate_tile_sheets,
+    "terrain_textures": generate_terrain_textures,
     "characters": generate_characters,
     "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
 }
 
-# Default categories when --category=all (excludes deprecated weapons and legacy tiles)
-DEFAULT_CATEGORIES = ["tile_sheets", "characters", "items", "portraits"]
+# Default categories when --category=all
+# terrain_textures is preferred over tile_sheets for terrain generation
+DEFAULT_CATEGORIES = ["terrain_textures", "characters", "items", "portraits"]
 
 
 def main():

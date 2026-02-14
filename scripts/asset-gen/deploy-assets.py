@@ -80,7 +80,7 @@ def deploy(source: Path, target: Path) -> dict:
         manifest = {}
 
     # Ensure all sections exist
-    for section in ("tiles", "sprites", "animations", "weapons", "objects", "items", "portraits"):
+    for section in ("tiles", "terrain_textures", "sprites", "animations", "weapons", "objects", "items", "portraits"):
         manifest.setdefault(section, {})
 
     # Ensure target directories exist
@@ -89,7 +89,43 @@ def deploy(source: Path, target: Path) -> dict:
 
     deployed = 0
 
-    # --- Tile variant sheets (new: arrays of variants per terrain) ---
+    # --- Terrain textures (preferred: seamless rectangular textures) ---
+    texture_meta_path = source / "tiles" / "_texture_meta.json"
+    if texture_meta_path.exists():
+        with open(texture_meta_path) as f:
+            texture_meta = json.load(f)
+
+        for sheet_key, file_or_files in texture_meta.items():
+            terrain_name = TILE_SHEET_TERRAIN_MAP.get(sheet_key)
+            if not terrain_name:
+                print(f"  WARNING: Unknown texture key: {sheet_key}")
+                continue
+
+            if isinstance(file_or_files, list):
+                # Water: array of animation frame filenames
+                paths = []
+                for filename in file_or_files:
+                    src_file = source / "tiles" / "textures" / filename
+                    if src_file.exists():
+                        dest = target / "tiles" / filename
+                        shutil.copy2(src_file, dest)
+                        paths.append(f"/assets/tiles/{filename}")
+                        deployed += 1
+                if paths:
+                    manifest["terrain_textures"][terrain_name] = paths
+                    print(f"  Texture: {terrain_name} ({len(paths)} frames)")
+            else:
+                # Single texture file
+                filename = file_or_files
+                src_file = source / "tiles" / "textures" / filename
+                if src_file.exists():
+                    dest = target / "tiles" / filename
+                    shutil.copy2(src_file, dest)
+                    manifest["terrain_textures"][terrain_name] = f"/assets/tiles/{filename}"
+                    deployed += 1
+                    print(f"  Texture: {terrain_name} -> {filename}")
+
+    # --- Tile variant sheets (legacy: diamond tile arrays per terrain) ---
     tile_meta_path = source / "tiles" / "_tile_meta.json"
     if tile_meta_path.exists():
         with open(tile_meta_path) as f:
