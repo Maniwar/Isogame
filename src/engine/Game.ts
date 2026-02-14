@@ -592,14 +592,14 @@ export class Game {
     const didAct = this.combatSystem.aiAct(state, npc);
 
     if (didAct) {
-      // If NPC moved (pos changed), set facing toward movement direction
-      if (npc.pos.x !== prevPos.x || npc.pos.y !== prevPos.y) {
-        npc.direction = MovementSystem.getDirectionBetween(prevPos, npc.pos);
-      }
+      const moved = npc.pos.x !== prevPos.x || npc.pos.y !== prevPos.y;
 
-      const dmg = playerHpBefore - state.player.stats.hp;
-      if (dmg > 0) {
-        // Face the player when attacking
+      if (moved) {
+        // NPC moved — set facing toward movement direction
+        npc.direction = MovementSystem.getDirectionBetween(prevPos, npc.pos);
+      } else {
+        // NPC stayed in place — it attacked (hit or miss).
+        // Always trigger attack animation regardless of whether damage was dealt.
         npc.direction = MovementSystem.getDirectionBetween(npc.pos, state.player.pos);
 
         if (this.combatSystem.isRangedWeapon(npc)) {
@@ -607,19 +607,29 @@ export class Game {
         } else {
           this.animationSystem.triggerAttack(npc);
         }
-        if (!state.player.dead) {
-          // Player faces the attacker during hit reaction
-          state.player.direction = MovementSystem.getDirectionBetween(state.player.pos, npc.pos);
-          this.animationSystem.triggerHit(state.player);
+
+        const dmg = playerHpBefore - state.player.stats.hp;
+        if (dmg > 0) {
+          // Hit — play hit reaction on player and spawn hit VFX
+          if (!state.player.dead) {
+            state.player.direction = MovementSystem.getDirectionBetween(state.player.pos, npc.pos);
+            this.animationSystem.triggerHit(state.player);
+          }
+          const lastLog = state.combatLog[state.combatLog.length - 1];
+          const isCrit = lastLog?.text.includes("CRITICAL") ?? false;
+          this.spawnAttackVFX(npc, state.player, {
+            hit: true, damage: dmg, message: "", crit: isCrit,
+            crippled: lastLog?.text.includes("CRIPPLED") ? "torso" : undefined,
+            severed: lastLog?.text.includes("SEVERED"),
+          });
+        } else {
+          // Miss — still spawn miss VFX (projectile/slash + "MISS" text)
+          this.spawnAttackVFX(npc, state.player, {
+            hit: false, damage: 0, message: "", crit: false,
+          });
         }
-        const lastLog = state.combatLog[state.combatLog.length - 1];
-        const isCrit = lastLog?.text.includes("CRITICAL") ?? false;
-        this.spawnAttackVFX(npc, state.player, {
-          hit: true, damage: dmg, message: "", crit: isCrit,
-          crippled: lastLog?.text.includes("CRIPPLED") ? "torso" : undefined,
-          severed: lastLog?.text.includes("SEVERED"),
-        });
       }
+
       this.aiActionTimer = this.AI_ACTION_DELAY;
       if (state.player.dead) {
         this.notify("You have been killed. Game Over.", "#ff0000");

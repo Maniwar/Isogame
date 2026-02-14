@@ -222,8 +222,9 @@ export class AssetManager {
    * only old 4-row data exists (or vice versa), try equivalent keys.
    */
   private static readonly FRAME_FALLBACKS: Record<string, string[]> = {
+    "walk_2": ["walk_1"],            // mid-stride → contact fallback
     "walk_3": ["walk_1"],            // 4-frame walk → 2-frame walk
-    "walk_4": ["walk_2"],
+    "walk_4": ["walk_3", "walk_2", "walk_1"],  // passing → best available
     "attack_1": ["attack"],          // 2-frame attack → legacy single "attack"
     "attack_2": ["attack"],
     "attack": ["attack_2"],          // legacy "attack" → new strike frame
