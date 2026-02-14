@@ -585,6 +585,61 @@ def detect_grid(sheet: Image.Image, expected_rows: int, expected_cols: int) -> l
     return cells
 
 
+def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5) -> Image.Image:
+    """Remove spillover content from neighboring cells.
+
+    Grid detection boundaries sometimes cut through characters, leaving
+    a small fragment (e.g. boots from the row above) disconnected from
+    the main content. This finds vertical gaps of >= gap_rows fully-
+    transparent rows and erases the smaller fragment.
+    """
+    arr = np.array(region.convert("RGBA"))
+    alpha = arr[:, :, 3]
+    h, w = alpha.shape
+    row_has_content = np.any(alpha > threshold, axis=1)
+
+    # Find contiguous bands of content separated by transparent gaps
+    bands: list[tuple[int, int]] = []  # (start_y, end_y)
+    in_band = False
+    band_start = 0
+
+    for y in range(h):
+        if row_has_content[y]:
+            if not in_band:
+                band_start = y
+                in_band = True
+        else:
+            if in_band:
+                bands.append((band_start, y))
+                in_band = False
+    if in_band:
+        bands.append((band_start, h))
+
+    if len(bands) <= 1:
+        return region  # single band or empty — nothing to strip
+
+    # Check if bands are separated by significant gaps
+    merged: list[tuple[int, int]] = [bands[0]]
+    for start, end in bands[1:]:
+        prev_start, prev_end = merged[-1]
+        if start - prev_end < gap_rows:
+            merged[-1] = (prev_start, end)  # merge close bands
+        else:
+            merged.append((start, end))
+
+    if len(merged) <= 1:
+        return region  # all bands are close together
+
+    # Keep the largest band (by pixel height), erase others
+    largest = max(merged, key=lambda b: b[1] - b[0])
+    result = region.copy()
+    result_arr = np.array(result)
+    for start, end in merged:
+        if (start, end) != largest:
+            result_arr[start:end, :, 3] = 0  # erase spillover
+    return Image.fromarray(result_arr, "RGBA")
+
+
 def slice_spritesheet(
     sheet: Image.Image,
     cell_w: int,
@@ -593,33 +648,88 @@ def slice_spritesheet(
     cols: int,
 ) -> list[list[Image.Image]]:
     """
-    Content-aware sprite sheet slicer.
+    Sprite sheet slicer with uniform scaling across all frames.
 
-    Instead of blindly cutting a grid, this:
-    1. Detects natural grid boundaries using alpha channel analysis
-    2. Extracts each cell region
-    3. Finds the actual character content within each cell
-    4. Centers the content bottom-center in the target cell size
-       (feet anchored at bottom for consistent isometric placement)
+    1. Detects natural grid boundaries (Gemini produces uneven grids)
+    2. Extracts each cell, strips spillover from neighboring cells
+    3. Computes one uniform scale factor from the largest content across
+       ALL cells — so every frame shows the character at the same size
+    4. Applies that scale and places content bottom-center
 
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
     """
     sheet = sheet.convert("RGBA")
 
-    # Detect the grid structure
+    # Detect the grid structure (content-aware, handles uneven spacing)
     grid = detect_grid(sheet, rows, cols)
 
+    # First pass: extract all regions, strip spillover, find content bboxes
+    regions: list[list[Image.Image]] = []
+    bboxes: list[list[tuple[int, int, int, int] | None]] = []
+    all_cws: list[int] = []
+    all_chs: list[int] = []
+
+    for r in range(rows):
+        row_regions = []
+        row_bboxes = []
+        for c in range(cols):
+            x, y, w, h = grid[r][c]
+            region = sheet.crop((x, y, x + w, y + h))
+            region = _strip_spillover(region)
+            bbox = find_content_bbox(region)
+            row_regions.append(region)
+            row_bboxes.append(bbox)
+            if bbox is not None:
+                all_cws.append(bbox[2] - bbox[0])
+                all_chs.append(bbox[3] - bbox[1])
+        regions.append(row_regions)
+        bboxes.append(row_bboxes)
+
+    # Compute one uniform scale factor from the 90th-percentile content
+    # HEIGHT. We scale to fill the frame vertically (which determines
+    # visual size) and allow wide poses (arms/weapons) to be center-cropped
+    # horizontally if needed. Using height-only prevents wide outlier cells
+    # from shrinking all frames to tiny sizes.
+    if all_chs:
+        ref_ch = int(np.percentile(all_chs, 90))
+        scale = cell_h / ref_ch if ref_ch > 0 else 1.0
+    else:
+        scale = 1.0
+
+    # Second pass: crop each cell's content, scale uniformly, place bottom-center
     frames = []
     for r in range(rows):
         row_frames = []
         for c in range(cols):
-            x, y, w, h = grid[r][c]
-            # Extract the raw region from the sheet
-            region = sheet.crop((x, y, x + w, y + h))
-            # Find content and center it bottom-center in target cell
-            frame = extract_and_center(region, cell_w, cell_h)
-            row_frames.append(frame)
+            bbox = bboxes[r][c]
+            if bbox is None:
+                row_frames.append(Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0)))
+                continue
+
+            content = regions[r][c].crop(bbox)
+            cw, ch = content.size
+
+            new_w = max(1, int(cw * scale))
+            new_h = max(1, int(ch * scale))
+            content = content.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+            # Center-crop horizontally if wider than target
+            if new_w > cell_w:
+                crop_x = (new_w - cell_w) // 2
+                content = content.crop((crop_x, 0, crop_x + cell_w, new_h))
+                new_w = cell_w
+            # Crop from top if taller than target
+            if new_h > cell_h:
+                content = content.crop((0, new_h - cell_h, new_w, new_h))
+                new_h = cell_h
+
+            # Place bottom-center (feet on ground)
+            canvas = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
+            offset_x = (cell_w - new_w) // 2
+            offset_y = cell_h - new_h
+            canvas.paste(content, (offset_x, offset_y), content)
+            row_frames.append(canvas)
         frames.append(row_frames)
 
     return frames
@@ -704,7 +814,7 @@ def slice_and_save_character_sheet(
     # Force green backgrounds to transparent (Gemini often ignores alpha requests)
     sheet = force_transparent_bg(sheet)
 
-    # Auto-detect actual grid dimensions — Gemini rarely produces the requested 8×8
+    # Auto-detect actual grid dimensions — Gemini produces uneven grids
     actual_rows, actual_cols = detect_actual_grid_size(sheet)
 
     print(f"    Sheet size: {sheet.size[0]}x{sheet.size[1]}, "
