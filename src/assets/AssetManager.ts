@@ -529,13 +529,16 @@ export class AssetManager {
   }
 
   /**
-   * Normalize a single frame: clamp semi-transparent pixels to binary alpha.
+   * Normalize a single frame: NO pixel manipulation.
    *
-   * Canvas 2D uses premultiplied alpha internally, so alpha-bleeding (setting
-   * RGB on alpha=0 pixels) doesn't survive — the browser premultiplies to
-   * (0,0,0,0) regardless. Instead, we use binary alpha and the Renderer
-   * disables imageSmoothingEnabled when drawing sprites to eliminate bilinear
-   * dark halos entirely (nearest-neighbor = no edge blending).
+   * Previous versions used binary alpha clamping (alpha < threshold → 0,
+   * else → 255) which destroyed semi-transparent shading and created visible
+   * holes in character sprites. The renderer uses bilinear smoothing with
+   * proper premultiplied alpha, so dark halos are not an issue — sprites
+   * can be used as-is from the Gemini pipeline.
+   *
+   * Only upscales genuinely undersized frames (attack frames at <85% fill)
+   * to keep animation sizes consistent.
    */
   private normalizeFrame(frame: DrawTarget): HTMLCanvasElement {
     const sw = frame instanceof HTMLCanvasElement
@@ -543,31 +546,110 @@ export class AssetManager {
     const sh = frame instanceof HTMLCanvasElement
       ? frame.height : (frame as HTMLImageElement).naturalHeight || (frame as HTMLImageElement).height;
 
+    const contentH = this.measureContentHeight(frame, sw, sh);
+    if (contentH <= 0) return this.copyToCanvas(frame, sw, sh);
+
+    const targetH = sh * 0.85;
+
+    // Frames that already fill ≥85% of canvas height → use as-is
+    if (contentH >= targetH) {
+      return this.copyToCanvas(frame, sw, sh);
+    }
+
+    // Only upscale undersized frames (e.g., attack frames at 68% fill)
+    const scale = targetH / contentH;
+    if (scale > 1.5) return this.copyToCanvas(frame, sw, sh); // safety cap
+
+    return this.rescaleSpriteUniform(frame, sw, sh, scale);
+  }
+
+  /** Copy a frame to a canvas without any pixel manipulation. */
+  private copyToCanvas(frame: DrawTarget, sw: number, sh: number): HTMLCanvasElement {
     const canvas = this.createCanvas(sw, sh);
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(frame as CanvasImageSource, 0, 0);
-
-    try {
-      const data = ctx.getImageData(0, 0, sw, sh);
-      const d = data.data;
-      // Binary alpha: fully opaque or fully transparent (no semi-transparent edges
-      // that create dark fringe when the renderer scales sprites)
-      for (let i = 0; i < d.length; i += 4) {
-        if (d[i + 3] < AssetManager.ALPHA_THRESH) {
-          d[i] = d[i + 1] = d[i + 2] = 0;
-          d[i + 3] = 0;
-        } else {
-          d[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(data, 0, 0);
-    } catch { /* CORS — return as-is */ }
-
     return canvas;
   }
 
   /** Alpha threshold for content detection — low enough to catch anti-aliased edges */
   private static readonly ALPHA_THRESH = 10;
+
+  /**
+   * Measure the height of opaque content in a frame by scanning for the
+   * topmost and bottommost rows with alpha >= ALPHA_THRESH.
+   */
+  private measureContentHeight(frame: DrawTarget, sw: number, sh: number): number {
+    const tmp = this.createCanvas(sw, sh);
+    const ctx = tmp.getContext("2d")!;
+    ctx.drawImage(frame as CanvasImageSource, 0, 0);
+
+    try {
+      const data = ctx.getImageData(0, 0, sw, sh).data;
+      let minY = sh, maxY = 0;
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          if (data[(y * sw + x) * 4 + 3] >= AssetManager.ALPHA_THRESH) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+            break;
+          }
+        }
+      }
+      if (minY > maxY) return 0;
+      return maxY - minY + 1;
+    } catch {
+      return sh;
+    }
+  }
+
+  /**
+   * Scale the ENTIRE source image uniformly, anchoring at the bottom-center
+   * of the content. No pixel-level alpha manipulation — preserves all
+   * semi-transparent shading from the source sprites.
+   */
+  private rescaleSpriteUniform(
+    frame: DrawTarget, sw: number, sh: number, scale: number
+  ): HTMLCanvasElement {
+    const tmp = this.createCanvas(sw, sh);
+    const tmpCtx = tmp.getContext("2d")!;
+    tmpCtx.drawImage(frame as CanvasImageSource, 0, 0);
+
+    let minX = sw, maxX = 0, minY = sh, maxY = 0;
+    try {
+      const data = tmpCtx.getImageData(0, 0, sw, sh).data;
+      for (let y = 0; y < sh; y++) {
+        for (let x = 0; x < sw; x++) {
+          if (data[(y * sw + x) * 4 + 3] >= AssetManager.ALPHA_THRESH) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+    } catch {
+      return this.copyToCanvas(frame, sw, sh);
+    }
+
+    if (minX > maxX) return this.copyToCanvas(frame, sw, sh);
+
+    const result = this.createCanvas(sw, sh);
+    const ctx = result.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+
+    const scaledW = sw * scale;
+    const scaledH = sh * scale;
+
+    // Anchor: content bottom at (sh - 2), content center at (sw / 2)
+    const contentBottomScaled = maxY * scale;
+    const dy = (sh - 2) - contentBottomScaled;
+    const contentCenterXScaled = ((minX + maxX) / 2) * scale;
+    const dx = sw / 2 - contentCenterXScaled;
+
+    ctx.drawImage(frame as CanvasImageSource, dx, dy, scaledW, scaledH);
+    return result;
+  }
 
   // -----------------------------------------------------------------------
   // Procedural fallback generation
