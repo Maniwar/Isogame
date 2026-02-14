@@ -170,11 +170,14 @@ export class Renderer {
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Preferred path: pattern fill + diamond clip.
-    // The terrain texture is a seamless rectangular image that repeats
-    // across world space. Each tile's diamond is a window into the same
-    // continuous surface, so adjacent tiles connect seamlessly.
-    const pattern = assets.getTerrainPattern(tile.terrain, ctx);
+    // Preferred path: pattern fill + diamond clip (only when AI terrain textures
+    // are loaded from the manifest). Procedural rectangular textures are always
+    // generated as fallback, but we only use pattern mode when real AI textures
+    // exist — otherwise we fall through to the legacy diamond tile path which
+    // includes AI diamond tiles from the manifest's "tiles" section.
+    const pattern = assets.hasTerrainTextureMode()
+      ? assets.getTerrainPattern(tile.terrain, ctx)
+      : null;
 
     if (pattern) {
       ctx.save();
