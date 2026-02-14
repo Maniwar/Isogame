@@ -41,6 +41,8 @@ export class AssetManager {
   private terrainTextures = new Map<Terrain, DrawTarget[]>();
   /** Cached CanvasPattern objects for each terrain (created lazily) */
   private terrainPatterns = new Map<Terrain, CanvasPattern>();
+  /** Cached water animation patterns by frame index */
+  private waterPatternCache = new Map<string, CanvasPattern>();
   /** Whether terrain textures (rectangular) are available */
   private hasTerrainTextures = false;
 
@@ -174,10 +176,15 @@ export class AssetManager {
     const textures = this.terrainTextures.get(terrain);
     if (!textures || textures.length === 0) return null;
 
-    // Water animates — cycle through frames, no caching
+    // Water animates — cycle through frames with cached patterns per frame
     if (terrain === Terrain.Water && textures.length > 1) {
-      const frameIndex = Math.floor(Date.now() / 500) % textures.length;
-      return ctx.createPattern(textures[frameIndex] as CanvasImageSource, "repeat");
+      const frameIndex = Math.floor(Date.now() / 800) % textures.length;
+      const cacheKey = `water_${frameIndex}`;
+      const cached = this.waterPatternCache.get(cacheKey);
+      if (cached) return cached;
+      const pat = ctx.createPattern(textures[frameIndex] as CanvasImageSource, "repeat");
+      if (pat) this.waterPatternCache.set(cacheKey, pat);
+      return pat;
     }
 
     // Other terrains: return cached pattern
@@ -200,8 +207,11 @@ export class AssetManager {
     if (variants.length === 1) return variants[0];
 
     if (terrain === Terrain.Water) {
-      // Animate water: cycle through frames at ~500ms per frame
-      const frameIndex = Math.floor(Date.now() / 500) % variants.length;
+      // Animate water: stagger per-tile so adjacent tiles don't all flip at once.
+      // Each tile gets a phase offset based on its position, creating a wave effect.
+      const posHash = ((tileX * 73856093) ^ (tileY * 19349663)) >>> 0;
+      const offset = posHash % variants.length;
+      const frameIndex = (Math.floor(Date.now() / 800) + offset) % variants.length;
       return variants[frameIndex];
     }
 
@@ -759,6 +769,30 @@ export class AssetManager {
     for (const [terrainStr, colors] of Object.entries(terrainColors)) {
       const terrain = Number(terrainStr) as Terrain;
 
+      if (terrain === Terrain.Water) {
+        // Generate multiple water frames with shifted wave patterns for animation
+        const waterFrameCount = 4;
+        const texFrames: DrawTarget[] = [];
+        const tileFrames: DrawTarget[] = [];
+        for (let f = 0; f < waterFrameCount; f++) {
+          const texCanvas = this.createCanvas(sz, sz);
+          const texCtx = texCanvas.getContext("2d")!;
+          texCtx.fillStyle = colors.base;
+          texCtx.fillRect(0, 0, sz, sz);
+          this.addWaterTextureFrame(texCtx, sz, sz, f, waterFrameCount);
+          texFrames.push(texCanvas);
+
+          const canvas = this.createCanvas(TILE_W, TILE_H);
+          const ctx = canvas.getContext("2d")!;
+          this.drawIsoDiamond(ctx, colors.base);
+          this.addWaterTileFrame(ctx, f, waterFrameCount);
+          tileFrames.push(canvas);
+        }
+        this.terrainTextures.set(terrain, texFrames);
+        this.tiles.set(terrain, tileFrames);
+        continue;
+      }
+
       // Generate a rectangular seamless terrain texture (no diamond shape).
       // The renderer uses this as a CanvasPattern fill clipped to diamonds.
       const texCanvas = this.createCanvas(sz, sz);
@@ -1100,6 +1134,89 @@ export class AssetManager {
         break;
     }
     ctx.globalAlpha = 1;
+  }
+
+  /** Generate a single water rectangular texture frame with phase-shifted waves */
+  private addWaterTextureFrame(
+    ctx: CanvasRenderingContext2D, w: number, h: number,
+    frame: number, totalFrames: number,
+  ) {
+    const phase = (frame / totalFrames) * Math.PI * 2;
+
+    // Subtle depth gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, "rgba(74, 112, 112, 0.15)");
+    grad.addColorStop(1, "rgba(42, 74, 74, 0.1)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    // Wave lines shifted by phase
+    ctx.strokeStyle = "#5a9a9a";
+    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = 0.3;
+    for (let i = 0; i < 6; i++) {
+      const baseY = (i + 0.5) * (h / 6);
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 4) {
+        const y = baseY + Math.sin((x / w) * Math.PI * 3 + phase + i * 0.7) * 2.5;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Specular highlights
+    ctx.fillStyle = "#7ababa";
+    ctx.globalAlpha = 0.12;
+    for (let i = 0; i < 5; i++) {
+      const hx = ((i * 29 + frame * 17) % w);
+      const hy = ((i * 37 + frame * 13) % h);
+      ctx.beginPath();
+      ctx.ellipse(hx, hy, 3, 1.5, phase + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Generate a single water diamond tile frame with phase-shifted waves */
+  private addWaterTileFrame(
+    ctx: CanvasRenderingContext2D,
+    frame: number, totalFrames: number,
+  ) {
+    const phase = (frame / totalFrames) * Math.PI * 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(TILE_HALF_W, 1);
+    ctx.lineTo(TILE_W - 1, TILE_HALF_H);
+    ctx.lineTo(TILE_HALF_W, TILE_H - 1);
+    ctx.lineTo(1, TILE_HALF_H);
+    ctx.closePath();
+    ctx.clip();
+
+    // Wave lines
+    ctx.strokeStyle = "#5a9a9a";
+    ctx.lineWidth = 0.7;
+    ctx.globalAlpha = 0.35;
+    for (let i = 0; i < 3; i++) {
+      const baseY = 8 + i * 8;
+      ctx.beginPath();
+      for (let x = 10; x <= 54; x += 3) {
+        const y = baseY + Math.sin((x / 64) * Math.PI * 4 + phase + i * 0.8) * 1.5;
+        if (x === 10) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Small highlight
+    ctx.fillStyle = "#7ababa";
+    ctx.globalAlpha = 0.1;
+    const hx = 25 + Math.cos(phase) * 6;
+    const hy = 14 + Math.sin(phase) * 2;
+    ctx.beginPath();
+    ctx.ellipse(hx, hy, 3, 1, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   private generateSprites() {
