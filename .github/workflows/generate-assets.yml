@@ -56,61 +56,132 @@ jobs:
           fi
           echo "API key is configured (${#GEMINI_API_KEY} chars)"
 
-      - name: Generate assets
+      - name: Configure git for commits
+        if: inputs.dry_run == false
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # Dry run: preview all prompts in one shot, no commits needed
+      - name: Dry run (preview prompts)
+        if: inputs.dry_run == true
+        env:
+          GEMINI_API_KEY: "dry-run"
+        run: |
+          cd scripts/asset-gen
+          python generate.py --category ${{ inputs.category }} --dry-run
+
+      # Real run: generate → process → deploy → commit per category
+      # Each category is committed+pushed before the next starts, so
+      # if the job times out mid-run, completed categories are safe.
+      - name: Generate and commit assets (incremental)
+        if: inputs.dry_run == false
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          cd scripts/asset-gen
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python generate.py --category ${{ inputs.category }} --dry-run
+          INPUT_CATEGORY="${{ inputs.category }}"
+
+          # Resolve category list
+          if [ "$INPUT_CATEGORY" = "all" ]; then
+            CATEGORIES="terrain_textures characters objects items portraits"
           else
-            python generate.py --category ${{ inputs.category }}
+            # Convert comma-separated to space-separated
+            CATEGORIES=$(echo "$INPUT_CATEGORY" | tr ',' ' ')
           fi
 
-      - name: Show generated files
-        if: inputs.dry_run == false
-        run: |
-          echo "=== Raw output files ==="
-          find scripts/asset-gen/output -name "*.png" -type f | head -50 || echo "No PNG files found in output/"
+          echo "=== Incremental asset generation ==="
+          echo "Categories: $CATEGORIES"
           echo ""
-          echo "Total PNGs: $(find scripts/asset-gen/output -name '*.png' -type f | wc -l)"
 
-      - name: Post-process assets
-        if: inputs.dry_run == false
-        run: |
-          cd scripts/asset-gen
-          python postprocess.py
+          # Map generate.py categories to postprocess.py categories
+          postprocess_cat() {
+            case "$1" in
+              characters)        echo "sprites" ;;
+              terrain_textures)  echo "terrain_textures" ;;
+              tile_sheets)       echo "tile_sheets" ;;
+              tiles)             echo "tile_sheets" ;;
+              *)                 echo "$1" ;;
+            esac
+          }
 
-      - name: Deploy assets to public/
-        if: inputs.dry_run == false
-        run: |
-          cd scripts/asset-gen
-          python deploy-assets.py
+          TOTAL_COMMITTED=0
 
-      # Reprocess character sprites with QA validation, auto-grid detection,
-      # uniform scaling, green BG removal, palette, and direction mirroring.
-      # This overwrites the basic postprocess.py slicing with the full pipeline.
-      - name: Validate sprite sheets (pre-reprocess)
-        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
-        continue-on-error: true
-        run: |
-          cd scripts/asset-gen
-          echo "=== Validating sprite sheets ==="
-          python reprocess.py --category sprites --validate-only
+          for CAT in $CATEGORIES; do
+            echo ""
+            echo "========================================"
+            echo "=== Category: $CAT"
+            echo "========================================"
 
-      - name: Reprocess character sprites (slice + mirror + palette)
-        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
-        run: |
-          cd scripts/asset-gen
-          echo "=== Reprocessing sprites (uniform scale + mirror + palette) ==="
-          python reprocess.py --category sprites
+            PP_CAT=$(postprocess_cat "$CAT")
 
-      - name: Reprocess weapon overlays (slice + mirror + palette)
-        if: inputs.dry_run == false && (inputs.category == 'characters' || inputs.category == 'all')
-        run: |
-          cd scripts/asset-gen
-          echo "=== Reprocessing weapons (position-preserving + mirror + palette) ==="
-          python reprocess.py --category weapons
+            # Step 1: Generate
+            echo "--- Generating $CAT ---"
+            cd scripts/asset-gen
+            python generate.py --category "$CAT"
+
+            # Step 2: Post-process
+            echo "--- Post-processing ($PP_CAT) ---"
+            python postprocess.py --category "$PP_CAT"
+
+            # Step 3: Deploy (merges with existing manifest.json)
+            echo "--- Deploying to public/assets/ ---"
+            python deploy-assets.py
+
+            # Step 4: Character-specific reprocessing
+            if [ "$CAT" = "characters" ]; then
+              echo "--- Validating sprite sheets ---"
+              python reprocess.py --category sprites --validate-only || true
+
+              echo "--- Reprocessing sprites (uniform scale + mirror + palette) ---"
+              python reprocess.py --category sprites
+
+              echo "--- Reprocessing weapons (position-preserving + mirror + palette) ---"
+              python reprocess.py --category weapons
+            fi
+
+            cd ../..
+
+            # Step 5: Commit and push this category
+            echo "--- Committing $CAT ---"
+            git add public/assets/
+            if git diff --staged --quiet; then
+              echo "::warning::No new assets for $CAT"
+              continue
+            fi
+
+            ASSET_COUNT=$(git diff --staged --name-only | grep -c '\.png$' || true)
+            git commit -m "assets: Generate ${CAT} — ${ASSET_COUNT} images via Gemini"
+
+            # Push with retry (exponential backoff)
+            PUSHED=false
+            for attempt in 1 2 3 4; do
+              echo "Push attempt $attempt..."
+              git pull --rebase origin main || true
+              if git push; then
+                echo "Committed and pushed ${CAT} (${ASSET_COUNT} PNGs)"
+                PUSHED=true
+                break
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                DELAY=$((2 ** attempt))
+                echo "::warning::Push failed (attempt $attempt/4). Retrying in ${DELAY}s..."
+                sleep $DELAY
+              fi
+            done
+
+            if [ "$PUSHED" = "false" ]; then
+              echo "::error::Push failed for ${CAT} after 4 attempts"
+              exit 1
+            fi
+
+            TOTAL_COMMITTED=$((TOTAL_COMMITTED + ASSET_COUNT))
+            echo "=== $CAT complete ($ASSET_COUNT PNGs) ==="
+          done
+
+          echo ""
+          echo "========================================"
+          echo "=== All categories complete! Total: ${TOTAL_COMMITTED} PNGs ==="
+          echo "========================================"
 
       - name: Show deployed assets
         if: inputs.dry_run == false
@@ -140,35 +211,4 @@ jobs:
           "
           else
             echo "WARNING: No manifest.json generated"
-          fi
-
-      - name: Commit and push generated assets
-        if: inputs.dry_run == false
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/assets/
-          if git diff --staged --quiet; then
-            echo "::warning::No new assets to commit — check logs above for errors"
-          else
-            ASSET_COUNT=$(git diff --staged --name-only | grep -c '\.png$' || true)
-            git commit -m "assets: Generate ${{ inputs.category }} — ${ASSET_COUNT} images via Gemini"
-
-            # Retry push up to 4 times with exponential backoff
-            # Pull --rebase first to incorporate any remote changes since checkout
-            for attempt in 1 2 3 4; do
-              echo "Push attempt $attempt..."
-              git pull --rebase origin main || true
-              if git push; then
-                echo "Committed and pushed ${ASSET_COUNT} asset files"
-                exit 0
-              fi
-              if [ "$attempt" -lt 4 ]; then
-                DELAY=$((2 ** attempt))
-                echo "::warning::Push failed (attempt $attempt/4). Retrying in ${DELAY}s..."
-                sleep $DELAY
-              fi
-            done
-            echo "::error::Push failed after 4 attempts"
-            exit 1
           fi
