@@ -186,37 +186,63 @@ export class Renderer {
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Use pre-clipped diamond tile canvases directly (no save/clip/restore).
-    // For non-water: hash-based variant selection from procedural + AI tiles.
-    // For water: per-tile staggered animation across 4+ frames.
-    let neighborSig = 0;
-    if (state) {
-      const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-      for (let i = 0; i < cardinalDirs.length; i++) {
-        const nx = x + cardinalDirs[i][0];
-        const ny = y + cardinalDirs[i][1];
-        const nTile = state.map.tiles[ny]?.[nx];
-        if (!nTile || nTile.terrain !== tile.terrain) {
-          neighborSig |= (1 << i);
-        }
-      }
-    }
+    // Prefer seamless terrain texture patterns (rectangular textures clipped
+    // to diamond). Falls back to pre-clipped diamond tile sprites.
+    let drewTerrain = false;
 
-    const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
-    if (sprite) {
-      ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
-    } else {
-      // Fallback: solid color diamond
-      const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
-      if (baseColor) {
-        ctx.fillStyle = baseColor;
+    // Skip water for pattern mode — AI water textures aren't proper seamless
+    // rectangles. Procedural animated water tiles work better.
+    if (assets.hasTerrainTextureMode() && tile.terrain !== Terrain.Water) {
+      const pattern = assets.getTerrainPattern(tile.terrain, ctx);
+      if (pattern) {
+        ctx.save();
+        // Clip to isometric diamond
         ctx.beginPath();
         ctx.moveTo(wx, wy - TILE_HALF_H);
         ctx.lineTo(wx + TILE_HALF_W, wy);
         ctx.lineTo(wx, wy + TILE_HALF_H);
         ctx.lineTo(wx - TILE_HALF_W, wy);
         ctx.closePath();
-        ctx.fill();
+        ctx.clip();
+
+        ctx.fillStyle = pattern;
+        ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+        ctx.restore();
+        drewTerrain = true;
+      }
+    }
+
+    if (!drewTerrain) {
+      // Fallback: use pre-clipped diamond tile sprites
+      let neighborSig = 0;
+      if (state) {
+        const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+        for (let i = 0; i < cardinalDirs.length; i++) {
+          const nx = x + cardinalDirs[i][0];
+          const ny = y + cardinalDirs[i][1];
+          const nTile = state.map.tiles[ny]?.[nx];
+          if (!nTile || nTile.terrain !== tile.terrain) {
+            neighborSig |= (1 << i);
+          }
+        }
+      }
+
+      const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
+      if (sprite) {
+        ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+      } else {
+        // Last resort: solid color diamond
+        const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
+        if (baseColor) {
+          ctx.fillStyle = baseColor;
+          ctx.beginPath();
+          ctx.moveTo(wx, wy - TILE_HALF_H);
+          ctx.lineTo(wx + TILE_HALF_W, wy);
+          ctx.lineTo(wx, wy + TILE_HALF_H);
+          ctx.lineTo(wx - TILE_HALF_W, wy);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
     }
 
@@ -224,7 +250,19 @@ export class Renderer {
     if (tile.object) {
       const obj = assets.getObject(tile.object);
       if (obj) {
-        ctx.drawImage(obj, wx - obj.width / 2, wy - obj.height + TILE_HALF_H);
+        const objW = obj instanceof HTMLImageElement ? obj.naturalWidth : obj.width;
+        const objH = obj instanceof HTMLImageElement ? obj.naturalHeight : obj.height;
+
+        // Ground shadow — elliptical shadow under objects for grounding
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = "#1e1e16";
+        ctx.beginPath();
+        ctx.ellipse(wx, wy, Math.min(objW * 0.4, TILE_HALF_W * 0.7), TILE_HALF_H * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.drawImage(obj, wx - objW / 2, wy - objH + TILE_HALF_H);
       }
     }
   }
@@ -403,7 +441,12 @@ export class Renderer {
       // This avoids browser quirks with the 5-argument form where the source
       // dimensions may be computed incorrectly for certain image states.
       ctx.save();
-      ctx.imageSmoothingEnabled = false;
+      // AI sprites (64x96 HTMLImageElements) are detailed art — use bilinear
+      // smoothing when scaling to display size to avoid pixelation artifacts.
+      // Procedural sprites (small canvases) benefit from nearest-neighbor.
+      const isAiSprite = sprite instanceof HTMLImageElement;
+      ctx.imageSmoothingEnabled = isAiSprite;
+      if (isAiSprite) (ctx as any).imageSmoothingQuality = "high";
       if (srcW > 0 && srcH > 0) {
         ctx.drawImage(sprite, 0, 0, srcW, srcH, spriteLeft, spriteTop, sw, sh);
       }

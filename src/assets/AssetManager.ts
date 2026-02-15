@@ -478,17 +478,20 @@ export class AssetManager {
       }
     }
 
-    // Objects — register under both the manifest key and the game alias
+    // Objects — register under both the manifest key and the game alias.
+    // AI-generated object images often have opaque backgrounds that need
+    // to be removed so they composite correctly over terrain tiles.
     if (manifest.objects) {
       for (const [key, path] of Object.entries(manifest.objects)) {
         this.totalToLoad++;
         promises.push(
           this.loadImage(path).then((img) => {
             if (img) {
-              this.objects.set(key, img);
+              const cleaned = this.cleanObjectAlpha(img);
+              this.objects.set(key, cleaned);
               const alias = AssetManager.OBJECT_ALIAS[key];
               if (alias && !this.objects.has(alias)) {
-                this.objects.set(alias, img);
+                this.objects.set(alias, cleaned);
               }
               this.loadedCount++;
             }
@@ -612,6 +615,82 @@ export class AssetManager {
     ctx.clip();
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
     ctx.restore();
+    return canvas;
+  }
+
+  /**
+   * Remove opaque backgrounds from AI-generated object images.
+   * Samples corner pixels to detect the background color, then makes
+   * all pixels within a color-distance threshold fully transparent.
+   * Feathers edges for clean anti-aliased compositing over terrain.
+   */
+  private cleanObjectAlpha(img: HTMLImageElement): HTMLCanvasElement {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const canvas = this.createCanvas(w, h);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    // Sample corner pixels (4 corners, 2x2 each) to detect background color
+    const corners: [number, number, number][] = [];
+    const samplePoints = [
+      [0, 0], [1, 0], [0, 1],                     // top-left
+      [w - 1, 0], [w - 2, 0], [w - 1, 1],         // top-right
+      [0, h - 1], [1, h - 1], [0, h - 2],         // bottom-left
+      [w - 1, h - 1], [w - 2, h - 1], [w - 1, h - 2], // bottom-right
+    ];
+
+    for (const [sx, sy] of samplePoints) {
+      const idx = (sy * w + sx) * 4;
+      // Only use samples that are mostly opaque (part of the background)
+      if (data[idx + 3] > 200) {
+        corners.push([data[idx], data[idx + 1], data[idx + 2]]);
+      }
+    }
+
+    // If fewer than 4 corner pixels are opaque, image likely already has
+    // proper transparency — return as-is
+    if (corners.length < 4) return canvas;
+
+    // Average the corner samples to get the background color
+    let bgR = 0, bgG = 0, bgB = 0;
+    for (const [r, g, b] of corners) { bgR += r; bgG += g; bgB += b; }
+    bgR = Math.round(bgR / corners.length);
+    bgG = Math.round(bgG / corners.length);
+    bgB = Math.round(bgB / corners.length);
+
+    // Check corner color consistency — if corners vary too much, it's not
+    // a simple background (might be part of the actual art)
+    let maxDev = 0;
+    for (const [r, g, b] of corners) {
+      const dev = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+      if (dev > maxDev) maxDev = dev;
+    }
+    if (maxDev > 80) return canvas; // corners too varied, skip cleanup
+
+    // Remove background: threshold-based with feathered edges
+    const threshold = 55;     // max color distance to consider "background"
+    const featherRange = 25;  // feather zone for smooth edges
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+      if (a < 10) continue; // already transparent
+
+      const dist = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
+      if (dist < threshold) {
+        // Clearly background — make fully transparent
+        data[i + 3] = 0;
+      } else if (dist < threshold + featherRange) {
+        // Feather zone — blend alpha for smooth edge
+        const blend = (dist - threshold) / featherRange;
+        data[i + 3] = Math.round(a * blend);
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
     return canvas;
   }
 
