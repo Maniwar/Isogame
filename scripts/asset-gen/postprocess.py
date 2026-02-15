@@ -198,160 +198,49 @@ def cleanup_transparency(image: Image.Image, threshold: int = 10) -> Image.Image
 
 
 def fill_interior_holes(image: Image.Image) -> Image.Image:
-    """Fill transparent holes inside character sprites.
+    """Fill small transparent gaps inside character sprites.
 
-    AI-generated sprites often have interior transparent pixels (30-50% of the
-    character bounding box) which makes tiles visible through the character.
-
-    Algorithm:
-    1. Build a binary alpha mask (opaque vs transparent)
-    2. Apply morphological closing (dilate then erode) to seal thin gaps
-       between body parts (legs, arms, etc.) that would let the flood fill
-       leak into the interior
-    3. Flood-fill from border on the closed mask to find the exterior
-    4. Any pixel that is transparent in the original AND inside the closed
-       silhouette is an interior hole
-    5. Fill holes by iterative dilation from neighboring opaque pixels
+    Uses morphological closing (dilate then erode) to bridge small 1-2px
+    transparent gaps in the character body. Larger transparent areas (between
+    legs, beside the body) are intentional and left alone.
     """
     if image.mode != "RGBA":
         return image
 
     arr = np.array(image, dtype=np.uint8).copy()
     alpha = arr[:, :, 3]
-    h, w = alpha.shape
 
-    # Build binary mask: True = opaque
+    if not (alpha > 0).any():
+        return image
+
+    # Morphological close with a small 3x3 kernel, 2 iterations.
+    # This fills 1-2px interior gaps without expanding the silhouette much.
+    from scipy.ndimage import binary_dilation, binary_erosion
     opaque = alpha > 0
+    struct = np.ones((3, 3), dtype=bool)
+    closed = binary_dilation(opaque, struct, iterations=2)
+    closed = binary_erosion(closed, struct, iterations=2)
 
-    if not opaque.any():
+    # Only fill pixels that were transparent but are now inside the closed mask
+    to_fill = closed & ~opaque
+    fill_count = int(np.sum(to_fill))
+    if fill_count == 0:
         return image
 
-    # Morphological closing: dilate then erode the opaque mask.
-    # This seals thin gaps (1-3px) between body parts that would otherwise
-    # allow the flood fill to leak into the character interior.
-    close_radius = 3
-    closed = opaque.copy()
-
-    # Dilate: expand opaque regions
-    for _ in range(close_radius):
-        dilated = closed.copy()
-        if h > 1:
-            dilated[1:, :] |= closed[:-1, :]
-            dilated[:-1, :] |= closed[1:, :]
-        if w > 1:
-            dilated[:, 1:] |= closed[:, :-1]
-            dilated[:, :-1] |= closed[:, 1:]
-        closed = dilated
-
-    # Erode: shrink back (but gaps stay sealed)
-    for _ in range(close_radius):
-        eroded = closed.copy()
-        if h > 1:
-            eroded[1:, :] &= closed[:-1, :]
-            eroded[:-1, :] &= closed[1:, :]
-        if w > 1:
-            eroded[:, 1:] &= closed[:, :-1]
-            eroded[:, :-1] &= closed[:, 1:]
-        closed = eroded
-
-    # Flood-fill from border on the CLOSED mask to find exterior
-    from collections import deque
-    exterior = np.zeros((h, w), dtype=bool)
-    queue = deque()
-
-    # Seed from all border transparent pixels (on closed mask)
-    for y in range(h):
-        if not closed[y, 0]:
-            exterior[y, 0] = True
-            queue.append((y, 0))
-        if not closed[y, w - 1]:
-            exterior[y, w - 1] = True
-            queue.append((y, w - 1))
-    for x in range(1, w - 1):
-        if not closed[0, x]:
-            exterior[0, x] = True
-            queue.append((0, x))
-        if not closed[h - 1, x]:
-            exterior[h - 1, x] = True
-            queue.append((h - 1, x))
-
-    # BFS flood fill on closed mask
-    while queue:
-        cy, cx = queue.popleft()
+    # Fill with average color of nearest opaque neighbors
+    ys, xs = np.nonzero(to_fill)
+    for y, x in zip(ys, xs):
+        colors = []
         for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ny, nx = cy + dy, cx + dx
-            if 0 <= ny < h and 0 <= nx < w and not exterior[ny, nx] and not closed[ny, nx]:
-                exterior[ny, nx] = True
-                queue.append((ny, nx))
+            ny, nx = y + dy, x + dx
+            if 0 <= ny < alpha.shape[0] and 0 <= nx < alpha.shape[1] and alpha[ny, nx] > 0:
+                colors.append(arr[ny, nx, :3].astype(np.int32))
+        if colors:
+            avg = np.mean(colors, axis=0).astype(np.uint8)
+            arr[y, x, :3] = avg
+            arr[y, x, 3] = 255
 
-    # Interior holes: transparent in ORIGINAL and NOT exterior in closed mask
-    interior = ~opaque & ~exterior
-    hole_count = int(np.sum(interior))
-    if hole_count == 0:
-        return image
-
-    # Fill holes by iterative nearest-neighbor dilation.
-    # Each iteration expands opaque pixels into adjacent hole pixels,
-    # copying the average color of neighboring opaque pixels.
-    filled = arr.copy()
-    remaining = interior.copy()
-
-    for _ in range(max(h, w)):
-        if not remaining.any():
-            break
-
-        # Find hole pixels adjacent to filled pixels
-        filled_mask = filled[:, :, 3] > 0
-        neighbors = np.zeros_like(remaining)
-        if h > 1:
-            neighbors[1:, :] |= filled_mask[:-1, :]
-            neighbors[:-1, :] |= filled_mask[1:, :]
-        if w > 1:
-            neighbors[:, 1:] |= filled_mask[:, :-1]
-            neighbors[:, :-1] |= filled_mask[:, 1:]
-
-        # Pixels to fill this iteration: holes with at least one opaque neighbor
-        to_fill = remaining & neighbors
-        if not to_fill.any():
-            break
-
-        # For each pixel to fill, average the colors of opaque neighbors
-        ys, xs = np.nonzero(to_fill)
-        for y, x in zip(ys, xs):
-            colors = []
-            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                ny, nx = y + dy, x + dx
-                if 0 <= ny < h and 0 <= nx < w and filled[ny, nx, 3] > 0:
-                    colors.append(filled[ny, nx, :3].astype(np.int32))
-            if colors:
-                avg = np.mean(colors, axis=0).astype(np.uint8)
-                filled[y, x, :3] = avg
-                filled[y, x, 3] = 255
-
-        remaining[to_fill] = False
-
-    # Any remaining isolated holes: fill with nearest opaque pixel
-    if remaining.any():
-        ys, xs = np.nonzero(remaining)
-        for y, x in zip(ys, xs):
-            for radius in range(1, max(h, w)):
-                found = False
-                for dy in range(-radius, radius + 1):
-                    for dx in range(-radius, radius + 1):
-                        if abs(dy) != radius and abs(dx) != radius:
-                            continue
-                        ny, nx = y + dy, x + dx
-                        if 0 <= ny < h and 0 <= nx < w and filled[ny, nx, 3] > 0:
-                            filled[y, x, :3] = filled[ny, nx, :3]
-                            filled[y, x, 3] = 255
-                            found = True
-                            break
-                    if found:
-                        break
-                if found:
-                    break
-
-    return Image.fromarray(filled, "RGBA")
+    return Image.fromarray(arr, "RGBA")
 
 
 def assemble_spritesheet(
@@ -648,87 +537,69 @@ def slice_spritesheet(
     cols: int,
 ) -> list[list[Image.Image]]:
     """
-    Sprite sheet slicer with uniform scaling across all frames.
+    Simple sprite sheet slicer: equal grid cells, proportional scale.
 
-    1. Detects natural grid boundaries (Gemini produces uneven grids)
-    2. Extracts each cell, strips spillover from neighboring cells
-    3. Computes one uniform scale factor from the largest content across
-       ALL cells — so every frame shows the character at the same size
-    4. Applies that scale and places content bottom-center
+    Uses plain equal-sized grid cells (sheet_size / rows/cols) — no
+    content-aware grid detection.  Scales each cell proportionally by
+    height to fit the target frame, preserving character proportions
+    across ALL characters (since Gemini draws them at roughly the same
+    scale within their cells).
 
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
     """
     sheet = sheet.convert("RGBA")
+    sw, sh = sheet.size
 
-    # Detect the grid structure (content-aware, handles uneven spacing)
-    grid = detect_grid(sheet, rows, cols)
+    # Equal grid: every cell is exactly the same size
+    src_cell_w = sw // cols
+    src_cell_h = sh // rows
 
-    # First pass: extract all regions, strip spillover, find content bboxes
-    regions: list[list[Image.Image]] = []
-    bboxes: list[list[tuple[int, int, int, int] | None]] = []
-    all_cws: list[int] = []
-    all_chs: list[int] = []
+    # Single scale factor: map cell height → target height.
+    # This is the same for ALL characters (since 2048/8=256 for all NPC
+    # sheets), which keeps their relative proportions from the AI art.
+    scale = cell_h / src_cell_h
 
-    for r in range(rows):
-        row_regions = []
-        row_bboxes = []
-        for c in range(cols):
-            x, y, w, h = grid[r][c]
-            region = sheet.crop((x, y, x + w, y + h))
-            region = _strip_spillover(region)
-            bbox = find_content_bbox(region)
-            row_regions.append(region)
-            row_bboxes.append(bbox)
-            if bbox is not None:
-                all_cws.append(bbox[2] - bbox[0])
-                all_chs.append(bbox[3] - bbox[1])
-        regions.append(row_regions)
-        bboxes.append(row_bboxes)
-
-    # Compute one uniform scale factor from the 90th-percentile content
-    # HEIGHT. We scale to fill the frame vertically (which determines
-    # visual size) and allow wide poses (arms/weapons) to be center-cropped
-    # horizontally if needed. Using height-only prevents wide outlier cells
-    # from shrinking all frames to tiny sizes.
-    if all_chs:
-        ref_ch = int(np.percentile(all_chs, 90))
-        scale = cell_h / ref_ch if ref_ch > 0 else 1.0
-    else:
-        scale = 1.0
-
-    # Second pass: crop each cell's content, scale uniformly, place bottom-center
     frames = []
     for r in range(rows):
         row_frames = []
         for c in range(cols):
-            bbox = bboxes[r][c]
-            if bbox is None:
-                row_frames.append(Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0)))
-                continue
+            # Extract cell from equal grid
+            x = c * src_cell_w
+            y = r * src_cell_h
+            region = sheet.crop((x, y, x + src_cell_w, y + src_cell_h))
 
-            content = regions[r][c].crop(bbox)
-            cw, ch = content.size
+            # Scale proportionally (same factor for width and height)
+            new_w = max(1, int(src_cell_w * scale))
+            new_h = max(1, int(src_cell_h * scale))
+            scaled = region.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
-            new_w = max(1, int(cw * scale))
-            new_h = max(1, int(ch * scale))
-            content = content.resize((new_w, new_h), Image.Resampling.LANCZOS)
-
-            # Center-crop horizontally if wider than target
-            if new_w > cell_w:
-                crop_x = (new_w - cell_w) // 2
-                content = content.crop((crop_x, 0, crop_x + cell_w, new_h))
-                new_w = cell_w
-            # Crop from top if taller than target
-            if new_h > cell_h:
-                content = content.crop((0, new_h - cell_h, new_w, new_h))
-                new_h = cell_h
-
-            # Place bottom-center (feet on ground)
+            # Place onto target canvas: center horizontally, align bottom
             canvas = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
-            offset_x = (cell_w - new_w) // 2
-            offset_y = cell_h - new_h
-            canvas.paste(content, (offset_x, offset_y), content)
+
+            # Horizontal: center, crop if wider than target
+            if new_w <= cell_w:
+                paste_x = (cell_w - new_w) // 2
+                src_crop_x = 0
+                paste_w = new_w
+            else:
+                paste_x = 0
+                src_crop_x = (new_w - cell_w) // 2
+                paste_w = cell_w
+
+            # Vertical: bottom-align (feet on ground), crop top if taller
+            if new_h <= cell_h:
+                paste_y = cell_h - new_h
+                src_crop_y = 0
+                paste_h = new_h
+            else:
+                paste_y = 0
+                src_crop_y = new_h - cell_h
+                paste_h = cell_h
+
+            cropped = scaled.crop((src_crop_x, src_crop_y,
+                                   src_crop_x + paste_w, src_crop_y + paste_h))
+            canvas.paste(cropped, (paste_x, paste_y), cropped)
             row_frames.append(canvas)
         frames.append(row_frames)
 
