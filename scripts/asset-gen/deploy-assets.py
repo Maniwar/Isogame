@@ -321,6 +321,10 @@ def deploy(source: Path, target: Path) -> dict:
         "sheriff-morgan": "npc_sheriff",
         "doc-hendricks": "npc_doc",
         "scrap": "npc_merchant",
+        "guard-captain": "npc_guard",
+        "bone-feather": "npc_tribal",
+        "old-pete": "npc_caravan",
+        "grim": "npc_ghoul",
     }
     portraits_dir = source / "portraits"
     if portraits_dir.exists():

@@ -15,6 +15,7 @@ on:
           - tiles
           - tile_sheets
           - characters
+          - objects
           - items
           - portraits
       dry_run:
@@ -123,7 +124,7 @@ jobs:
             python3 -c "
           import json
           m = json.load(open('public/assets/manifest.json'))
-          for section in ('terrain_textures', 'sprites', 'animations', 'tiles', 'items', 'portraits'):
+          for section in ('terrain_textures', 'sprites', 'animations', 'tiles', 'objects', 'items', 'portraits'):
               if section in m:
                   keys = list(m[section].keys())
                   if section == 'animations':
