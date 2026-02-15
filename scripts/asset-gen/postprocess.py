@@ -484,6 +484,38 @@ def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5
     return Image.fromarray(result_arr, "RGBA")
 
 
+def _premultiplied_resize(
+    image: Image.Image, new_w: int, new_h: int
+) -> Image.Image:
+    """Resize an RGBA image using LANCZOS with premultiplied alpha.
+
+    Standard LANCZOS on non-premultiplied RGBA creates dark halos: fully
+    transparent pixels have RGB=(0,0,0), and the interpolation bleeds that
+    black into neighboring opaque edges.
+
+    Fix: premultiply RGB by alpha before resize, then un-premultiply after.
+    This ensures transparent pixels contribute zero color to the blend.
+    """
+    arr = np.array(image, dtype=np.float64)
+    alpha = arr[:, :, 3:4] / 255.0
+
+    # Premultiply: RGB * (A/255)
+    arr[:, :, :3] *= alpha
+    premul = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+
+    # Resize all channels together
+    scaled = premul.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    # Un-premultiply: RGB / (A/255), only where A > 0
+    arr2 = np.array(scaled, dtype=np.float64)
+    a2 = arr2[:, :, 3:4]
+    # Replace zero alpha with 1 to avoid division by zero, then mask result
+    safe_a = np.where(a2 > 0, a2, 1.0)
+    arr2[:, :, :3] = np.where(a2 > 0, arr2[:, :, :3] / (safe_a / 255.0), 0)
+
+    return Image.fromarray(np.clip(arr2, 0, 255).astype(np.uint8), "RGBA")
+
+
 def slice_spritesheet(
     sheet: Image.Image,
     cell_w: int,
@@ -492,13 +524,16 @@ def slice_spritesheet(
     cols: int,
 ) -> list[list[Image.Image]]:
     """
-    Simple sprite sheet slicer: equal grid cells, proportional scale.
+    Sprite sheet slicer: equal grid cells, premultiplied-alpha resize.
 
-    Uses plain equal-sized grid cells (sheet_size / rows/cols) — no
-    content-aware grid detection.  Scales each cell proportionally by
-    height to fit the target frame, preserving character proportions
-    across ALL characters (since Gemini draws them at roughly the same
-    scale within their cells).
+    Uses plain equal-sized grid cells (sheet_size / rows/cols).  Scales
+    each cell proportionally by height to fit the target frame, preserving
+    character proportions across ALL characters.
+
+    Key fixes:
+      - _strip_spillover() removes fragments bleeding from adjacent cells
+      - Premultiplied-alpha LANCZOS resize prevents dark halo artifacts
+      - Aggressive transparency cleanup (threshold=128) for crisp edges
 
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
@@ -524,10 +559,18 @@ def slice_spritesheet(
             y = r * src_cell_h
             region = sheet.crop((x, y, x + src_cell_w, y + src_cell_h))
 
-            # Scale proportionally (same factor for width and height)
+            # Remove fragments from neighboring cells bleeding across the boundary
+            region = _strip_spillover(region)
+
+            # Scale proportionally using premultiplied alpha to prevent dark halos
             new_w = max(1, int(src_cell_w * scale))
             new_h = max(1, int(src_cell_h * scale))
-            scaled = region.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            scaled = _premultiplied_resize(region, new_w, new_h)
+
+            # Aggressive transparency cleanup: snap semi-transparent fringe to fully
+            # opaque or fully transparent.  Threshold=128 catches all visible fringes
+            # that LANCZOS creates at character edges.
+            scaled = cleanup_transparency(scaled, threshold=128)
 
             # Place onto target canvas: center horizontally, align bottom
             canvas = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
@@ -723,8 +766,8 @@ def slice_and_save_character_sheet(
             if frame is None:
                 frame = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
 
-            # Post-process each frame
-            frame = cleanup_transparency(frame)
+            # Post-process each frame (match slicer threshold for crisp edges)
+            frame = cleanup_transparency(frame, threshold=128)
             if apply_palette:
                 palette_img = build_palette_image(config)
                 frame = reduce_palette(frame, palette_img)
