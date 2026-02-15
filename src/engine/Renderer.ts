@@ -387,11 +387,14 @@ export class Renderer {
     const spriteTop = finalDrawY - sh + TILE_HALF_H;
 
     if (sprite) {
-      // Bilinear filtering is correct here: at default zoom=2 + mobile DPR,
-      // sprites are always upscaled (64x96 → 200+ physical px), so bilinear
-      // gives smooth results. The pipeline ensures binary alpha (no semi-
-      // transparent fringe), so premultiplied alpha halos are not an issue.
+      // Disable bilinear filtering for sprites: the 64x96 source is drawn
+      // at 52x78 (downscaled), and bilinear interpolation of binary-alpha
+      // edges blends transparent pixels (RGBA 0,0,0,0) with opaque neighbors,
+      // creating dark halo borders at runtime.  Nearest-neighbor preserves
+      // the clean binary alpha from the asset pipeline.
+      ctx.imageSmoothingEnabled = false;
       ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
+      ctx.imageSmoothingEnabled = true;
     } else {
       // Fallback: draw a simple colored shape if no sprite found
       ctx.fillStyle = entity.isPlayer ? "#40c040" : entity.isHostile ? "#b83030" : "#d4c4a0";

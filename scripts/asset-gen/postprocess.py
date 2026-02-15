@@ -197,51 +197,6 @@ def cleanup_transparency(image: Image.Image, threshold: int = 10) -> Image.Image
     return Image.fromarray(arr, "RGBA")
 
 
-def fill_interior_holes(image: Image.Image) -> Image.Image:
-    """Fill small transparent gaps inside character sprites.
-
-    Uses morphological closing (dilate then erode) to bridge small 1-2px
-    transparent gaps in the character body. Larger transparent areas (between
-    legs, beside the body) are intentional and left alone.
-    """
-    if image.mode != "RGBA":
-        return image
-
-    arr = np.array(image, dtype=np.uint8).copy()
-    alpha = arr[:, :, 3]
-
-    if not (alpha > 0).any():
-        return image
-
-    # Morphological close with a small 3x3 kernel, 2 iterations.
-    # This fills 1-2px interior gaps without expanding the silhouette much.
-    from scipy.ndimage import binary_dilation, binary_erosion
-    opaque = alpha > 0
-    struct = np.ones((3, 3), dtype=bool)
-    closed = binary_dilation(opaque, struct, iterations=2)
-    closed = binary_erosion(closed, struct, iterations=2)
-
-    # Only fill pixels that were transparent but are now inside the closed mask
-    to_fill = closed & ~opaque
-    fill_count = int(np.sum(to_fill))
-    if fill_count == 0:
-        return image
-
-    # Fill with average color of nearest opaque neighbors
-    ys, xs = np.nonzero(to_fill)
-    for y, x in zip(ys, xs):
-        colors = []
-        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ny, nx = y + dy, x + dx
-            if 0 <= ny < alpha.shape[0] and 0 <= nx < alpha.shape[1] and alpha[ny, nx] > 0:
-                colors.append(arr[ny, nx, :3].astype(np.int32))
-        if colors:
-            avg = np.mean(colors, axis=0).astype(np.uint8)
-            arr[y, x, :3] = avg
-            arr[y, x, 3] = 255
-
-    return Image.fromarray(arr, "RGBA")
-
 
 def assemble_spritesheet(
     frames: list[Image.Image],
@@ -529,6 +484,38 @@ def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5
     return Image.fromarray(result_arr, "RGBA")
 
 
+def _premultiplied_resize(
+    image: Image.Image, new_w: int, new_h: int
+) -> Image.Image:
+    """Resize an RGBA image using LANCZOS with premultiplied alpha.
+
+    Standard LANCZOS on non-premultiplied RGBA creates dark halos: fully
+    transparent pixels have RGB=(0,0,0), and the interpolation bleeds that
+    black into neighboring opaque edges.
+
+    Fix: premultiply RGB by alpha before resize, then un-premultiply after.
+    This ensures transparent pixels contribute zero color to the blend.
+    """
+    arr = np.array(image, dtype=np.float64)
+    alpha = arr[:, :, 3:4] / 255.0
+
+    # Premultiply: RGB * (A/255)
+    arr[:, :, :3] *= alpha
+    premul = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+
+    # Resize all channels together
+    scaled = premul.resize((new_w, new_h), Image.Resampling.LANCZOS)
+
+    # Un-premultiply: RGB / (A/255), only where A > 0
+    arr2 = np.array(scaled, dtype=np.float64)
+    a2 = arr2[:, :, 3:4]
+    # Replace zero alpha with 1 to avoid division by zero, then mask result
+    safe_a = np.where(a2 > 0, a2, 1.0)
+    arr2[:, :, :3] = np.where(a2 > 0, arr2[:, :, :3] / (safe_a / 255.0), 0)
+
+    return Image.fromarray(np.clip(arr2, 0, 255).astype(np.uint8), "RGBA")
+
+
 def slice_spritesheet(
     sheet: Image.Image,
     cell_w: int,
@@ -537,13 +524,16 @@ def slice_spritesheet(
     cols: int,
 ) -> list[list[Image.Image]]:
     """
-    Simple sprite sheet slicer: equal grid cells, proportional scale.
+    Sprite sheet slicer: equal grid cells, premultiplied-alpha resize.
 
-    Uses plain equal-sized grid cells (sheet_size / rows/cols) — no
-    content-aware grid detection.  Scales each cell proportionally by
-    height to fit the target frame, preserving character proportions
-    across ALL characters (since Gemini draws them at roughly the same
-    scale within their cells).
+    Uses plain equal-sized grid cells (sheet_size / rows/cols).  Scales
+    each cell proportionally by height to fit the target frame, preserving
+    character proportions across ALL characters.
+
+    Key fixes:
+      - _strip_spillover() removes fragments bleeding from adjacent cells
+      - Premultiplied-alpha LANCZOS resize prevents dark halo artifacts
+      - Aggressive transparency cleanup (threshold=128) for crisp edges
 
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
@@ -569,10 +559,18 @@ def slice_spritesheet(
             y = r * src_cell_h
             region = sheet.crop((x, y, x + src_cell_w, y + src_cell_h))
 
-            # Scale proportionally (same factor for width and height)
+            # Remove fragments from neighboring cells bleeding across the boundary
+            region = _strip_spillover(region)
+
+            # Scale proportionally using premultiplied alpha to prevent dark halos
             new_w = max(1, int(src_cell_w * scale))
             new_h = max(1, int(src_cell_h * scale))
-            scaled = region.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            scaled = _premultiplied_resize(region, new_w, new_h)
+
+            # Aggressive transparency cleanup: snap semi-transparent fringe to fully
+            # opaque or fully transparent.  Threshold=128 catches all visible fringes
+            # that LANCZOS creates at character edges.
+            scaled = cleanup_transparency(scaled, threshold=128)
 
             # Place onto target canvas: center horizontally, align bottom
             canvas = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
@@ -627,27 +625,36 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     is_green = (g > 100) & (g > r + 20) & (g > b + 30)
     arr[is_green, 3] = 0
 
-    # Second pass: detect dominant border color and remove it.
-    # Some sheets have a non-standard green that passes RGB checks
-    # but also have near-uniform background colors that should be removed.
+    # Second pass: detect dominant border color and remove it — but only
+    # if the borders are actually opaque.  Sheets that already have a
+    # transparent background (border alpha mostly 0) don't need this, and
+    # running it anyway risks matching character skin/clothing colors that
+    # happen to be close to the transparent pixels' stale RGB values.
     h, w = arr.shape[:2]
-    border_pixels = np.concatenate([
-        arr[0, :, :3],         # top row
-        arr[h-1, :, :3],       # bottom row
-        arr[:, 0, :3],         # left col
-        arr[:, w-1, :3],       # right col
-    ], axis=0).astype(np.float32)
+    border_alpha = np.concatenate([
+        arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
+    ])
+    border_opaque_fraction = np.mean(border_alpha > 10)
 
-    if len(border_pixels) > 0:
-        # Find median border color
-        median_color = np.median(border_pixels, axis=0)
-        # Remove pixels within a tolerance of the median border color
-        diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
-        is_bg = diff < 40  # 40 = Euclidean distance tolerance
-        # Only apply if the border color is significantly present (>30% of image)
-        bg_fraction = np.sum(is_bg) / (h * w)
-        if bg_fraction > 0.30:
-            arr[is_bg, 3] = 0
+    if border_opaque_fraction > 0.5:
+        # Borders are mostly opaque — this sheet has a solid background
+        border_pixels = np.concatenate([
+            arr[0, :, :3], arr[h-1, :, :3], arr[:, 0, :3], arr[:, w-1, :3]
+        ], axis=0).astype(np.float32)
+
+        # Only consider opaque border pixels for the median
+        border_alpha_flat = np.concatenate([
+            arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
+        ])
+        opaque_border = border_pixels[border_alpha_flat > 10]
+
+        if len(opaque_border) > 0:
+            median_color = np.median(opaque_border, axis=0)
+            diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
+            is_bg = diff < 40
+            bg_fraction = np.sum(is_bg) / (h * w)
+            if bg_fraction > 0.30:
+                arr[is_bg, 3] = 0
 
     return Image.fromarray(arr, "RGBA")
 
@@ -768,9 +775,8 @@ def slice_and_save_character_sheet(
             if frame is None:
                 frame = Image.new("RGBA", (cell_w, cell_h), (0, 0, 0, 0))
 
-            # Post-process each frame
-            frame = cleanup_transparency(frame)
-            frame = fill_interior_holes(frame)
+            # Post-process each frame (match slicer threshold for crisp edges)
+            frame = cleanup_transparency(frame, threshold=128)
             if apply_palette:
                 palette_img = build_palette_image(config)
                 frame = reduce_palette(frame, palette_img)
