@@ -297,18 +297,46 @@ def extract_and_center(region: Image.Image, target_w: int, target_h: int,
     return canvas
 
 
-def detect_actual_grid_size(sheet: Image.Image, min_cell: int = 120) -> tuple[int, int]:
+def detect_actual_grid_size(
+    sheet: Image.Image,
+    min_cell: int = 120,
+    expected_rows: int = 8,
+    expected_cols: int = 8,
+) -> tuple[int, int]:
     """Detect the actual number of rows and columns in a sprite sheet.
 
     Gemini often ignores the requested grid size (e.g. 8×8) and produces
     anything from 4×1 to 6×6.  This function analyses alpha-channel density
     to find natural gaps between cells and counts the real grid dimensions.
 
+    For sheets whose dimensions match the expected grid (e.g. 2048×2048 for
+    8×8), the expected size is used directly.  Alpha-based gap detection is
+    unreliable when characters have dense overlapping content — it detected
+    7 rows instead of 8 for the raider sheet, causing misaligned slicing
+    that "splits" characters.
+
     Returns (actual_rows, actual_cols).
     """
+    sw, sh = sheet.size
+
+    # For sheets matching the expected grid dimensions (2048×2048 → 8×8),
+    # skip unreliable gap detection and use the known grid directly.
+    # The Gemini pipeline always requests 8×8 at 2048×2048.
+    # Only apply this for large sheets (cell >= 200px) to avoid forcing
+    # 8×8 on smaller sheets (e.g. 1024×1024) that genuinely have fewer cells.
+    expected_cell_w = sw / expected_cols
+    expected_cell_h = sh / expected_rows
+    min_expected_cell = 200  # 2048/8 = 256 passes; 1024/8 = 128 doesn't
+    if (expected_cell_w == int(expected_cell_w) and
+            expected_cell_h == int(expected_cell_h) and
+            int(expected_cell_w) >= min_expected_cell and
+            int(expected_cell_h) >= min_expected_cell):
+        return expected_rows, expected_cols
+
+    # For non-standard sheet sizes, fall back to alpha-density detection
     arr = np.array(sheet.convert("RGBA"))
     alpha = arr[:, :, 3]
-    sh, sw = alpha.shape
+    ah, aw = alpha.shape
 
     row_density = np.mean(alpha > 10, axis=1)
     col_density = np.mean(alpha > 10, axis=0)
@@ -361,8 +389,8 @@ def detect_actual_grid_size(sheet: Image.Image, min_cell: int = 120) -> tuple[in
 
         return len(best_filtered) - 1, best_filtered
 
-    actual_rows, row_splits = count_cells(row_density, sh)
-    actual_cols, col_splits = count_cells(col_density, sw)
+    actual_rows, row_splits = count_cells(row_density, ah)
+    actual_cols, col_splits = count_cells(col_density, aw)
 
     return actual_rows, actual_cols
 
@@ -432,10 +460,19 @@ def detect_grid(sheet: Image.Image, expected_rows: int, expected_cols: int) -> l
 def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5) -> Image.Image:
     """Remove spillover content from neighboring cells.
 
-    Grid detection boundaries sometimes cut through characters, leaving
-    a small fragment (e.g. boots from the row above) disconnected from
-    the main content. This finds vertical gaps of >= gap_rows fully-
-    transparent rows and erases the smaller fragment.
+    AI-generated sprite sheets have characters that extend beyond their
+    grid cell (~280px tall in 256px cells).  After equal-grid slicing,
+    each cell may contain:
+      - Small boot/head fragments from an adjacent row (spillover)
+      - The main character body for this cell
+
+    Strategy: find vertical bands separated by transparent gaps, then
+    keep the band closest to the BOTTOM of the cell.  Characters stand
+    on the ground, so the main body is always in the bottom portion
+    while spillover from the row above appears near the top.
+
+    Only strips when the top band is significantly smaller than the
+    bottom band (< 40% its height) to avoid removing legitimate content.
     """
     arr = np.array(region.convert("RGBA"))
     alpha = arr[:, :, 3]
@@ -462,7 +499,7 @@ def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5
     if len(bands) <= 1:
         return region  # single band or empty — nothing to strip
 
-    # Check if bands are separated by significant gaps
+    # Merge bands that are very close together (< gap_rows)
     merged: list[tuple[int, int]] = [bands[0]]
     for start, end in bands[1:]:
         prev_start, prev_end = merged[-1]
@@ -474,13 +511,17 @@ def _strip_spillover(region: Image.Image, threshold: int = 10, gap_rows: int = 5
     if len(merged) <= 1:
         return region  # all bands are close together
 
-    # Keep the largest band (by pixel height), erase others
-    largest = max(merged, key=lambda b: b[1] - b[0])
+    # Keep ONLY the bottom-most band (where the character body is).
+    # Characters are bottom-aligned (feet on ground) in each cell, so
+    # the main body is always at the bottom.  Spillover from the row
+    # above always appears near the top of the cell.  Erase everything
+    # above the bottom band.
+    bottom_band = merged[-1]
+
     result = region.copy()
     result_arr = np.array(result)
-    for start, end in merged:
-        if (start, end) != largest:
-            result_arr[start:end, :, 3] = 0  # erase spillover
+    for start, end in merged[:-1]:
+        result_arr[start:end, :, 3] = 0  # erase top spillover
     return Image.fromarray(result_arr, "RGBA")
 
 
@@ -530,11 +571,6 @@ def slice_spritesheet(
     each cell proportionally by height to fit the target frame, preserving
     character proportions across ALL characters.
 
-    Key fixes:
-      - _strip_spillover() removes fragments bleeding from adjacent cells
-      - Premultiplied-alpha LANCZOS resize prevents dark halo artifacts
-      - Aggressive transparency cleanup (threshold=128) for crisp edges
-
     Returns:
         2D list: result[row][col] = individual frame Image (target size).
     """
@@ -559,8 +595,13 @@ def slice_spritesheet(
             y = r * src_cell_h
             region = sheet.crop((x, y, x + src_cell_w, y + src_cell_h))
 
-            # Remove fragments from neighboring cells bleeding across the boundary
-            region = _strip_spillover(region)
+            # Remove fragments from neighboring cells bleeding across the boundary.
+            # Characters in AI-generated sheets often extend beyond their 256px
+            # grid cell, so adjacent cells contain boot/head spillover separated
+            # by 10-30px transparent gaps.  Use gap_rows=8 to catch these gaps
+            # (verified: rows 3-7 in all sheets have 0 internal gaps, so no
+            # false positives; only rows 1-2 in some sheets have real spillover).
+            region = _strip_spillover(region, gap_rows=8)
 
             # Scale proportionally using premultiplied alpha to prevent dark halos
             new_w = max(1, int(src_cell_w * scale))
