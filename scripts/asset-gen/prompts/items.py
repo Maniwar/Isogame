@@ -1,11 +1,14 @@
 """Prompt templates for inventory item icon generation."""
 
 ITEM_STYLE_PREAMBLE = (
-    "Create an inventory icon in the style of classic Fallout 2. "
+    "Create an inventory icon in the style of Fallout 2 (1998, Black Isle Studios). "
     "The icon should be a clear, recognizable depiction of the item "
     "on a transparent background. "
-    "Use a muted post-apocalyptic color palette with earthy tones. "
-    "The style should be detailed pixel art, slightly isometric perspective. "
+    "Desaturated post-nuclear color palette: rusty browns, olive drab, "
+    "weathered metal grays, faded labels. Nothing looks new or clean. "
+    "Pre-rendered 3D look with visible wear and texture detail — "
+    "matching the Fallout 2 inventory screen aesthetic. "
+    "Slightly angled top-down perspective, like items laid on a table. "
 )
 
 ITEM_TEMPLATE = (

@@ -286,6 +286,20 @@ def deploy(source: Path, target: Path) -> dict:
                     deployed += 1
                     print(f"  Sheet: {weapon_key}-sheet.png (kept)")
 
+    # --- Environmental objects ---
+    objects_dir = source / "objects"
+    if objects_dir.exists():
+        for cat_dir in sorted(objects_dir.iterdir()):
+            if not cat_dir.is_dir():
+                continue
+            for png in sorted(cat_dir.glob("*.png")):
+                obj_key = png.stem  # e.g., "destroyed_car", "dead_tree"
+                dest = target / "objects" / png.name
+                shutil.copy2(png, dest)
+                manifest["objects"][obj_key] = f"/assets/objects/{png.name}"
+                deployed += 1
+                print(f"  Object: {png.name} -> {obj_key}")
+
     # --- Items ---
     items_dir = source / "items"
     if items_dir.exists():

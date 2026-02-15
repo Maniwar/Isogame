@@ -1,11 +1,15 @@
 """Prompt templates for NPC dialogue portrait generation."""
 
 PORTRAIT_STYLE_PREAMBLE = (
-    "Create a character portrait in the style of classic Fallout 2 dialogue screens. "
-    "The portrait should be a head-and-shoulders shot, facing slightly to one side. "
-    "Use a muted post-apocalyptic color palette. "
-    "The art style should be detailed, painterly pixel art with visible brushwork. "
-    "Dark, moody lighting with a neutral or slightly warm background. "
+    "Create a character portrait in the style of Fallout 2 (1998, Black Isle Studios) "
+    "dialogue screens — the 'talking heads' aesthetic. "
+    "Head-and-shoulders shot, facing slightly to one side, tight framing. "
+    "Desaturated post-nuclear color palette: skin tones are weathered and sun-damaged, "
+    "clothing is faded and dusty, lighting is harsh overhead like desert sun. "
+    "Art style: realistic painted look with visible texture and grit — NOT cartoon. "
+    "Like a pre-rendered 3D character portrait from the late 1990s. "
+    "Dark, warm-toned background (deep brown or dark olive, not black). "
+    "Faces show age, scars, dirt, sunburn — life in the wasteland is hard. "
 )
 
 PORTRAIT_TEMPLATE = (
@@ -59,6 +63,41 @@ NPC_PORTRAITS = [
             "multiple piercings, and a necklace of bottle caps"
         ),
         "expression": "threatening, predatory smile",
+    },
+    {
+        "name": "Guard Captain",
+        "description": (
+            "A battle-hardened settlement guard with a scarred face, combat helmet, "
+            "and makeshift metal armor. Square jaw, alert eyes scanning for threats"
+        ),
+        "expression": "vigilant, stern, no-nonsense",
+    },
+    {
+        "name": "Bone Feather",
+        "description": (
+            "A young tribal warrior with face paint in geometric patterns, "
+            "bone piercings, feathers braided into long dark hair, and animal "
+            "hide necklace. Sun-darkened skin"
+        ),
+        "expression": "proud, wary, intense gaze",
+    },
+    {
+        "name": "Old Pete",
+        "description": (
+            "A grizzled caravan driver, deeply tanned with sun-crinkled eyes, "
+            "a wide-brimmed leather hat, gray stubble, and a perpetual squint. "
+            "Looks like he's seen every mile of wasteland road"
+        ),
+        "expression": "weary but friendly, knowing half-smile",
+    },
+    {
+        "name": "Grim",
+        "description": (
+            "A civilized ghoul with patches of raw tissue where skin has "
+            "sloughed off, sunken eyes, no nose, wearing a pre-war fedora "
+            "and a surprisingly well-maintained suit jacket over a rotting shirt"
+        ),
+        "expression": "sardonic, world-weary, dark humor",
     },
 ]
 

@@ -19,10 +19,16 @@ Weapon variant system:
 """
 
 CHAR_STYLE_PREAMBLE = (
-    "Create a character sprite in the style of classic Fallout 2. "
-    "Top-down 3/4 isometric perspective. "
-    "Muted, desaturated post-apocalyptic color palette with earthy tones. "
-    "Detailed pixel art with a gritty, weathered feel. "
+    "Create a character sprite in the style of Fallout 2 (1998, Black Isle Studios). "
+    "Top-down 3/4 isometric perspective — the exact camera angle used in Fallout 2. "
+    "Characters are small, proportional figures (not chibi, not exaggerated). "
+    "Color palette: desaturated earth tones — dusty browns, olive drab, rust, "
+    "faded khaki, weathered gray. NO bright or saturated colors. "
+    "Everything is sun-bleached and worn. Leather is cracked, metal is rusted, "
+    "fabric is frayed. The aesthetic is 1950s retro-futuristic Americana "
+    "after nuclear war — Atomic Age design language decayed by 80 years of neglect. "
+    "Art style: detailed pre-rendered 3D look (like original Fallout 2 sprites), "
+    "slightly soft with visible texture detail, NOT flat cartoon pixel art. "
     "CRITICAL: Pure bright GREEN (#00FF00) chroma key background everywhere. "
     "Draw ONLY the character — NO scenery, NO ground, NO shadows, NO text, NO labels. "
 )
@@ -182,6 +188,60 @@ CHARACTER_BASES = {
             "Full body visible from head to boots."
         ),
     },
+    "npc_guard": {
+        "name": "Settlement Guard",
+        "description": (
+            "A stoic guard wearing makeshift metal armor plates over leather, "
+            "a combat helmet with scratches, and a dusty bandana around the neck. "
+            "Sturdy build, alert posture. "
+            "Full body visible from head to boots."
+        ),
+    },
+    "npc_tribal": {
+        "name": "Tribal Warrior",
+        "description": (
+            "A lean tribal warrior with body paint, bone jewelry, "
+            "and patched animal hide clothing. Feathers braided into dark hair. "
+            "Carries a sharpened spear. Desert-adapted tribal survivor. "
+            "Full body visible from head to bare feet."
+        ),
+    },
+    "npc_caravan": {
+        "name": "Caravan Driver",
+        "description": (
+            "A weathered caravan trader wearing a wide-brimmed leather hat, "
+            "a long dust coat with many pockets, and heavy boots. "
+            "Tanned and wind-burned face, rope belt with canteen. "
+            "Full body visible from head to boots."
+        ),
+    },
+    "npc_wastelander": {
+        "name": "Wastelander",
+        "description": (
+            "A generic wasteland survivor in ragged, patched clothing. "
+            "Faded t-shirt, worn jeans, makeshift sandals. Thin and sun-weathered. "
+            "Carries a small satchel. Looks tired but surviving. "
+            "Full body visible from head to feet."
+        ),
+    },
+    "npc_mutant": {
+        "name": "Super Mutant",
+        "description": (
+            "A large, hulking super mutant with greenish-yellow skin, "
+            "massive muscles, and a crude outfit of scrap metal and leather straps. "
+            "Bald, heavy brow, small angry eyes. Towering and intimidating. "
+            "Full body visible from head to feet."
+        ),
+    },
+    "npc_ghoul": {
+        "name": "Ghoul",
+        "description": (
+            "A radiation-scarred ghoul with patches of missing skin revealing "
+            "raw tissue, a raspy thin frame, and tattered pre-war clothing. "
+            "Sunken eyes, no nose, lipless mouth. Still intelligent and civilized. "
+            "Full body visible from head to worn shoes."
+        ),
+    },
 }
 
 # ---------------------------------------------------------------------------
@@ -261,6 +321,12 @@ def _build_archetypes():
         "npc_merchant": "rifle",
         "npc_doc": "unarmed",
         "npc_raider": "rifle",
+        "npc_guard": "rifle",
+        "npc_tribal": "knife",
+        "npc_caravan": "pistol",
+        "npc_wastelander": "unarmed",
+        "npc_mutant": "bat",
+        "npc_ghoul": "pistol",
     }
     for npc_key, weapon_key in npc_weapons.items():
         base = CHARACTER_BASES[npc_key]

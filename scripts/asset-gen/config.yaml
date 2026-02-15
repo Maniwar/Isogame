@@ -2,18 +2,23 @@
 # Style and pipeline settings for Gemini-based asset generation
 
 style:
-  name: "Post-Apocalyptic Isometric"
+  name: "Fallout 2 Isometric"
   description: >
-    Fallout 2-inspired isometric pixel art. Muted, desaturated colors with
-    earthy browns, rust oranges, dusty yellows, and faded greens. Gritty,
-    weathered surfaces. Retro-futuristic 1950s Americana meets nuclear wasteland.
+    Faithful to Fallout 2 (1998, Black Isle Studios) visual style. Pre-rendered
+    3D isometric art with desaturated earth tones — dusty browns, rust oranges,
+    olive drab, weathered tan, faded khaki. Everything is sun-bleached, irradiated,
+    and decades past its prime. 1950s Atomic Age retro-futuristic Americana
+    destroyed by nuclear war. California desert wasteland 80 years after the bombs.
+    NOT cartoon pixel art — the look is detailed, textured, slightly soft-rendered
+    like the original Fallout 2 sprites and tiles.
   keywords:
-    - "isometric pixel art"
-    - "post-apocalyptic wasteland"
-    - "Fallout 2 style"
-    - "retro-futuristic"
-    - "top-down 3/4 view"
-    - "muted desaturated palette"
+    - "Fallout 2 1998 Black Isle Studios"
+    - "pre-rendered isometric 3D"
+    - "post-nuclear wasteland"
+    - "retro-futuristic 1950s Atomic Age"
+    - "top-down 3/4 isometric view"
+    - "desaturated earth tones"
+    - "sun-bleached weathered gritty"
 
 # Target palette — Fallout 2 post-apocalyptic color scheme
 palette:
@@ -86,6 +91,11 @@ sprites:
 
 items:
   icon_size: 64          # Square icons for inventory
+  format: "png"
+  transparent_bg: true
+
+objects:
+  size: 256              # Square object sprites (downscaled at render time)
   format: "png"
   transparent_bg: true
 

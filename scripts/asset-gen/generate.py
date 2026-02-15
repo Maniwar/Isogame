@@ -75,6 +75,7 @@ from prompts.weapons import (
 )
 from prompts.items import build_item_prompt, ITEM_CATALOG
 from prompts.portraits import build_portrait_prompt, NPC_PORTRAITS
+from prompts.objects import build_object_prompt, build_object_sheet_prompt, OBJECT_CATALOG
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG_PATH = SCRIPT_DIR / "config.yaml"
@@ -599,6 +600,76 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
+def generate_objects(client: genai.Client, config: dict, dry_run: bool,
+                     reference_images: list) -> int:
+    """Generate environmental object sprites for map decoration.
+
+    Each object produces a transparent-background PNG at 256×256 (or config size).
+    Objects with variant lists generate a multi-variant sheet (1024×1024).
+    """
+    model = config["api"]["model"]
+    rpm = config["api"]["requests_per_minute"]
+    generated = 0
+
+    print(f"\n--- Generating environmental objects ({len(OBJECT_CATALOG)} objects) ---")
+
+    for obj in OBJECT_CATALOG:
+        key = obj["key"]
+        cat = obj["category"]
+        obj_dir = OUTPUT_DIR / "objects" / cat
+
+        variants = obj.get("variants")
+        if variants:
+            # Generate variant sheet (2×2 grid at 1024×1024)
+            filename = f"{key}-sheet.png"
+            output_path = obj_dir / filename
+
+            prompt = build_object_sheet_prompt(
+                name=obj["name"],
+                description=obj["description"],
+                variants=variants,
+                config=config,
+            )
+
+            if dry_run:
+                print(f"  [DRY RUN] {filename} ({len(variants)} variants)")
+                print(f"    Prompt: {prompt[:200]}...")
+                generated += 1
+                continue
+
+            print(f"  Generating: {filename} ({len(variants)} variants of {obj['name']})")
+            image = generate_image(client, prompt, model, reference_images, image_size="1K")
+            if image:
+                save_image(image, output_path)
+                generated += 1
+            rate_limit(rpm)
+        else:
+            # Generate single object
+            filename = f"{key}.png"
+            output_path = obj_dir / filename
+
+            prompt = build_object_prompt(
+                name=obj["name"],
+                description=obj["description"],
+                config=config,
+            )
+
+            if dry_run:
+                print(f"  [DRY RUN] {filename}")
+                print(f"    Prompt: {prompt[:120]}...")
+                generated += 1
+                continue
+
+            print(f"  Generating: {filename}")
+            image = generate_image(client, prompt, model, reference_images)
+            if image:
+                save_image(image, output_path)
+                generated += 1
+            rate_limit(rpm)
+
+    return generated
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -614,11 +685,12 @@ CATEGORY_MAP = {
     "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
+    "objects": generate_objects,
 }
 
 # Default categories when --category=all
 # terrain_textures is preferred over tile_sheets for terrain generation
-DEFAULT_CATEGORIES = ["terrain_textures", "characters", "items", "portraits"]
+DEFAULT_CATEGORIES = ["terrain_textures", "characters", "objects", "items", "portraits"]
 
 
 def main():
