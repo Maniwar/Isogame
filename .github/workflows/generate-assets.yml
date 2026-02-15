@@ -5,19 +5,20 @@ on:
   workflow_dispatch:
     inputs:
       category:
-        description: "Asset category to generate"
+        description: "Category to generate (single, comma-separated, or preset)"
         required: true
         default: "all"
         type: choice
         options:
           - all
           - terrain_textures
-          - tiles
-          - tile_sheets
           - characters
           - objects
           - items
           - portraits
+          - objects,items,portraits
+          - tiles
+          - tile_sheets
       dry_run:
         description: "Dry run (preview prompts only, no API calls)"
         required: false

@@ -699,9 +699,10 @@ def main():
     )
     parser.add_argument(
         "--category",
-        choices=list(CATEGORY_MAP.keys()) + ["all"],
         default="all",
-        help="Asset category to generate (default: all)",
+        help="Asset category to generate: a single name, comma-separated list, "
+             "or 'all' (default: all). "
+             f"Valid categories: {', '.join(CATEGORY_MAP.keys())}",
     )
     parser.add_argument(
         "--dry-run",
@@ -769,7 +770,15 @@ def main():
 
     # Run generation
     total = 0
-    categories = DEFAULT_CATEGORIES if args.category == "all" else [args.category]
+    if args.category == "all":
+        categories = DEFAULT_CATEGORIES
+    else:
+        categories = [c.strip() for c in args.category.split(",")]
+        invalid = [c for c in categories if c not in CATEGORY_MAP]
+        if invalid:
+            print(f"ERROR: Unknown category: {', '.join(invalid)}")
+            print(f"Valid categories: {', '.join(CATEGORY_MAP.keys())}")
+            sys.exit(1)
 
     print(f"=== Isogame Asset Generator ===")
     print(f"Model: {config['api']['model']}")
