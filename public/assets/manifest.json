@@ -191,6 +191,136 @@
       "NE": "/assets/sprites/player_unarmed-idle-ne.png",
       "E": "/assets/sprites/player_unarmed-idle-e.png",
       "SE": "/assets/sprites/player_unarmed-idle-se.png"
+    },
+    "npc_caravan": {
+      "S": "/assets/sprites/npc_caravan-idle-s.png",
+      "SW": "/assets/sprites/npc_caravan-idle-sw.png",
+      "W": "/assets/sprites/npc_caravan-idle-w.png",
+      "NW": "/assets/sprites/npc_caravan-idle-nw.png",
+      "N": "/assets/sprites/npc_caravan-idle-n.png",
+      "NE": "/assets/sprites/npc_caravan-idle-ne.png",
+      "E": "/assets/sprites/npc_caravan-idle-e.png",
+      "SE": "/assets/sprites/npc_caravan-idle-se.png"
+    },
+    "npc_ghoul": {
+      "S": "/assets/sprites/npc_ghoul-idle-s.png",
+      "SW": "/assets/sprites/npc_ghoul-idle-sw.png",
+      "W": "/assets/sprites/npc_ghoul-idle-w.png",
+      "NW": "/assets/sprites/npc_ghoul-idle-nw.png",
+      "N": "/assets/sprites/npc_ghoul-idle-n.png",
+      "NE": "/assets/sprites/npc_ghoul-idle-ne.png",
+      "E": "/assets/sprites/npc_ghoul-idle-e.png",
+      "SE": "/assets/sprites/npc_ghoul-idle-se.png"
+    },
+    "npc_guard": {
+      "S": "/assets/sprites/npc_guard-idle-s.png",
+      "SW": "/assets/sprites/npc_guard-idle-sw.png",
+      "W": "/assets/sprites/npc_guard-idle-w.png",
+      "NW": "/assets/sprites/npc_guard-idle-nw.png",
+      "N": "/assets/sprites/npc_guard-idle-n.png",
+      "NE": "/assets/sprites/npc_guard-idle-ne.png",
+      "E": "/assets/sprites/npc_guard-idle-e.png",
+      "SE": "/assets/sprites/npc_guard-idle-se.png"
+    },
+    "npc_guard_pistol": {
+      "S": "/assets/sprites/npc_guard_pistol-idle-s.png",
+      "SW": "/assets/sprites/npc_guard_pistol-idle-sw.png",
+      "W": "/assets/sprites/npc_guard_pistol-idle-w.png",
+      "NW": "/assets/sprites/npc_guard_pistol-idle-nw.png",
+      "N": "/assets/sprites/npc_guard_pistol-idle-n.png",
+      "NE": "/assets/sprites/npc_guard_pistol-idle-ne.png",
+      "E": "/assets/sprites/npc_guard_pistol-idle-e.png",
+      "SE": "/assets/sprites/npc_guard_pistol-idle-se.png"
+    },
+    "npc_mutant": {
+      "S": "/assets/sprites/npc_mutant-idle-s.png",
+      "SW": "/assets/sprites/npc_mutant-idle-sw.png",
+      "W": "/assets/sprites/npc_mutant-idle-w.png",
+      "NW": "/assets/sprites/npc_mutant-idle-nw.png",
+      "N": "/assets/sprites/npc_mutant-idle-n.png",
+      "NE": "/assets/sprites/npc_mutant-idle-ne.png",
+      "E": "/assets/sprites/npc_mutant-idle-e.png",
+      "SE": "/assets/sprites/npc_mutant-idle-se.png"
+    },
+    "npc_mutant_unarmed": {
+      "S": "/assets/sprites/npc_mutant_unarmed-idle-s.png",
+      "SW": "/assets/sprites/npc_mutant_unarmed-idle-sw.png",
+      "W": "/assets/sprites/npc_mutant_unarmed-idle-w.png",
+      "NW": "/assets/sprites/npc_mutant_unarmed-idle-nw.png",
+      "N": "/assets/sprites/npc_mutant_unarmed-idle-n.png",
+      "NE": "/assets/sprites/npc_mutant_unarmed-idle-ne.png",
+      "E": "/assets/sprites/npc_mutant_unarmed-idle-e.png",
+      "SE": "/assets/sprites/npc_mutant_unarmed-idle-se.png"
+    },
+    "npc_raider_bat": {
+      "S": "/assets/sprites/npc_raider_bat-idle-s.png",
+      "SW": "/assets/sprites/npc_raider_bat-idle-sw.png",
+      "W": "/assets/sprites/npc_raider_bat-idle-w.png",
+      "NW": "/assets/sprites/npc_raider_bat-idle-nw.png",
+      "N": "/assets/sprites/npc_raider_bat-idle-n.png",
+      "NE": "/assets/sprites/npc_raider_bat-idle-ne.png",
+      "E": "/assets/sprites/npc_raider_bat-idle-e.png",
+      "SE": "/assets/sprites/npc_raider_bat-idle-se.png"
+    },
+    "npc_raider_knife": {
+      "S": "/assets/sprites/npc_raider_knife-idle-s.png",
+      "SW": "/assets/sprites/npc_raider_knife-idle-sw.png",
+      "W": "/assets/sprites/npc_raider_knife-idle-w.png",
+      "NW": "/assets/sprites/npc_raider_knife-idle-nw.png",
+      "N": "/assets/sprites/npc_raider_knife-idle-n.png",
+      "NE": "/assets/sprites/npc_raider_knife-idle-ne.png",
+      "E": "/assets/sprites/npc_raider_knife-idle-e.png",
+      "SE": "/assets/sprites/npc_raider_knife-idle-se.png"
+    },
+    "npc_raider_pistol": {
+      "S": "/assets/sprites/npc_raider_pistol-idle-s.png",
+      "SW": "/assets/sprites/npc_raider_pistol-idle-sw.png",
+      "W": "/assets/sprites/npc_raider_pistol-idle-w.png",
+      "NW": "/assets/sprites/npc_raider_pistol-idle-nw.png",
+      "N": "/assets/sprites/npc_raider_pistol-idle-n.png",
+      "NE": "/assets/sprites/npc_raider_pistol-idle-ne.png",
+      "E": "/assets/sprites/npc_raider_pistol-idle-e.png",
+      "SE": "/assets/sprites/npc_raider_pistol-idle-se.png"
+    },
+    "npc_sheriff_rifle": {
+      "S": "/assets/sprites/npc_sheriff_rifle-idle-s.png",
+      "SW": "/assets/sprites/npc_sheriff_rifle-idle-sw.png",
+      "W": "/assets/sprites/npc_sheriff_rifle-idle-w.png",
+      "NW": "/assets/sprites/npc_sheriff_rifle-idle-nw.png",
+      "N": "/assets/sprites/npc_sheriff_rifle-idle-n.png",
+      "NE": "/assets/sprites/npc_sheriff_rifle-idle-ne.png",
+      "E": "/assets/sprites/npc_sheriff_rifle-idle-e.png",
+      "SE": "/assets/sprites/npc_sheriff_rifle-idle-se.png"
+    },
+    "npc_tribal": {
+      "S": "/assets/sprites/npc_tribal-idle-s.png",
+      "SW": "/assets/sprites/npc_tribal-idle-sw.png",
+      "W": "/assets/sprites/npc_tribal-idle-w.png",
+      "NW": "/assets/sprites/npc_tribal-idle-nw.png",
+      "N": "/assets/sprites/npc_tribal-idle-n.png",
+      "NE": "/assets/sprites/npc_tribal-idle-ne.png",
+      "E": "/assets/sprites/npc_tribal-idle-e.png",
+      "SE": "/assets/sprites/npc_tribal-idle-se.png"
+    },
+    "npc_tribal_unarmed": {
+      "S": "/assets/sprites/npc_tribal_unarmed-idle-s.png",
+      "SW": "/assets/sprites/npc_tribal_unarmed-idle-sw.png",
+      "W": "/assets/sprites/npc_tribal_unarmed-idle-w.png",
+      "NW": "/assets/sprites/npc_tribal_unarmed-idle-nw.png",
+      "N": "/assets/sprites/npc_tribal_unarmed-idle-n.png",
+      "NE": "/assets/sprites/npc_tribal_unarmed-idle-ne.png",
+      "E": "/assets/sprites/npc_tribal_unarmed-idle-e.png",
+      "SE": "/assets/sprites/npc_tribal_unarmed-idle-se.png"
+    },
+    "npc_wastelander": {
+      "S": "/assets/sprites/npc_wastelander-idle-s.png",
+      "SW": "/assets/sprites/npc_wastelander-idle-sw.png",
+      "W": "/assets/sprites/npc_wastelander-idle-w.png",
+      "NW": "/assets/sprites/npc_wastelander-idle-nw.png",
+      "N": "/assets/sprites/npc_wastelander-idle-n.png",
+      "NE": "/assets/sprites/npc_wastelander-idle-ne.png",
+      "E": "/assets/sprites/npc_wastelander-idle-e.png",
+      "SE": "/assets/sprites/npc_wastelander-idle-se.png"
     }
   },
   "animations": {
@@ -1012,6 +1142,1072 @@
         "NE": "/assets/sprites/player_unarmed-hit-ne.png",
         "E": "/assets/sprites/player_unarmed-hit-e.png",
         "SE": "/assets/sprites/player_unarmed-hit-se.png"
+      }
+    },
+    "npc_caravan": {
+      "idle": {
+        "S": "/assets/sprites/npc_caravan-idle-s.png",
+        "SW": "/assets/sprites/npc_caravan-idle-sw.png",
+        "W": "/assets/sprites/npc_caravan-idle-w.png",
+        "NW": "/assets/sprites/npc_caravan-idle-nw.png",
+        "N": "/assets/sprites/npc_caravan-idle-n.png",
+        "NE": "/assets/sprites/npc_caravan-idle-ne.png",
+        "E": "/assets/sprites/npc_caravan-idle-e.png",
+        "SE": "/assets/sprites/npc_caravan-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_caravan-walk_1-s.png",
+        "SW": "/assets/sprites/npc_caravan-walk_1-sw.png",
+        "W": "/assets/sprites/npc_caravan-walk_1-w.png",
+        "NW": "/assets/sprites/npc_caravan-walk_1-nw.png",
+        "N": "/assets/sprites/npc_caravan-walk_1-n.png",
+        "NE": "/assets/sprites/npc_caravan-walk_1-ne.png",
+        "E": "/assets/sprites/npc_caravan-walk_1-e.png",
+        "SE": "/assets/sprites/npc_caravan-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_caravan-walk_2-s.png",
+        "SW": "/assets/sprites/npc_caravan-walk_2-sw.png",
+        "W": "/assets/sprites/npc_caravan-walk_2-w.png",
+        "NW": "/assets/sprites/npc_caravan-walk_2-nw.png",
+        "N": "/assets/sprites/npc_caravan-walk_2-n.png",
+        "NE": "/assets/sprites/npc_caravan-walk_2-ne.png",
+        "E": "/assets/sprites/npc_caravan-walk_2-e.png",
+        "SE": "/assets/sprites/npc_caravan-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_caravan-walk_3-s.png",
+        "SW": "/assets/sprites/npc_caravan-walk_3-sw.png",
+        "W": "/assets/sprites/npc_caravan-walk_3-w.png",
+        "NW": "/assets/sprites/npc_caravan-walk_3-nw.png",
+        "N": "/assets/sprites/npc_caravan-walk_3-n.png",
+        "NE": "/assets/sprites/npc_caravan-walk_3-ne.png",
+        "E": "/assets/sprites/npc_caravan-walk_3-e.png",
+        "SE": "/assets/sprites/npc_caravan-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_caravan-walk_4-s.png",
+        "SW": "/assets/sprites/npc_caravan-walk_4-sw.png",
+        "W": "/assets/sprites/npc_caravan-walk_4-w.png",
+        "NW": "/assets/sprites/npc_caravan-walk_4-nw.png",
+        "N": "/assets/sprites/npc_caravan-walk_4-n.png",
+        "NE": "/assets/sprites/npc_caravan-walk_4-ne.png",
+        "E": "/assets/sprites/npc_caravan-walk_4-e.png",
+        "SE": "/assets/sprites/npc_caravan-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_caravan-attack_1-s.png",
+        "SW": "/assets/sprites/npc_caravan-attack_1-sw.png",
+        "W": "/assets/sprites/npc_caravan-attack_1-w.png",
+        "NW": "/assets/sprites/npc_caravan-attack_1-nw.png",
+        "N": "/assets/sprites/npc_caravan-attack_1-n.png",
+        "NE": "/assets/sprites/npc_caravan-attack_1-ne.png",
+        "E": "/assets/sprites/npc_caravan-attack_1-e.png",
+        "SE": "/assets/sprites/npc_caravan-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_caravan-attack_2-s.png",
+        "SW": "/assets/sprites/npc_caravan-attack_2-sw.png",
+        "W": "/assets/sprites/npc_caravan-attack_2-w.png",
+        "NW": "/assets/sprites/npc_caravan-attack_2-nw.png",
+        "N": "/assets/sprites/npc_caravan-attack_2-n.png",
+        "NE": "/assets/sprites/npc_caravan-attack_2-ne.png",
+        "E": "/assets/sprites/npc_caravan-attack_2-e.png",
+        "SE": "/assets/sprites/npc_caravan-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_caravan-hit-s.png",
+        "SW": "/assets/sprites/npc_caravan-hit-sw.png",
+        "W": "/assets/sprites/npc_caravan-hit-w.png",
+        "NW": "/assets/sprites/npc_caravan-hit-nw.png",
+        "N": "/assets/sprites/npc_caravan-hit-n.png",
+        "NE": "/assets/sprites/npc_caravan-hit-ne.png",
+        "E": "/assets/sprites/npc_caravan-hit-e.png",
+        "SE": "/assets/sprites/npc_caravan-hit-se.png"
+      }
+    },
+    "npc_ghoul": {
+      "idle": {
+        "S": "/assets/sprites/npc_ghoul-idle-s.png",
+        "SW": "/assets/sprites/npc_ghoul-idle-sw.png",
+        "W": "/assets/sprites/npc_ghoul-idle-w.png",
+        "NW": "/assets/sprites/npc_ghoul-idle-nw.png",
+        "N": "/assets/sprites/npc_ghoul-idle-n.png",
+        "NE": "/assets/sprites/npc_ghoul-idle-ne.png",
+        "E": "/assets/sprites/npc_ghoul-idle-e.png",
+        "SE": "/assets/sprites/npc_ghoul-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_ghoul-walk_1-s.png",
+        "SW": "/assets/sprites/npc_ghoul-walk_1-sw.png",
+        "W": "/assets/sprites/npc_ghoul-walk_1-w.png",
+        "NW": "/assets/sprites/npc_ghoul-walk_1-nw.png",
+        "N": "/assets/sprites/npc_ghoul-walk_1-n.png",
+        "NE": "/assets/sprites/npc_ghoul-walk_1-ne.png",
+        "E": "/assets/sprites/npc_ghoul-walk_1-e.png",
+        "SE": "/assets/sprites/npc_ghoul-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_ghoul-walk_2-s.png",
+        "SW": "/assets/sprites/npc_ghoul-walk_2-sw.png",
+        "W": "/assets/sprites/npc_ghoul-walk_2-w.png",
+        "NW": "/assets/sprites/npc_ghoul-walk_2-nw.png",
+        "N": "/assets/sprites/npc_ghoul-walk_2-n.png",
+        "NE": "/assets/sprites/npc_ghoul-walk_2-ne.png",
+        "E": "/assets/sprites/npc_ghoul-walk_2-e.png",
+        "SE": "/assets/sprites/npc_ghoul-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_ghoul-walk_3-s.png",
+        "SW": "/assets/sprites/npc_ghoul-walk_3-sw.png",
+        "W": "/assets/sprites/npc_ghoul-walk_3-w.png",
+        "NW": "/assets/sprites/npc_ghoul-walk_3-nw.png",
+        "N": "/assets/sprites/npc_ghoul-walk_3-n.png",
+        "NE": "/assets/sprites/npc_ghoul-walk_3-ne.png",
+        "E": "/assets/sprites/npc_ghoul-walk_3-e.png",
+        "SE": "/assets/sprites/npc_ghoul-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_ghoul-walk_4-s.png",
+        "SW": "/assets/sprites/npc_ghoul-walk_4-sw.png",
+        "W": "/assets/sprites/npc_ghoul-walk_4-w.png",
+        "NW": "/assets/sprites/npc_ghoul-walk_4-nw.png",
+        "N": "/assets/sprites/npc_ghoul-walk_4-n.png",
+        "NE": "/assets/sprites/npc_ghoul-walk_4-ne.png",
+        "E": "/assets/sprites/npc_ghoul-walk_4-e.png",
+        "SE": "/assets/sprites/npc_ghoul-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_ghoul-attack_1-s.png",
+        "SW": "/assets/sprites/npc_ghoul-attack_1-sw.png",
+        "W": "/assets/sprites/npc_ghoul-attack_1-w.png",
+        "NW": "/assets/sprites/npc_ghoul-attack_1-nw.png",
+        "N": "/assets/sprites/npc_ghoul-attack_1-n.png",
+        "NE": "/assets/sprites/npc_ghoul-attack_1-ne.png",
+        "E": "/assets/sprites/npc_ghoul-attack_1-e.png",
+        "SE": "/assets/sprites/npc_ghoul-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_ghoul-attack_2-s.png",
+        "SW": "/assets/sprites/npc_ghoul-attack_2-sw.png",
+        "W": "/assets/sprites/npc_ghoul-attack_2-w.png",
+        "NW": "/assets/sprites/npc_ghoul-attack_2-nw.png",
+        "N": "/assets/sprites/npc_ghoul-attack_2-n.png",
+        "NE": "/assets/sprites/npc_ghoul-attack_2-ne.png",
+        "E": "/assets/sprites/npc_ghoul-attack_2-e.png",
+        "SE": "/assets/sprites/npc_ghoul-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_ghoul-hit-s.png",
+        "SW": "/assets/sprites/npc_ghoul-hit-sw.png",
+        "W": "/assets/sprites/npc_ghoul-hit-w.png",
+        "NW": "/assets/sprites/npc_ghoul-hit-nw.png",
+        "N": "/assets/sprites/npc_ghoul-hit-n.png",
+        "NE": "/assets/sprites/npc_ghoul-hit-ne.png",
+        "E": "/assets/sprites/npc_ghoul-hit-e.png",
+        "SE": "/assets/sprites/npc_ghoul-hit-se.png"
+      }
+    },
+    "npc_guard": {
+      "idle": {
+        "S": "/assets/sprites/npc_guard-idle-s.png",
+        "SW": "/assets/sprites/npc_guard-idle-sw.png",
+        "W": "/assets/sprites/npc_guard-idle-w.png",
+        "NW": "/assets/sprites/npc_guard-idle-nw.png",
+        "N": "/assets/sprites/npc_guard-idle-n.png",
+        "NE": "/assets/sprites/npc_guard-idle-ne.png",
+        "E": "/assets/sprites/npc_guard-idle-e.png",
+        "SE": "/assets/sprites/npc_guard-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_guard-walk_1-s.png",
+        "SW": "/assets/sprites/npc_guard-walk_1-sw.png",
+        "W": "/assets/sprites/npc_guard-walk_1-w.png",
+        "NW": "/assets/sprites/npc_guard-walk_1-nw.png",
+        "N": "/assets/sprites/npc_guard-walk_1-n.png",
+        "NE": "/assets/sprites/npc_guard-walk_1-ne.png",
+        "E": "/assets/sprites/npc_guard-walk_1-e.png",
+        "SE": "/assets/sprites/npc_guard-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_guard-walk_2-s.png",
+        "SW": "/assets/sprites/npc_guard-walk_2-sw.png",
+        "W": "/assets/sprites/npc_guard-walk_2-w.png",
+        "NW": "/assets/sprites/npc_guard-walk_2-nw.png",
+        "N": "/assets/sprites/npc_guard-walk_2-n.png",
+        "NE": "/assets/sprites/npc_guard-walk_2-ne.png",
+        "E": "/assets/sprites/npc_guard-walk_2-e.png",
+        "SE": "/assets/sprites/npc_guard-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_guard-walk_3-s.png",
+        "SW": "/assets/sprites/npc_guard-walk_3-sw.png",
+        "W": "/assets/sprites/npc_guard-walk_3-w.png",
+        "NW": "/assets/sprites/npc_guard-walk_3-nw.png",
+        "N": "/assets/sprites/npc_guard-walk_3-n.png",
+        "NE": "/assets/sprites/npc_guard-walk_3-ne.png",
+        "E": "/assets/sprites/npc_guard-walk_3-e.png",
+        "SE": "/assets/sprites/npc_guard-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_guard-walk_4-s.png",
+        "SW": "/assets/sprites/npc_guard-walk_4-sw.png",
+        "W": "/assets/sprites/npc_guard-walk_4-w.png",
+        "NW": "/assets/sprites/npc_guard-walk_4-nw.png",
+        "N": "/assets/sprites/npc_guard-walk_4-n.png",
+        "NE": "/assets/sprites/npc_guard-walk_4-ne.png",
+        "E": "/assets/sprites/npc_guard-walk_4-e.png",
+        "SE": "/assets/sprites/npc_guard-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_guard-attack_1-s.png",
+        "SW": "/assets/sprites/npc_guard-attack_1-sw.png",
+        "W": "/assets/sprites/npc_guard-attack_1-w.png",
+        "NW": "/assets/sprites/npc_guard-attack_1-nw.png",
+        "N": "/assets/sprites/npc_guard-attack_1-n.png",
+        "NE": "/assets/sprites/npc_guard-attack_1-ne.png",
+        "E": "/assets/sprites/npc_guard-attack_1-e.png",
+        "SE": "/assets/sprites/npc_guard-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_guard-attack_2-s.png",
+        "SW": "/assets/sprites/npc_guard-attack_2-sw.png",
+        "W": "/assets/sprites/npc_guard-attack_2-w.png",
+        "NW": "/assets/sprites/npc_guard-attack_2-nw.png",
+        "N": "/assets/sprites/npc_guard-attack_2-n.png",
+        "NE": "/assets/sprites/npc_guard-attack_2-ne.png",
+        "E": "/assets/sprites/npc_guard-attack_2-e.png",
+        "SE": "/assets/sprites/npc_guard-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_guard-hit-s.png",
+        "SW": "/assets/sprites/npc_guard-hit-sw.png",
+        "W": "/assets/sprites/npc_guard-hit-w.png",
+        "NW": "/assets/sprites/npc_guard-hit-nw.png",
+        "N": "/assets/sprites/npc_guard-hit-n.png",
+        "NE": "/assets/sprites/npc_guard-hit-ne.png",
+        "E": "/assets/sprites/npc_guard-hit-e.png",
+        "SE": "/assets/sprites/npc_guard-hit-se.png"
+      }
+    },
+    "npc_guard_pistol": {
+      "idle": {
+        "S": "/assets/sprites/npc_guard_pistol-idle-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-idle-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-idle-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-idle-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-idle-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-idle-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-idle-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_guard_pistol-walk_1-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-walk_1-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-walk_1-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-walk_1-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-walk_1-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-walk_1-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-walk_1-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_guard_pistol-walk_2-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-walk_2-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-walk_2-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-walk_2-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-walk_2-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-walk_2-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-walk_2-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_guard_pistol-walk_3-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-walk_3-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-walk_3-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-walk_3-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-walk_3-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-walk_3-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-walk_3-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_guard_pistol-walk_4-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-walk_4-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-walk_4-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-walk_4-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-walk_4-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-walk_4-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-walk_4-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_guard_pistol-attack_1-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-attack_1-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-attack_1-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-attack_1-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-attack_1-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-attack_1-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-attack_1-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_guard_pistol-attack_2-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-attack_2-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-attack_2-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-attack_2-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-attack_2-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-attack_2-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-attack_2-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_guard_pistol-hit-s.png",
+        "SW": "/assets/sprites/npc_guard_pistol-hit-sw.png",
+        "W": "/assets/sprites/npc_guard_pistol-hit-w.png",
+        "NW": "/assets/sprites/npc_guard_pistol-hit-nw.png",
+        "N": "/assets/sprites/npc_guard_pistol-hit-n.png",
+        "NE": "/assets/sprites/npc_guard_pistol-hit-ne.png",
+        "E": "/assets/sprites/npc_guard_pistol-hit-e.png",
+        "SE": "/assets/sprites/npc_guard_pistol-hit-se.png"
+      }
+    },
+    "npc_mutant": {
+      "idle": {
+        "S": "/assets/sprites/npc_mutant-idle-s.png",
+        "SW": "/assets/sprites/npc_mutant-idle-sw.png",
+        "W": "/assets/sprites/npc_mutant-idle-w.png",
+        "NW": "/assets/sprites/npc_mutant-idle-nw.png",
+        "N": "/assets/sprites/npc_mutant-idle-n.png",
+        "NE": "/assets/sprites/npc_mutant-idle-ne.png",
+        "E": "/assets/sprites/npc_mutant-idle-e.png",
+        "SE": "/assets/sprites/npc_mutant-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_mutant-walk_1-s.png",
+        "SW": "/assets/sprites/npc_mutant-walk_1-sw.png",
+        "W": "/assets/sprites/npc_mutant-walk_1-w.png",
+        "NW": "/assets/sprites/npc_mutant-walk_1-nw.png",
+        "N": "/assets/sprites/npc_mutant-walk_1-n.png",
+        "NE": "/assets/sprites/npc_mutant-walk_1-ne.png",
+        "E": "/assets/sprites/npc_mutant-walk_1-e.png",
+        "SE": "/assets/sprites/npc_mutant-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_mutant-walk_2-s.png",
+        "SW": "/assets/sprites/npc_mutant-walk_2-sw.png",
+        "W": "/assets/sprites/npc_mutant-walk_2-w.png",
+        "NW": "/assets/sprites/npc_mutant-walk_2-nw.png",
+        "N": "/assets/sprites/npc_mutant-walk_2-n.png",
+        "NE": "/assets/sprites/npc_mutant-walk_2-ne.png",
+        "E": "/assets/sprites/npc_mutant-walk_2-e.png",
+        "SE": "/assets/sprites/npc_mutant-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_mutant-walk_3-s.png",
+        "SW": "/assets/sprites/npc_mutant-walk_3-sw.png",
+        "W": "/assets/sprites/npc_mutant-walk_3-w.png",
+        "NW": "/assets/sprites/npc_mutant-walk_3-nw.png",
+        "N": "/assets/sprites/npc_mutant-walk_3-n.png",
+        "NE": "/assets/sprites/npc_mutant-walk_3-ne.png",
+        "E": "/assets/sprites/npc_mutant-walk_3-e.png",
+        "SE": "/assets/sprites/npc_mutant-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_mutant-walk_4-s.png",
+        "SW": "/assets/sprites/npc_mutant-walk_4-sw.png",
+        "W": "/assets/sprites/npc_mutant-walk_4-w.png",
+        "NW": "/assets/sprites/npc_mutant-walk_4-nw.png",
+        "N": "/assets/sprites/npc_mutant-walk_4-n.png",
+        "NE": "/assets/sprites/npc_mutant-walk_4-ne.png",
+        "E": "/assets/sprites/npc_mutant-walk_4-e.png",
+        "SE": "/assets/sprites/npc_mutant-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_mutant-attack_1-s.png",
+        "SW": "/assets/sprites/npc_mutant-attack_1-sw.png",
+        "W": "/assets/sprites/npc_mutant-attack_1-w.png",
+        "NW": "/assets/sprites/npc_mutant-attack_1-nw.png",
+        "N": "/assets/sprites/npc_mutant-attack_1-n.png",
+        "NE": "/assets/sprites/npc_mutant-attack_1-ne.png",
+        "E": "/assets/sprites/npc_mutant-attack_1-e.png",
+        "SE": "/assets/sprites/npc_mutant-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_mutant-attack_2-s.png",
+        "SW": "/assets/sprites/npc_mutant-attack_2-sw.png",
+        "W": "/assets/sprites/npc_mutant-attack_2-w.png",
+        "NW": "/assets/sprites/npc_mutant-attack_2-nw.png",
+        "N": "/assets/sprites/npc_mutant-attack_2-n.png",
+        "NE": "/assets/sprites/npc_mutant-attack_2-ne.png",
+        "E": "/assets/sprites/npc_mutant-attack_2-e.png",
+        "SE": "/assets/sprites/npc_mutant-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_mutant-hit-s.png",
+        "SW": "/assets/sprites/npc_mutant-hit-sw.png",
+        "W": "/assets/sprites/npc_mutant-hit-w.png",
+        "NW": "/assets/sprites/npc_mutant-hit-nw.png",
+        "N": "/assets/sprites/npc_mutant-hit-n.png",
+        "NE": "/assets/sprites/npc_mutant-hit-ne.png",
+        "E": "/assets/sprites/npc_mutant-hit-e.png",
+        "SE": "/assets/sprites/npc_mutant-hit-se.png"
+      }
+    },
+    "npc_mutant_unarmed": {
+      "idle": {
+        "S": "/assets/sprites/npc_mutant_unarmed-idle-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-idle-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-idle-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-idle-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-idle-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-idle-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-idle-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_mutant_unarmed-walk_1-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-walk_1-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-walk_1-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-walk_1-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-walk_1-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-walk_1-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-walk_1-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_mutant_unarmed-walk_2-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-walk_2-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-walk_2-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-walk_2-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-walk_2-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-walk_2-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-walk_2-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_mutant_unarmed-walk_3-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-walk_3-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-walk_3-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-walk_3-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-walk_3-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-walk_3-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-walk_3-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_mutant_unarmed-walk_4-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-walk_4-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-walk_4-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-walk_4-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-walk_4-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-walk_4-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-walk_4-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_mutant_unarmed-attack_1-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-attack_1-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-attack_1-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-attack_1-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-attack_1-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-attack_1-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-attack_1-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_mutant_unarmed-attack_2-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-attack_2-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-attack_2-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-attack_2-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-attack_2-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-attack_2-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-attack_2-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_mutant_unarmed-hit-s.png",
+        "SW": "/assets/sprites/npc_mutant_unarmed-hit-sw.png",
+        "W": "/assets/sprites/npc_mutant_unarmed-hit-w.png",
+        "NW": "/assets/sprites/npc_mutant_unarmed-hit-nw.png",
+        "N": "/assets/sprites/npc_mutant_unarmed-hit-n.png",
+        "NE": "/assets/sprites/npc_mutant_unarmed-hit-ne.png",
+        "E": "/assets/sprites/npc_mutant_unarmed-hit-e.png",
+        "SE": "/assets/sprites/npc_mutant_unarmed-hit-se.png"
+      }
+    },
+    "npc_raider_bat": {
+      "idle": {
+        "S": "/assets/sprites/npc_raider_bat-idle-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-idle-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-idle-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-idle-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-idle-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-idle-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-idle-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_raider_bat-walk_1-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-walk_1-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-walk_1-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-walk_1-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-walk_1-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-walk_1-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-walk_1-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_raider_bat-walk_2-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-walk_2-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-walk_2-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-walk_2-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-walk_2-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-walk_2-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-walk_2-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_raider_bat-walk_3-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-walk_3-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-walk_3-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-walk_3-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-walk_3-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-walk_3-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-walk_3-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_raider_bat-walk_4-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-walk_4-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-walk_4-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-walk_4-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-walk_4-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-walk_4-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-walk_4-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_raider_bat-attack_1-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-attack_1-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-attack_1-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-attack_1-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-attack_1-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-attack_1-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-attack_1-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_raider_bat-attack_2-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-attack_2-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-attack_2-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-attack_2-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-attack_2-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-attack_2-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-attack_2-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_raider_bat-hit-s.png",
+        "SW": "/assets/sprites/npc_raider_bat-hit-sw.png",
+        "W": "/assets/sprites/npc_raider_bat-hit-w.png",
+        "NW": "/assets/sprites/npc_raider_bat-hit-nw.png",
+        "N": "/assets/sprites/npc_raider_bat-hit-n.png",
+        "NE": "/assets/sprites/npc_raider_bat-hit-ne.png",
+        "E": "/assets/sprites/npc_raider_bat-hit-e.png",
+        "SE": "/assets/sprites/npc_raider_bat-hit-se.png"
+      }
+    },
+    "npc_raider_knife": {
+      "idle": {
+        "S": "/assets/sprites/npc_raider_knife-idle-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-idle-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-idle-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-idle-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-idle-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-idle-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-idle-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_raider_knife-walk_1-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-walk_1-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-walk_1-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-walk_1-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-walk_1-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-walk_1-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-walk_1-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_raider_knife-walk_2-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-walk_2-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-walk_2-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-walk_2-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-walk_2-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-walk_2-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-walk_2-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_raider_knife-walk_3-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-walk_3-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-walk_3-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-walk_3-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-walk_3-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-walk_3-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-walk_3-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_raider_knife-walk_4-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-walk_4-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-walk_4-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-walk_4-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-walk_4-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-walk_4-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-walk_4-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_raider_knife-attack_1-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-attack_1-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-attack_1-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-attack_1-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-attack_1-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-attack_1-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-attack_1-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_raider_knife-attack_2-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-attack_2-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-attack_2-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-attack_2-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-attack_2-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-attack_2-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-attack_2-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_raider_knife-hit-s.png",
+        "SW": "/assets/sprites/npc_raider_knife-hit-sw.png",
+        "W": "/assets/sprites/npc_raider_knife-hit-w.png",
+        "NW": "/assets/sprites/npc_raider_knife-hit-nw.png",
+        "N": "/assets/sprites/npc_raider_knife-hit-n.png",
+        "NE": "/assets/sprites/npc_raider_knife-hit-ne.png",
+        "E": "/assets/sprites/npc_raider_knife-hit-e.png",
+        "SE": "/assets/sprites/npc_raider_knife-hit-se.png"
+      }
+    },
+    "npc_raider_pistol": {
+      "idle": {
+        "S": "/assets/sprites/npc_raider_pistol-idle-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-idle-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-idle-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-idle-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-idle-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-idle-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-idle-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_raider_pistol-walk_1-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-walk_1-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-walk_1-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-walk_1-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-walk_1-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-walk_1-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-walk_1-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_raider_pistol-walk_2-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-walk_2-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-walk_2-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-walk_2-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-walk_2-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-walk_2-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-walk_2-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_raider_pistol-walk_3-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-walk_3-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-walk_3-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-walk_3-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-walk_3-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-walk_3-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-walk_3-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_raider_pistol-walk_4-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-walk_4-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-walk_4-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-walk_4-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-walk_4-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-walk_4-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-walk_4-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_raider_pistol-attack_1-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-attack_1-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-attack_1-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-attack_1-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-attack_1-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-attack_1-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-attack_1-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_raider_pistol-attack_2-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-attack_2-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-attack_2-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-attack_2-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-attack_2-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-attack_2-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-attack_2-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_raider_pistol-hit-s.png",
+        "SW": "/assets/sprites/npc_raider_pistol-hit-sw.png",
+        "W": "/assets/sprites/npc_raider_pistol-hit-w.png",
+        "NW": "/assets/sprites/npc_raider_pistol-hit-nw.png",
+        "N": "/assets/sprites/npc_raider_pistol-hit-n.png",
+        "NE": "/assets/sprites/npc_raider_pistol-hit-ne.png",
+        "E": "/assets/sprites/npc_raider_pistol-hit-e.png",
+        "SE": "/assets/sprites/npc_raider_pistol-hit-se.png"
+      }
+    },
+    "npc_sheriff_rifle": {
+      "idle": {
+        "S": "/assets/sprites/npc_sheriff_rifle-idle-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-idle-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-idle-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-idle-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-idle-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-idle-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-idle-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_sheriff_rifle-walk_1-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-walk_1-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-walk_1-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-walk_1-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-walk_1-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-walk_1-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-walk_1-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_sheriff_rifle-walk_2-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-walk_2-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-walk_2-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-walk_2-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-walk_2-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-walk_2-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-walk_2-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_sheriff_rifle-walk_3-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-walk_3-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-walk_3-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-walk_3-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-walk_3-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-walk_3-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-walk_3-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_sheriff_rifle-walk_4-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-walk_4-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-walk_4-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-walk_4-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-walk_4-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-walk_4-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-walk_4-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_sheriff_rifle-attack_1-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-attack_1-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-attack_1-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-attack_1-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-attack_1-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-attack_1-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-attack_1-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_sheriff_rifle-attack_2-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-attack_2-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-attack_2-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-attack_2-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-attack_2-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-attack_2-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-attack_2-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_sheriff_rifle-hit-s.png",
+        "SW": "/assets/sprites/npc_sheriff_rifle-hit-sw.png",
+        "W": "/assets/sprites/npc_sheriff_rifle-hit-w.png",
+        "NW": "/assets/sprites/npc_sheriff_rifle-hit-nw.png",
+        "N": "/assets/sprites/npc_sheriff_rifle-hit-n.png",
+        "NE": "/assets/sprites/npc_sheriff_rifle-hit-ne.png",
+        "E": "/assets/sprites/npc_sheriff_rifle-hit-e.png",
+        "SE": "/assets/sprites/npc_sheriff_rifle-hit-se.png"
+      }
+    },
+    "npc_tribal": {
+      "idle": {
+        "S": "/assets/sprites/npc_tribal-idle-s.png",
+        "SW": "/assets/sprites/npc_tribal-idle-sw.png",
+        "W": "/assets/sprites/npc_tribal-idle-w.png",
+        "NW": "/assets/sprites/npc_tribal-idle-nw.png",
+        "N": "/assets/sprites/npc_tribal-idle-n.png",
+        "NE": "/assets/sprites/npc_tribal-idle-ne.png",
+        "E": "/assets/sprites/npc_tribal-idle-e.png",
+        "SE": "/assets/sprites/npc_tribal-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_tribal-walk_1-s.png",
+        "SW": "/assets/sprites/npc_tribal-walk_1-sw.png",
+        "W": "/assets/sprites/npc_tribal-walk_1-w.png",
+        "NW": "/assets/sprites/npc_tribal-walk_1-nw.png",
+        "N": "/assets/sprites/npc_tribal-walk_1-n.png",
+        "NE": "/assets/sprites/npc_tribal-walk_1-ne.png",
+        "E": "/assets/sprites/npc_tribal-walk_1-e.png",
+        "SE": "/assets/sprites/npc_tribal-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_tribal-walk_2-s.png",
+        "SW": "/assets/sprites/npc_tribal-walk_2-sw.png",
+        "W": "/assets/sprites/npc_tribal-walk_2-w.png",
+        "NW": "/assets/sprites/npc_tribal-walk_2-nw.png",
+        "N": "/assets/sprites/npc_tribal-walk_2-n.png",
+        "NE": "/assets/sprites/npc_tribal-walk_2-ne.png",
+        "E": "/assets/sprites/npc_tribal-walk_2-e.png",
+        "SE": "/assets/sprites/npc_tribal-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_tribal-walk_3-s.png",
+        "SW": "/assets/sprites/npc_tribal-walk_3-sw.png",
+        "W": "/assets/sprites/npc_tribal-walk_3-w.png",
+        "NW": "/assets/sprites/npc_tribal-walk_3-nw.png",
+        "N": "/assets/sprites/npc_tribal-walk_3-n.png",
+        "NE": "/assets/sprites/npc_tribal-walk_3-ne.png",
+        "E": "/assets/sprites/npc_tribal-walk_3-e.png",
+        "SE": "/assets/sprites/npc_tribal-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_tribal-walk_4-s.png",
+        "SW": "/assets/sprites/npc_tribal-walk_4-sw.png",
+        "W": "/assets/sprites/npc_tribal-walk_4-w.png",
+        "NW": "/assets/sprites/npc_tribal-walk_4-nw.png",
+        "N": "/assets/sprites/npc_tribal-walk_4-n.png",
+        "NE": "/assets/sprites/npc_tribal-walk_4-ne.png",
+        "E": "/assets/sprites/npc_tribal-walk_4-e.png",
+        "SE": "/assets/sprites/npc_tribal-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_tribal-attack_1-s.png",
+        "SW": "/assets/sprites/npc_tribal-attack_1-sw.png",
+        "W": "/assets/sprites/npc_tribal-attack_1-w.png",
+        "NW": "/assets/sprites/npc_tribal-attack_1-nw.png",
+        "N": "/assets/sprites/npc_tribal-attack_1-n.png",
+        "NE": "/assets/sprites/npc_tribal-attack_1-ne.png",
+        "E": "/assets/sprites/npc_tribal-attack_1-e.png",
+        "SE": "/assets/sprites/npc_tribal-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_tribal-attack_2-s.png",
+        "SW": "/assets/sprites/npc_tribal-attack_2-sw.png",
+        "W": "/assets/sprites/npc_tribal-attack_2-w.png",
+        "NW": "/assets/sprites/npc_tribal-attack_2-nw.png",
+        "N": "/assets/sprites/npc_tribal-attack_2-n.png",
+        "NE": "/assets/sprites/npc_tribal-attack_2-ne.png",
+        "E": "/assets/sprites/npc_tribal-attack_2-e.png",
+        "SE": "/assets/sprites/npc_tribal-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_tribal-hit-s.png",
+        "SW": "/assets/sprites/npc_tribal-hit-sw.png",
+        "W": "/assets/sprites/npc_tribal-hit-w.png",
+        "NW": "/assets/sprites/npc_tribal-hit-nw.png",
+        "N": "/assets/sprites/npc_tribal-hit-n.png",
+        "NE": "/assets/sprites/npc_tribal-hit-ne.png",
+        "E": "/assets/sprites/npc_tribal-hit-e.png",
+        "SE": "/assets/sprites/npc_tribal-hit-se.png"
+      }
+    },
+    "npc_tribal_unarmed": {
+      "idle": {
+        "S": "/assets/sprites/npc_tribal_unarmed-idle-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-idle-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-idle-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-idle-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-idle-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-idle-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-idle-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_tribal_unarmed-walk_1-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-walk_1-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-walk_1-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-walk_1-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-walk_1-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-walk_1-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-walk_1-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_tribal_unarmed-walk_2-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-walk_2-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-walk_2-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-walk_2-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-walk_2-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-walk_2-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-walk_2-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_tribal_unarmed-walk_3-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-walk_3-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-walk_3-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-walk_3-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-walk_3-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-walk_3-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-walk_3-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_tribal_unarmed-walk_4-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-walk_4-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-walk_4-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-walk_4-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-walk_4-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-walk_4-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-walk_4-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_tribal_unarmed-attack_1-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-attack_1-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-attack_1-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-attack_1-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-attack_1-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-attack_1-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-attack_1-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_tribal_unarmed-attack_2-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-attack_2-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-attack_2-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-attack_2-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-attack_2-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-attack_2-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-attack_2-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_tribal_unarmed-hit-s.png",
+        "SW": "/assets/sprites/npc_tribal_unarmed-hit-sw.png",
+        "W": "/assets/sprites/npc_tribal_unarmed-hit-w.png",
+        "NW": "/assets/sprites/npc_tribal_unarmed-hit-nw.png",
+        "N": "/assets/sprites/npc_tribal_unarmed-hit-n.png",
+        "NE": "/assets/sprites/npc_tribal_unarmed-hit-ne.png",
+        "E": "/assets/sprites/npc_tribal_unarmed-hit-e.png",
+        "SE": "/assets/sprites/npc_tribal_unarmed-hit-se.png"
+      }
+    },
+    "npc_wastelander": {
+      "idle": {
+        "S": "/assets/sprites/npc_wastelander-idle-s.png",
+        "SW": "/assets/sprites/npc_wastelander-idle-sw.png",
+        "W": "/assets/sprites/npc_wastelander-idle-w.png",
+        "NW": "/assets/sprites/npc_wastelander-idle-nw.png",
+        "N": "/assets/sprites/npc_wastelander-idle-n.png",
+        "NE": "/assets/sprites/npc_wastelander-idle-ne.png",
+        "E": "/assets/sprites/npc_wastelander-idle-e.png",
+        "SE": "/assets/sprites/npc_wastelander-idle-se.png"
+      },
+      "walk_1": {
+        "S": "/assets/sprites/npc_wastelander-walk_1-s.png",
+        "SW": "/assets/sprites/npc_wastelander-walk_1-sw.png",
+        "W": "/assets/sprites/npc_wastelander-walk_1-w.png",
+        "NW": "/assets/sprites/npc_wastelander-walk_1-nw.png",
+        "N": "/assets/sprites/npc_wastelander-walk_1-n.png",
+        "NE": "/assets/sprites/npc_wastelander-walk_1-ne.png",
+        "E": "/assets/sprites/npc_wastelander-walk_1-e.png",
+        "SE": "/assets/sprites/npc_wastelander-walk_1-se.png"
+      },
+      "walk_2": {
+        "S": "/assets/sprites/npc_wastelander-walk_2-s.png",
+        "SW": "/assets/sprites/npc_wastelander-walk_2-sw.png",
+        "W": "/assets/sprites/npc_wastelander-walk_2-w.png",
+        "NW": "/assets/sprites/npc_wastelander-walk_2-nw.png",
+        "N": "/assets/sprites/npc_wastelander-walk_2-n.png",
+        "NE": "/assets/sprites/npc_wastelander-walk_2-ne.png",
+        "E": "/assets/sprites/npc_wastelander-walk_2-e.png",
+        "SE": "/assets/sprites/npc_wastelander-walk_2-se.png"
+      },
+      "walk_3": {
+        "S": "/assets/sprites/npc_wastelander-walk_3-s.png",
+        "SW": "/assets/sprites/npc_wastelander-walk_3-sw.png",
+        "W": "/assets/sprites/npc_wastelander-walk_3-w.png",
+        "NW": "/assets/sprites/npc_wastelander-walk_3-nw.png",
+        "N": "/assets/sprites/npc_wastelander-walk_3-n.png",
+        "NE": "/assets/sprites/npc_wastelander-walk_3-ne.png",
+        "E": "/assets/sprites/npc_wastelander-walk_3-e.png",
+        "SE": "/assets/sprites/npc_wastelander-walk_3-se.png"
+      },
+      "walk_4": {
+        "S": "/assets/sprites/npc_wastelander-walk_4-s.png",
+        "SW": "/assets/sprites/npc_wastelander-walk_4-sw.png",
+        "W": "/assets/sprites/npc_wastelander-walk_4-w.png",
+        "NW": "/assets/sprites/npc_wastelander-walk_4-nw.png",
+        "N": "/assets/sprites/npc_wastelander-walk_4-n.png",
+        "NE": "/assets/sprites/npc_wastelander-walk_4-ne.png",
+        "E": "/assets/sprites/npc_wastelander-walk_4-e.png",
+        "SE": "/assets/sprites/npc_wastelander-walk_4-se.png"
+      },
+      "attack_1": {
+        "S": "/assets/sprites/npc_wastelander-attack_1-s.png",
+        "SW": "/assets/sprites/npc_wastelander-attack_1-sw.png",
+        "W": "/assets/sprites/npc_wastelander-attack_1-w.png",
+        "NW": "/assets/sprites/npc_wastelander-attack_1-nw.png",
+        "N": "/assets/sprites/npc_wastelander-attack_1-n.png",
+        "NE": "/assets/sprites/npc_wastelander-attack_1-ne.png",
+        "E": "/assets/sprites/npc_wastelander-attack_1-e.png",
+        "SE": "/assets/sprites/npc_wastelander-attack_1-se.png"
+      },
+      "attack_2": {
+        "S": "/assets/sprites/npc_wastelander-attack_2-s.png",
+        "SW": "/assets/sprites/npc_wastelander-attack_2-sw.png",
+        "W": "/assets/sprites/npc_wastelander-attack_2-w.png",
+        "NW": "/assets/sprites/npc_wastelander-attack_2-nw.png",
+        "N": "/assets/sprites/npc_wastelander-attack_2-n.png",
+        "NE": "/assets/sprites/npc_wastelander-attack_2-ne.png",
+        "E": "/assets/sprites/npc_wastelander-attack_2-e.png",
+        "SE": "/assets/sprites/npc_wastelander-attack_2-se.png"
+      },
+      "hit": {
+        "S": "/assets/sprites/npc_wastelander-hit-s.png",
+        "SW": "/assets/sprites/npc_wastelander-hit-sw.png",
+        "W": "/assets/sprites/npc_wastelander-hit-w.png",
+        "NW": "/assets/sprites/npc_wastelander-hit-nw.png",
+        "N": "/assets/sprites/npc_wastelander-hit-n.png",
+        "NE": "/assets/sprites/npc_wastelander-hit-ne.png",
+        "E": "/assets/sprites/npc_wastelander-hit-e.png",
+        "SE": "/assets/sprites/npc_wastelander-hit-se.png"
       }
     }
   },
