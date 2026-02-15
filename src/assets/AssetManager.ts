@@ -126,6 +126,8 @@ export class AssetManager {
         if (this.hasAnimations) {
           const animKeys = [...this.animFrames.keys()];
           console.log(`[AssetManager] Animation frames loaded for: ${animKeys.join(", ")}`);
+          // Validate sprite dimensions at load time
+          this.validateSpriteDimensions();
         }
         if (manifest.weapons) {
           const weaponKeys = Object.keys(manifest.weapons);
@@ -506,6 +508,41 @@ export class AssetManager {
 
     // Character sprites are already properly sized (64x96) and hole-filled
     // by the Python postprocess pipeline. No runtime normalization needed.
+  }
+
+  /**
+   * Validate loaded sprite dimensions at startup.
+   * Logs warnings for any sprites that don't match the expected 64x96.
+   * This helps diagnose rendering issues where sprites appear split or distorted.
+   */
+  private validateSpriteDimensions() {
+    const expected = { w: 64, h: 96 };
+    let issues = 0;
+
+    for (const [spriteKey, anims] of this.animFrames) {
+      // Skip weapon aliases (they share the same image instances)
+      if (AssetManager.WEAPON_SUFFIXES.some((s) => spriteKey.endsWith(`_${s}`))) continue;
+
+      for (const [animName, dirMap] of anims) {
+        for (const [dir, img] of dirMap) {
+          const w = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+          const h = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+          if (w !== expected.w || h !== expected.h) {
+            console.warn(
+              `[AssetManager] Sprite dimension mismatch: ${spriteKey}/${animName}/${dir} ` +
+              `is ${w}x${h}, expected ${expected.w}x${expected.h}`,
+            );
+            issues++;
+          }
+        }
+      }
+    }
+
+    if (issues === 0) {
+      console.log("[AssetManager] All sprite dimensions validated: 64x96 ✓");
+    } else {
+      console.warn(`[AssetManager] ${issues} sprites have unexpected dimensions`);
+    }
   }
 
   /**

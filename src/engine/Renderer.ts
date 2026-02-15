@@ -55,6 +55,9 @@ export class Renderer {
   cssWidth = 800;
   cssHeight = 600;
 
+  /** Sprite dimension warnings — only log once per unique key */
+  private warnedSprites = new Set<string>();
+
   constructor(
     canvas: HTMLCanvasElement,
     camera: Camera,
@@ -115,7 +118,13 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
     (ctx as any).imageSmoothingQuality = "high";
 
-    // Draw tiles (painter's order: back to front)
+    // --- Terrain pass (save/restore isolates any leaked clip paths) ---
+    // drawTile uses ctx.clip() for terrain patterns. If a save/restore pair
+    // is ever missed, the clip would persist and slice subsequent sprite draws
+    // into diamond-shaped fragments — appearing as "split" characters.
+    // Wrapping the entire terrain pass in save/restore guarantees clean state
+    // for entity rendering even if an individual drawTile leaks state.
+    ctx.save();
     for (let y = minY; y <= maxY; y++) {
       for (let x = minX; x <= maxX; x++) {
         if (!state.map.tiles[y] || !state.map.tiles[y][x]) continue;
@@ -138,7 +147,14 @@ export class Renderer {
     for (const item of state.map.items) {
       this.drawGroundItem(item.pos, item.itemId);
     }
+    ctx.restore();
 
+    // Re-apply camera transform after terrain restore (restore pops transform)
+    this.camera.applyTransform(ctx, dpr);
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+
+    // --- Entity pass (guaranteed clean clip/composite state) ---
     // Draw dead entities (corpses) — flat, faded, with loot indicator
     const corpses = state.entities.filter((e) => e.dead && e.inventory.length > 0);
     for (const corpse of corpses) {
@@ -382,14 +398,33 @@ export class Renderer {
     const spriteTop = finalDrawY - sh + TILE_HALF_H;
 
     if (sprite) {
-      // Disable bilinear filtering for sprites: the 64x96 source is drawn
-      // at 52x78 (downscaled), and bilinear interpolation of binary-alpha
-      // edges blends transparent pixels (RGBA 0,0,0,0) with opaque neighbors,
-      // creating dark halo borders at runtime.  Nearest-neighbor preserves
-      // the clean binary alpha from the asset pipeline.
+      // Get actual source dimensions — use naturalWidth/Height for images
+      // (immune to CSS styling), width/height for canvases.
+      const srcW = sprite instanceof HTMLImageElement ? sprite.naturalWidth : sprite.width;
+      const srcH = sprite instanceof HTMLImageElement ? sprite.naturalHeight : sprite.height;
+
+      // Validate sprite dimensions (log once per key to avoid spam)
+      if (srcW > 0 && srcH > 0) {
+        if ((srcW !== 64 || srcH !== 96) && (srcW !== 24 || srcH !== 36)) {
+          const warnKey = `${entity.spriteKey}:${frameKey}:${entity.direction}`;
+          if (!this.warnedSprites.has(warnKey)) {
+            this.warnedSprites.add(warnKey);
+            console.warn(
+              `[Renderer] Unexpected sprite size for ${warnKey}: ${srcW}x${srcH} (expected 64x96)`,
+            );
+          }
+        }
+      }
+
+      // Use 9-argument drawImage to explicitly specify the source rectangle.
+      // This avoids browser quirks with the 5-argument form where the source
+      // dimensions may be computed incorrectly for certain image states.
+      ctx.save();
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sprite, spriteLeft, spriteTop, sw, sh);
-      ctx.imageSmoothingEnabled = true;
+      if (srcW > 0 && srcH > 0) {
+        ctx.drawImage(sprite, 0, 0, srcW, srcH, spriteLeft, spriteTop, sw, sh);
+      }
+      ctx.restore();
     } else {
       // Fallback: draw a simple colored shape if no sprite found
       ctx.fillStyle = entity.isPlayer ? "#40c040" : entity.isHostile ? "#b83030" : "#d4c4a0";
