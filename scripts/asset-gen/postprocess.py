@@ -197,51 +197,6 @@ def cleanup_transparency(image: Image.Image, threshold: int = 10) -> Image.Image
     return Image.fromarray(arr, "RGBA")
 
 
-def fill_interior_holes(image: Image.Image) -> Image.Image:
-    """Fill small transparent gaps inside character sprites.
-
-    Uses morphological closing (dilate then erode) to bridge small 1-2px
-    transparent gaps in the character body. Larger transparent areas (between
-    legs, beside the body) are intentional and left alone.
-    """
-    if image.mode != "RGBA":
-        return image
-
-    arr = np.array(image, dtype=np.uint8).copy()
-    alpha = arr[:, :, 3]
-
-    if not (alpha > 0).any():
-        return image
-
-    # Morphological close with a small 3x3 kernel, 2 iterations.
-    # This fills 1-2px interior gaps without expanding the silhouette much.
-    from scipy.ndimage import binary_dilation, binary_erosion
-    opaque = alpha > 0
-    struct = np.ones((3, 3), dtype=bool)
-    closed = binary_dilation(opaque, struct, iterations=2)
-    closed = binary_erosion(closed, struct, iterations=2)
-
-    # Only fill pixels that were transparent but are now inside the closed mask
-    to_fill = closed & ~opaque
-    fill_count = int(np.sum(to_fill))
-    if fill_count == 0:
-        return image
-
-    # Fill with average color of nearest opaque neighbors
-    ys, xs = np.nonzero(to_fill)
-    for y, x in zip(ys, xs):
-        colors = []
-        for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-            ny, nx = y + dy, x + dx
-            if 0 <= ny < alpha.shape[0] and 0 <= nx < alpha.shape[1] and alpha[ny, nx] > 0:
-                colors.append(arr[ny, nx, :3].astype(np.int32))
-        if colors:
-            avg = np.mean(colors, axis=0).astype(np.uint8)
-            arr[y, x, :3] = avg
-            arr[y, x, 3] = 255
-
-    return Image.fromarray(arr, "RGBA")
-
 
 def assemble_spritesheet(
     frames: list[Image.Image],
@@ -770,7 +725,6 @@ def slice_and_save_character_sheet(
 
             # Post-process each frame
             frame = cleanup_transparency(frame)
-            frame = fill_interior_holes(frame)
             if apply_palette:
                 palette_img = build_palette_image(config)
                 frame = reduce_palette(frame, palette_img)
