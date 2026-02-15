@@ -646,16 +646,18 @@ def slice_spritesheet(
 
 
 def force_transparent_bg(image: Image.Image) -> Image.Image:
-    """Remove green chroma-key background pixels.
+    """Remove background from AI-generated images.
 
-    Gemini generates a wide range of green shades — not just pure #00FF00.
-    Measured mean on raw sheets: R≈121, G≈185, B≈71.  These thresholds
-    are tuned to catch that range while preserving brown/tan character
-    details.  This runs BEFORE palette reduction so the raw Gemini colors
+    Handles three types of backgrounds that Gemini produces:
+
+    1. Green chroma key (#00FF00): Detected by green-dominant heuristic
+    2. Solid-color backgrounds: Detected by border pixel median analysis
+    3. Checkerboard "transparency" patterns: Detected by analyzing
+       alternating pixel colors on borders — Gemini renders a visible
+       checkerboard instead of actual alpha transparency
+
+    This runs BEFORE palette reduction so the raw Gemini colors
     are still present.
-
-    Also catches near-uniform background colors by looking for large
-    contiguous regions of similar color along the image borders.
     """
     arr = np.array(image.convert("RGBA"))
     r = arr[:, :, 0].astype(np.int16)
@@ -666,11 +668,8 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     is_green = (g > 100) & (g > r + 20) & (g > b + 30)
     arr[is_green, 3] = 0
 
-    # Second pass: detect dominant border color and remove it — but only
-    # if the borders are actually opaque.  Sheets that already have a
-    # transparent background (border alpha mostly 0) don't need this, and
-    # running it anyway risks matching character skin/clothing colors that
-    # happen to be close to the transparent pixels' stale RGB values.
+    # Second pass: detect dominant border color(s) and remove them.
+    # Only run if borders are actually opaque (not already transparent).
     h, w = arr.shape[:2]
     border_alpha = np.concatenate([
         arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
@@ -678,24 +677,60 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     border_opaque_fraction = np.mean(border_alpha > 10)
 
     if border_opaque_fraction > 0.5:
-        # Borders are mostly opaque — this sheet has a solid background
+        # Collect opaque border pixels
         border_pixels = np.concatenate([
             arr[0, :, :3], arr[h-1, :, :3], arr[:, 0, :3], arr[:, w-1, :3]
         ], axis=0).astype(np.float32)
-
-        # Only consider opaque border pixels for the median
         border_alpha_flat = np.concatenate([
             arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
         ])
-        opaque_border = border_pixels[border_alpha_flat > 10]
+        opaque_mask = border_alpha_flat > 10
+        opaque_border = border_pixels[opaque_mask]
 
         if len(opaque_border) > 0:
+            # Check for checkerboard pattern: analyze color variance
+            # Checkerboards have two distinct clusters; solid backgrounds have one
+            from sklearn.cluster import KMeans as _KMeans  # type: ignore
+            use_kmeans = False
+            try:
+                # Only import if available; otherwise use simple approach
+                use_kmeans = True
+            except ImportError:
+                pass
+
+            # Simple 2-cluster detection without sklearn:
+            # Split border pixels into two groups by distance from median
             median_color = np.median(opaque_border, axis=0)
-            diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
-            is_bg = diff < 40
-            bg_fraction = np.sum(is_bg) / (h * w)
-            if bg_fraction > 0.30:
-                arr[is_bg, 3] = 0
+            dists = np.sqrt(np.sum((opaque_border - median_color) ** 2, axis=1))
+            mean_dist = np.mean(dists)
+
+            if mean_dist > 20:
+                # High variance suggests checkerboard or multi-color background
+                # Find two cluster centers: pixels above/below median distance
+                far = opaque_border[dists > mean_dist]
+                near = opaque_border[dists <= mean_dist]
+                bg_colors = []
+                if len(near) > 0:
+                    bg_colors.append(np.median(near, axis=0))
+                if len(far) > 0:
+                    bg_colors.append(np.median(far, axis=0))
+
+                # Remove pixels matching either background color
+                all_bg = np.zeros((h, w), dtype=bool)
+                for bg_color in bg_colors:
+                    diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - bg_color) ** 2, axis=2))
+                    all_bg |= diff < 45
+
+                bg_fraction = np.sum(all_bg) / (h * w)
+                if bg_fraction > 0.25:
+                    arr[all_bg, 3] = 0
+            else:
+                # Low variance: single solid background color
+                diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
+                is_bg = diff < 40
+                bg_fraction = np.sum(is_bg) / (h * w)
+                if bg_fraction > 0.30:
+                    arr[is_bg, 3] = 0
 
     return Image.fromarray(arr, "RGBA")
 
