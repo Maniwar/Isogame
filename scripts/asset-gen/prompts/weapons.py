@@ -20,9 +20,13 @@ Uses gemini-3-pro-image-preview with image_size="2K" for native 2048×2048.
 from .characters import DIRECTIONS, DIRECTION_LABELS, ANIMATIONS, ANIMATION_LABELS
 
 WEAPON_STYLE_PREAMBLE = (
-    "Create a weapon overlay sprite in the style of classic Fallout 2. "
-    "Top-down 3/4 isometric perspective. Detailed pixel art. "
+    "Create a weapon overlay sprite in the style of Fallout 2 "
+    "(1998, Black Isle Studios). "
+    "Top-down 3/4 isometric perspective. "
+    "Art style: detailed pre-rendered 3D look — NOT flat cartoon or pixel art. "
     "Muted, desaturated post-apocalyptic color palette with earthy tones. "
+    "NO dark outlines or black borders around the weapon or hands. "
+    "Edges transition directly from surface material to green background. "
     "CRITICAL: Use a pure bright green (#00FF00) chroma key background. "
     "Draw ONLY the weapon and the hands/arms holding it — NO full body, "
     "NO torso, NO head, NO legs. Just the weapon + forearms/hands. "
@@ -55,13 +59,20 @@ WEAPON_SHEET_TEMPLATE = (
     "  Row 6 — ATTACK WIND-UP: Weapon drawn back, preparing to strike.\n"
     "  Row 7 — ATTACK STRIKE: {attack_desc}.\n"
     "  Row 8 — HIT REACTION: Weapon lowered, recoiling from incoming damage.\n\n"
+    "GRID LAYOUT:\n"
+    "- Cell boundaries are a strict pixel grid — 256px per cell:\n"
+    "    Columns: x=0–255, 256–511, 512–767, 768–1023, 1024–1279, 1280–1535, 1536–1791, 1792–2047\n"
+    "    Rows: y=0–255, 256–511, 512–767, 768–1023, 1024–1279, 1280–1535, 1536–1791, 1792–2047\n"
+    "- Software will slice this image into 64 individual cells at these exact coordinates.\n\n"
     "IMPORTANT RULES:\n"
     "- The image is EXACTLY 2048×2048. Each of the 64 cells is EXACTLY 256×256.\n"
-    "- Leave 4–8 pixels of green gap between cells so they are clearly separated.\n"
-    "- The weapon + hands fills ~60%% of each cell, centered in the cell.\n"
+    "- SIZING: The weapon + hands must fit within a 180 × 180 pixel area CENTERED "
+    "in each 256×256 cell. This leaves 38px of green padding on every side. "
+    "No part of the weapon may touch the cell edges.\n"
     "- The SAME weapon in ALL 64 cells — identical proportions and colors.\n"
     "- Only the POSE (row) and VIEWING ANGLE (column) change.\n"
     "- Pure bright GREEN (#00FF00) background in every cell and between cells.\n"
+    "- NO dark outlines or borders around the weapon or hands.\n"
     "- NO full body, NO scenery, NO text, NO labels, NO watermarks.\n"
 )
 

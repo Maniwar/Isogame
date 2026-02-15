@@ -19,7 +19,9 @@ TILE_STYLE_PREAMBLE = (
     "Top-down 3/4 isometric perspective. "
     "Desaturated post-nuclear color palette: dusty browns, rust oranges, "
     "weathered tan, faded olive, muted gray. NO bright or saturated colors. "
-    "Pre-rendered 3D look with visible grit and texture — like original Fallout 2 tiles. "
+    "Art style: detailed pre-rendered 3D look with visible grit and texture — "
+    "like original Fallout 2 tiles. NOT flat cartoon or pixel art. "
+    "NO dark outlines or borders around the tile edges. "
     "The tile must be a perfect isometric diamond shape on a transparent background. "
 )
 
@@ -157,11 +159,12 @@ def build_water_texture_prompt(config: dict) -> str:
 # ---------------------------------------------------------------------------
 
 TERRAIN_VARIANT_SHEET_PREAMBLE = (
-    "Create an isometric TERRAIN VARIANT SHEET in the style of classic Fallout 2. "
-    "Top-down 3/4 isometric perspective. "
+    "Create an isometric TERRAIN VARIANT SHEET in the style of Fallout 2 "
+    "(1998, Black Isle Studios). Top-down 3/4 isometric perspective. "
     "Muted, desaturated post-apocalyptic color palette: earthy browns, "
     "rust oranges, dusty yellows, faded greens. "
-    "Detailed pixel art with a gritty, weathered feel. "
+    "Art style: detailed pre-rendered 3D look with gritty, weathered texture — "
+    "NOT flat cartoon or pixel art. NO dark outlines on tile edges. "
 )
 
 TERRAIN_VARIANT_SHEET_TEMPLATE = (
@@ -376,10 +379,12 @@ def build_water_animation_sheet_prompt(config: dict) -> str:
 # --- Tile Set Sheet (all variants in one image) ---
 
 TILE_SET_PREAMBLE = (
-    "Create an isometric TILE SET in the style of classic Fallout 2. "
+    "Create an isometric TILE SET in the style of Fallout 2 "
+    "(1998, Black Isle Studios). "
     "Use a muted, desaturated post-apocalyptic color palette with earthy browns, "
     "rust oranges, dusty yellows, and faded greens. "
-    "Detailed pixel art with a gritty, weathered feel. "
+    "Art style: detailed pre-rendered 3D look with gritty, weathered texture — "
+    "NOT flat cartoon or pixel art. NO dark outlines on tile edges. "
     "Each tile is a perfect isometric diamond on a transparent background. "
 )
 
@@ -402,17 +407,21 @@ TILE_SET_TEMPLATE = (
 )
 
 ITEM_SET_TEMPLATE = (
-    "Create an INVENTORY ICON SHEET in the style of classic Fallout 2.\n"
-    "Use a muted post-apocalyptic color palette. Detailed pixel art.\n\n"
+    "Create an INVENTORY ICON SHEET in the style of Fallout 2 "
+    "(1998, Black Isle Studios).\n"
+    "Art style: pre-rendered 3D look — NOT flat cartoon or pixel art.\n"
+    "Muted, desaturated post-apocalyptic color palette.\n\n"
     "LAYOUT: {count} item icons in a single row.\n"
     "Each icon is {size}x{size} pixels.\n"
     "Total image size: {sheet_w}x{size} pixels.\n\n"
     "Items from left to right:\n{item_list}\n\n"
     "RULES:\n"
-    "- Each item centered in its {size}x{size} cell\n"
-    "- Transparent background\n"
+    "- Each item centered in its {size}x{size} cell with ~10%% padding on all sides\n"
+    "- Transparent background — NO ground, NO shadows\n"
+    "- NO dark outlines or borders around items\n"
     "- Items look worn, used, and weathered\n"
-    "- No text, no labels, no watermarks\n"
+    "- Slightly angled top-down perspective, like items on a table\n"
+    "- NO text, NO labels, NO watermarks\n"
 )
 
 

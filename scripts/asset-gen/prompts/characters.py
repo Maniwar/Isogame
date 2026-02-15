@@ -419,34 +419,41 @@ def _build_archetypes():
             "weapon_attack_desc": weapon["attack_desc"],
         })
 
-    # NPCs: one signature weapon each
-    npc_weapons = {
-        "npc_sheriff": "pistol",
-        "npc_merchant": "rifle",
-        "npc_doc": "unarmed",
-        "npc_raider": "rifle",
-        "npc_guard": "rifle",
-        "npc_tribal": "knife",
-        "npc_caravan": "pistol",
-        "npc_wastelander": "unarmed",
-        "npc_mutant": "bat",
-        "npc_ghoul": "pistol",
+    # NPCs: combatants get multiple weapon variants, others get one signature.
+    # The first weapon in each list is the "default" used when no weapon is equipped.
+    npc_weapons: dict[str, list[str]] = {
+        "npc_sheriff":     ["pistol", "rifle"],                 # law enforcement
+        "npc_merchant":    ["rifle"],                           # self-defense
+        "npc_doc":         ["unarmed"],                         # non-combatant
+        "npc_raider":      ["rifle", "pistol", "knife", "bat"], # uses whatever
+        "npc_guard":       ["rifle", "pistol"],                 # standard guard
+        "npc_tribal":      ["knife", "unarmed"],                # tribal weapons
+        "npc_caravan":     ["pistol"],                          # protection
+        "npc_wastelander": ["unarmed"],                         # passive
+        "npc_mutant":      ["bat", "unarmed"],                  # brute force
+        "npc_ghoul":       ["pistol"],                          # basic defense
     }
-    for npc_key, weapon_key in npc_weapons.items():
+    for npc_key, weapon_keys in npc_weapons.items():
         base = CHARACTER_BASES[npc_key]
-        weapon = WEAPON_VARIANTS[weapon_key]
-        archetypes.append({
-            "sprite_key": npc_key,
-            "base_key": npc_key,        # single-variant NPCs reference themselves
-            "name": f"{base['name']} ({weapon['label']})",
-            "description": (
-                f"{base['description']} "
-                f"{weapon['held_desc']}."
-            ),
-            "pose": f"standing idle, {weapon['idle_pose']}",
-            "weapon_idle_desc": weapon["idle_pose"],
-            "weapon_attack_desc": weapon["attack_desc"],
-        })
+        for i, weapon_key in enumerate(weapon_keys):
+            weapon = WEAPON_VARIANTS[weapon_key]
+            # First (default) weapon uses bare npc_key; extras get suffix
+            if i == 0:
+                sprite_key = npc_key
+            else:
+                sprite_key = f"{npc_key}_{weapon_key}"
+            archetypes.append({
+                "sprite_key": sprite_key,
+                "base_key": npc_key,
+                "name": f"{base['name']} ({weapon['label']})",
+                "description": (
+                    f"{base['description']} "
+                    f"{weapon['held_desc']}."
+                ),
+                "pose": f"standing idle, {weapon['idle_pose']}",
+                "weapon_idle_desc": weapon["idle_pose"],
+                "weapon_attack_desc": weapon["attack_desc"],
+            })
 
     return archetypes
 
