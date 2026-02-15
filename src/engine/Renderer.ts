@@ -170,25 +170,27 @@ export class Renderer {
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Step 1: Always try pattern fill first — procedural textures are always
-    // generated, giving seamless terrain across tile boundaries.
-    // For water, patterns cycle through multiple animated frames.
-    const pattern = assets.getTerrainPattern(tile.terrain, ctx);
+    // Use pre-clipped diamond tile canvases directly (no save/clip/restore).
+    // For non-water: hash-based variant selection from procedural + AI tiles.
+    // For water: per-tile staggered animation across 4+ frames.
+    let neighborSig = 0;
+    if (state) {
+      const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      for (let i = 0; i < cardinalDirs.length; i++) {
+        const nx = x + cardinalDirs[i][0];
+        const ny = y + cardinalDirs[i][1];
+        const nTile = state.map.tiles[ny]?.[nx];
+        if (!nTile || nTile.terrain !== tile.terrain) {
+          neighborSig |= (1 << i);
+        }
+      }
+    }
 
-    if (pattern) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(wx, wy - TILE_HALF_H);
-      ctx.lineTo(wx + TILE_HALF_W, wy);
-      ctx.lineTo(wx, wy + TILE_HALF_H);
-      ctx.lineTo(wx - TILE_HALF_W, wy);
-      ctx.closePath();
-      ctx.clip();
-      ctx.fillStyle = pattern;
-      ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
-      ctx.restore();
+    const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
+    if (sprite) {
+      ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
     } else {
-      // Fallback: solid color diamond if no pattern available
+      // Fallback: solid color diamond
       const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
       if (baseColor) {
         ctx.fillStyle = baseColor;
@@ -199,30 +201,6 @@ export class Renderer {
         ctx.lineTo(wx - TILE_HALF_W, wy);
         ctx.closePath();
         ctx.fill();
-      }
-    }
-
-    // Step 2: Overlay AI diamond tiles on top (if loaded from manifest).
-    // Skip for water — water uses pattern-based animation instead of sprites.
-    if (tile.terrain !== Terrain.Water) {
-      const aiTileCount = assets.getTileVariantCount(tile.terrain);
-      if (aiTileCount > 1) {
-        let neighborSig = 0;
-        if (state) {
-          const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-          for (let i = 0; i < cardinalDirs.length; i++) {
-            const nx = x + cardinalDirs[i][0];
-            const ny = y + cardinalDirs[i][1];
-            const nTile = state.map.tiles[ny]?.[nx];
-            if (!nTile || nTile.terrain !== tile.terrain) {
-              neighborSig |= (1 << i);
-            }
-          }
-        }
-        const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
-        if (sprite) {
-          ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
-        }
       }
     }
 
