@@ -371,10 +371,11 @@ export class AssetManager {
     }
 
     // Legacy diamond tiles — fallback for assets that haven't been regenerated.
+    // Skip Water: it uses procedural animated frames; AI tiles would break the animation.
     if (manifest.tiles) {
       for (const [terrainName, pathOrPaths] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
-        if (terrain === undefined) continue;
+        if (terrain === undefined || terrain === Terrain.Water) continue;
 
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
         const proceduralBase = this.tiles.get(terrain)?.[0];
@@ -555,9 +556,8 @@ export class AssetManager {
 
   /**
    * Composite an AI tile onto the procedural base tile.
-   * AI tiles are now pre-processed to exactly TILE_W x TILE_H (64x32)
-   * with a proper diamond mask.  The procedural base shows through any
-   * edge gaps from anti-aliasing.
+   * Composite an AI tile onto the procedural base, clipped to the
+   * isometric diamond so no rectangular overflow is visible.
    */
   private compositeAiTile(img: HTMLImageElement, base?: DrawTarget): HTMLCanvasElement {
     const canvas = this.createCanvas(TILE_W, TILE_H);
@@ -565,7 +565,17 @@ export class AssetManager {
     ctx.imageSmoothingEnabled = true;
     (ctx as any).imageSmoothingQuality = "high";
     if (base) ctx.drawImage(base, 0, 0, TILE_W, TILE_H);
+    // Clip to diamond so AI tiles with corner bleed don't overflow
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(TILE_HALF_W, 0);
+    ctx.lineTo(TILE_W, TILE_HALF_H);
+    ctx.lineTo(TILE_HALF_W, TILE_H);
+    ctx.lineTo(0, TILE_HALF_H);
+    ctx.closePath();
+    ctx.clip();
     ctx.drawImage(img, 0, 0, TILE_W, TILE_H);
+    ctx.restore();
     return canvas;
   }
 
