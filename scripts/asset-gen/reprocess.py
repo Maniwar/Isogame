@@ -803,19 +803,15 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
                     max_content_w = max(max_content_w, cw)
                     max_content_h = max(max_content_h, ch)
 
-    # Compute uniform scale: primarily HEIGHT-based for character body consistency.
-    # Weapons extending far horizontally (e.g., rifle in attack pose) shouldn't
-    # shrink the whole character.  Width overflow is allowed up to 50% — the
-    # content gets center-cropped to the frame, clipping only weapon extremities.
+    # Compute uniform scale: fit the largest character content within the frame
+    # with NO overflow. Both height and width must fit inside SPRITE_W × SPRITE_H.
+    # This prevents characters (especially bulky ones like raiders) from being
+    # clipped at the frame edges.
     uniform_scale = None
     if center_content and max_content_w > 0 and max_content_h > 0:
         height_scale = min(SPRITE_H / max_content_h, 1.0)
-        max_allowed_width = SPRITE_W * 1.5
-        if max_content_w * height_scale > max_allowed_width:
-            # Width overflow too extreme — cap to 150% of frame width
-            uniform_scale = min(max_allowed_width / max_content_w, 1.0)
-        else:
-            uniform_scale = height_scale
+        width_scale = min(SPRITE_W / max_content_w, 1.0)
+        uniform_scale = min(height_scale, width_scale)
         print(f"    Uniform scale: {uniform_scale:.3f} "
               f"(max content {max_content_w}x{max_content_h} → "
               f"{int(max_content_w * uniform_scale)}x{int(max_content_h * uniform_scale)} "
@@ -923,8 +919,11 @@ def reslice_sheet(sheet_path: Path, sprite_key: str, dst_dir: Path,
             # Fill any new holes created by palette reduction + alpha threshold
             frame = fill_interior_holes(frame, threshold=30)
 
-            # Remove dark fringe pixels at content edges
-            frame = defringe(frame, passes=2, dark_threshold=35)
+            # Remove dark fringe pixels at content edges.
+            # Higher threshold (50) catches the dark outlines that AI models
+            # frequently bake into character silhouettes. 3 passes handles
+            # 2-3px wide borders.
+            frame = defringe(frame, passes=3, dark_threshold=50)
 
             filename = f"{sprite_key}-{anim}-{direction}.png"
             frame.save(dst_dir / filename, "PNG")
@@ -1139,6 +1138,51 @@ def qa_validate() -> bool:
             checks.append(f"WARN sparse ({opaque}/{total} = {pct}%)")
         else:
             checks.append(f"OK content={pct}%")
+
+        # Edge clipping check — detect characters cut off at frame edges.
+        # Count opaque pixels touching the very edge rows/columns.
+        # A few pixels (≤5) is fine (anti-alias), but >10 means the
+        # character extends beyond the frame.
+        bot_edge = int(np.sum(a[h - 1, :] > 10))
+        top_edge = int(np.sum(a[0, :] > 10))
+        left_edge = int(np.sum(a[:, 0] > 10))
+        right_edge = int(np.sum(a[:, w - 1] > 10))
+        max_edge = max(bot_edge, top_edge, left_edge, right_edge)
+        if max_edge > 10:
+            edges = []
+            if bot_edge > 10: edges.append(f"bot={bot_edge}")
+            if top_edge > 10: edges.append(f"top={top_edge}")
+            if left_edge > 10: edges.append(f"left={left_edge}")
+            if right_edge > 10: edges.append(f"right={right_edge}")
+            checks.append(f"WARN clipped edges: {', '.join(edges)}")
+        else:
+            checks.append("OK edges clear")
+
+        # Dark border check — count dark opaque pixels adjacent to transparency.
+        # Characters from Fallout 2 style should NOT have dark outlines.
+        dark_border_count = 0
+        total_border_count = 0
+        for cy in range(1, h - 1):
+            for cx in range(1, w - 1):
+                if a[cy, cx] > 200:
+                    has_trans = False
+                    for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        if a[cy + dy, cx + dx] < 50:
+                            has_trans = True
+                            break
+                    if has_trans:
+                        total_border_count += 1
+                        brightness = (int(r[cy, cx]) + int(g[cy, cx]) + int(b[cy, cx])) // 3
+                        if brightness < 40:
+                            dark_border_count += 1
+        if total_border_count > 0:
+            dark_pct = dark_border_count * 100 // total_border_count
+            if dark_pct > 40:
+                checks.append(f"WARN dark outline: {dark_pct}%% of edge pixels are dark ({dark_border_count}/{total_border_count})")
+            else:
+                checks.append(f"OK outline={dark_pct}%%")
+        else:
+            checks.append("OK no border")
 
         print(f"  {sprite_key}: {', '.join(checks)}")
 

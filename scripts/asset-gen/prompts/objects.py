@@ -17,12 +17,17 @@ Object categories:
 """
 
 OBJECT_STYLE_PREAMBLE = (
-    "Create a single environmental object in the style of classic Fallout 2. "
+    "Create a single environmental object in the style of Fallout 2 "
+    "(1998, Black Isle Studios). "
     "Isometric top-down 3/4 perspective, matching a 2:1 diamond tile grid. "
     "Muted, desaturated post-apocalyptic palette: earthy browns, rust oranges, "
-    "faded olive drab, dusty yellows, weathered grays. "
-    "The art style is detailed pixel art with a gritty, sun-bleached, "
-    "radioactive wasteland feel — like Fallout 2 (1998) environment art. "
+    "faded olive drab, dusty yellows, weathered grays. NO bright or saturated colors. "
+    "Art style: detailed pre-rendered 3D look with gritty, sun-bleached, "
+    "radioactive wasteland texture — like Fallout 2 environment art. "
+    "NOT flat cartoon or pixel art. "
+    "NO dark outlines or black borders around the object silhouette. "
+    "Object edges transition directly from surface material to transparent background — "
+    "no drawn border line of any kind. "
     "Everything looks old, damaged, and decaying. Metal is rusted. "
     "Wood is splintered. Paint is peeling. Nothing is clean or new. "
     "CRITICAL: Transparent background (alpha channel). "
@@ -32,17 +37,21 @@ OBJECT_STYLE_PREAMBLE = (
 OBJECT_TEMPLATE = (
     "{preamble}"
     "Object: {name} — {description}\n\n"
-    "IMAGE SIZE: {size} × {size} pixels.\n"
-    "The object should be centered in the frame, occupying roughly "
-    "60-80% of the image area.\n"
+    "IMAGE SIZE: {size} × {size} pixels.\n\n"
+    "SIZING: The object must fit within a {safe_size} × {safe_size} pixel safe zone "
+    "centered in the {size} × {size} image. This leaves {padding} pixels of "
+    "transparent padding on every side. No part of the object may touch the image edges.\n\n"
+    "The object is centered horizontally and anchored to the BOTTOM of the safe zone "
+    "(base/feet of the object at the bottom).\n\n"
     "Isometric perspective: the viewer looks down at ~30 degrees.\n"
     "The object sits ON a ground plane (but don't draw the ground).\n\n"
     "RULES:\n"
-    "- Transparent PNG background — no ground, no shadows\n"
-    "- Match Fallout 2's art style: gritty, weathered, post-nuclear\n"
-    "- Everything is old and damaged — rust, dents, scratches, wear\n"
+    "- Transparent PNG background — NO ground plane, NO drop shadows, NO cast shadows\n"
+    "- NO dark outlines or borders around the object edges\n"
+    "- Object edges transition directly from surface material to transparent\n"
+    "- Gritty, weathered, post-nuclear — rust, dents, scratches, wear\n"
     "- Consistent isometric 3/4 top-down viewing angle\n"
-    "- No text, no labels, no watermarks\n"
+    "- NO text, NO labels, NO watermarks\n"
 )
 
 OBJECT_SHEET_TEMPLATE = (
@@ -55,13 +64,16 @@ OBJECT_SHEET_TEMPLATE = (
     "Each cell contains ONE variant of the object on a transparent background.\n"
     "All variants are the SAME type of object but with DIFFERENT visual details:\n"
     "{variant_list}\n\n"
+    "SIZING: Each object must fit within 80%% of its cell dimensions, centered. "
+    "This leaves a transparent margin of ~10%% on every side. "
+    "The object MUST NOT touch the cell edges.\n\n"
     "RULES:\n"
-    "- Each variant centered in its cell, ~60-80% of cell area\n"
-    "- Transparent background in every cell\n"
+    "- Transparent background in every cell — NO ground, NO shadows\n"
+    "- NO dark outlines or borders around object edges\n"
     "- Same object type, different wear/damage/orientation\n"
-    "- Consistent isometric 3/4 top-down perspective\n"
-    "- Gritty Fallout 2 post-apocalyptic style\n"
-    "- No text, no labels, no watermarks\n"
+    "- Consistent isometric 3/4 top-down perspective (~30 degrees)\n"
+    "- Pre-rendered 3D look — NOT cartoon or pixel art\n"
+    "- NO text, NO labels, NO watermarks\n"
 )
 
 
@@ -346,11 +358,15 @@ OBJECT_CATALOG = [
 def build_object_prompt(name: str, description: str, config: dict) -> str:
     """Build a prompt for generating a single environmental object."""
     size = config.get("objects", {}).get("size", 256)
+    padding = max(size // 10, 16)  # ~10% padding, minimum 16px
+    safe_size = size - 2 * padding
     return OBJECT_TEMPLATE.format(
         preamble=OBJECT_STYLE_PREAMBLE,
         name=name,
         description=description,
         size=size,
+        safe_size=safe_size,
+        padding=padding,
     )
 
 

@@ -6,18 +6,28 @@ ITEM_STYLE_PREAMBLE = (
     "on a transparent background. "
     "Desaturated post-nuclear color palette: rusty browns, olive drab, "
     "weathered metal grays, faded labels. Nothing looks new or clean. "
-    "Pre-rendered 3D look with visible wear and texture detail — "
+    "Art style: pre-rendered 3D look with visible wear and texture detail — "
     "matching the Fallout 2 inventory screen aesthetic. "
+    "NOT flat cartoon or pixel art. "
+    "NO dark outlines or black borders around the item. "
+    "The item edges transition directly from the object surface to transparent. "
     "Slightly angled top-down perspective, like items laid on a table. "
 )
 
 ITEM_TEMPLATE = (
     "{preamble}"
-    "Item: {name} — {description}. "
-    "Icon size: {size}x{size} pixels. "
-    "The item should look worn, used, and weathered — fitting for a post-apocalyptic setting. "
-    "Centered in the frame with a small margin. "
-    "No text, no labels, no watermarks."
+    "Item: {name} — {description}.\n\n"
+    "IMAGE SIZE: {size} × {size} pixels.\n"
+    "SIZING: The item must fit within a {safe_size} × {safe_size} pixel area "
+    "centered in the {size} × {size} frame. This leaves {padding} pixels of "
+    "transparent padding on every side. The item MUST NOT touch the image edges.\n\n"
+    "The item should look worn, used, and weathered — fitting for a post-apocalyptic setting.\n"
+    "RULES:\n"
+    "- Transparent background — NO ground, NO shadows, NO surface\n"
+    "- NO dark outlines or borders around the item\n"
+    "- Item edges blend directly from surface material to transparent\n"
+    "- Pre-rendered 3D look, NOT flat cartoon\n"
+    "- NO text, NO labels, NO watermarks\n"
 )
 
 # Item catalog — icon_key must match the game's ITEM_DB icon values in InventorySystem.ts
@@ -46,9 +56,14 @@ ITEM_CATALOG = [
 
 def build_item_prompt(name: str, description: str, config: dict) -> str:
     """Build a prompt for generating an inventory item icon."""
+    size = config["items"]["icon_size"]
+    padding = max(size // 8, 4)  # ~12% padding, minimum 4px
+    safe_size = size - 2 * padding
     return ITEM_TEMPLATE.format(
         preamble=ITEM_STYLE_PREAMBLE,
         name=name,
         description=description,
-        size=config["items"]["icon_size"],
+        size=size,
+        safe_size=safe_size,
+        padding=padding,
     )
