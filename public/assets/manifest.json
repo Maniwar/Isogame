@@ -36,12 +36,6 @@
       "/assets/tiles/sand-03.png",
       "/assets/tiles/sand-04.png"
     ],
-    "Water": [
-      "/assets/tiles/water-01.png",
-      "/assets/tiles/water-02.png",
-      "/assets/tiles/water-03.png",
-      "/assets/tiles/water-04.png"
-    ],
     "Dirt": [
       "/assets/tiles/dirt-01.png",
       "/assets/tiles/dirt-02.png",

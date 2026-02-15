@@ -371,10 +371,11 @@ export class AssetManager {
     }
 
     // Legacy diamond tiles — fallback for assets that haven't been regenerated.
+    // Skip Water: it uses procedural animated frames; AI tiles would break the animation.
     if (manifest.tiles) {
       for (const [terrainName, pathOrPaths] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
-        if (terrain === undefined) continue;
+        if (terrain === undefined || terrain === Terrain.Water) continue;
 
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
         const proceduralBase = this.tiles.get(terrain)?.[0];
