@@ -1347,7 +1347,10 @@ STEP_MAP = {
 }
 
 # Default categories when --category=all
-DEFAULT_CATEGORIES = ["terrain_textures", "tile_sheets", "sprites", "objects", "items", "portraits"]
+# Aligned with generate.py defaults: terrain_textures (not tile_sheets),
+# sprites (from characters), objects, items, portraits.
+# tile_sheets is a legacy format — use --category=tile_sheets explicitly if needed.
+DEFAULT_CATEGORIES = ["terrain_textures", "sprites", "objects", "items", "portraits"]
 
 
 def main():

@@ -186,37 +186,65 @@ export class Renderer {
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Use pre-clipped diamond tile canvases directly (no save/clip/restore).
-    // For non-water: hash-based variant selection from procedural + AI tiles.
-    // For water: per-tile staggered animation across 4+ frames.
-    let neighborSig = 0;
-    if (state) {
-      const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-      for (let i = 0; i < cardinalDirs.length; i++) {
-        const nx = x + cardinalDirs[i][0];
-        const ny = y + cardinalDirs[i][1];
-        const nTile = state.map.tiles[ny]?.[nx];
-        if (!nTile || nTile.terrain !== tile.terrain) {
-          neighborSig |= (1 << i);
-        }
-      }
-    }
+    // Two rendering paths:
+    //   1. Terrain textures (preferred): seamless rectangular textures
+    //      clipped to diamond shape via save/clip/restore. Adjacent tiles
+    //      share the same continuous texture, eliminating visible seams.
+    //   2. Diamond tiles (fallback): pre-clipped diamond tile canvases
+    //      with hash-based variant selection.
 
-    const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
-    if (sprite) {
-      ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
-    } else {
-      // Fallback: solid color diamond
-      const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
-      if (baseColor) {
-        ctx.fillStyle = baseColor;
+    let drawn = false;
+
+    // Path 1: Seamless terrain texture pattern fill
+    if (assets.hasTerrainTextureMode()) {
+      const pattern = assets.getTerrainPattern(tile.terrain, ctx);
+      if (pattern) {
+        ctx.save();
         ctx.beginPath();
         ctx.moveTo(wx, wy - TILE_HALF_H);
         ctx.lineTo(wx + TILE_HALF_W, wy);
         ctx.lineTo(wx, wy + TILE_HALF_H);
         ctx.lineTo(wx - TILE_HALF_W, wy);
         ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle = pattern;
         ctx.fill();
+        ctx.restore();
+        drawn = true;
+      }
+    }
+
+    // Path 2: Diamond tile variants
+    if (!drawn) {
+      let neighborSig = 0;
+      if (state) {
+        const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+        for (let i = 0; i < cardinalDirs.length; i++) {
+          const nx = x + cardinalDirs[i][0];
+          const ny = y + cardinalDirs[i][1];
+          const nTile = state.map.tiles[ny]?.[nx];
+          if (!nTile || nTile.terrain !== tile.terrain) {
+            neighborSig |= (1 << i);
+          }
+        }
+      }
+
+      const sprite = assets.getTile(tile.terrain, x, y, neighborSig);
+      if (sprite) {
+        ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+      } else {
+        // Fallback: solid color diamond
+        const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
+        if (baseColor) {
+          ctx.fillStyle = baseColor;
+          ctx.beginPath();
+          ctx.moveTo(wx, wy - TILE_HALF_H);
+          ctx.lineTo(wx + TILE_HALF_W, wy);
+          ctx.lineTo(wx, wy + TILE_HALF_H);
+          ctx.lineTo(wx - TILE_HALF_W, wy);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
     }
 
