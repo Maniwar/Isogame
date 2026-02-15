@@ -625,27 +625,36 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
     is_green = (g > 100) & (g > r + 20) & (g > b + 30)
     arr[is_green, 3] = 0
 
-    # Second pass: detect dominant border color and remove it.
-    # Some sheets have a non-standard green that passes RGB checks
-    # but also have near-uniform background colors that should be removed.
+    # Second pass: detect dominant border color and remove it — but only
+    # if the borders are actually opaque.  Sheets that already have a
+    # transparent background (border alpha mostly 0) don't need this, and
+    # running it anyway risks matching character skin/clothing colors that
+    # happen to be close to the transparent pixels' stale RGB values.
     h, w = arr.shape[:2]
-    border_pixels = np.concatenate([
-        arr[0, :, :3],         # top row
-        arr[h-1, :, :3],       # bottom row
-        arr[:, 0, :3],         # left col
-        arr[:, w-1, :3],       # right col
-    ], axis=0).astype(np.float32)
+    border_alpha = np.concatenate([
+        arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
+    ])
+    border_opaque_fraction = np.mean(border_alpha > 10)
 
-    if len(border_pixels) > 0:
-        # Find median border color
-        median_color = np.median(border_pixels, axis=0)
-        # Remove pixels within a tolerance of the median border color
-        diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
-        is_bg = diff < 40  # 40 = Euclidean distance tolerance
-        # Only apply if the border color is significantly present (>30% of image)
-        bg_fraction = np.sum(is_bg) / (h * w)
-        if bg_fraction > 0.30:
-            arr[is_bg, 3] = 0
+    if border_opaque_fraction > 0.5:
+        # Borders are mostly opaque — this sheet has a solid background
+        border_pixels = np.concatenate([
+            arr[0, :, :3], arr[h-1, :, :3], arr[:, 0, :3], arr[:, w-1, :3]
+        ], axis=0).astype(np.float32)
+
+        # Only consider opaque border pixels for the median
+        border_alpha_flat = np.concatenate([
+            arr[0, :, 3], arr[h-1, :, 3], arr[:, 0, 3], arr[:, w-1, 3]
+        ])
+        opaque_border = border_pixels[border_alpha_flat > 10]
+
+        if len(opaque_border) > 0:
+            median_color = np.median(opaque_border, axis=0)
+            diff = np.sqrt(np.sum((arr[:, :, :3].astype(np.float32) - median_color) ** 2, axis=2))
+            is_bg = diff < 40
+            bg_fraction = np.sum(is_bg) / (h * w)
+            if bg_fraction > 0.30:
+                arr[is_bg, 3] = 0
 
     return Image.fromarray(arr, "RGBA")
 
