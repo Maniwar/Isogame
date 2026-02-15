@@ -15,11 +15,11 @@ enabling animated water tiles at runtime.
 
 # Base style preamble injected into every tile prompt
 TILE_STYLE_PREAMBLE = (
-    "Create a single isometric tile in the style of classic Fallout 2. "
-    "The tile should be viewed from a top-down 3/4 isometric perspective. "
-    "Use a muted, desaturated post-apocalyptic color palette with earthy browns, "
-    "rust oranges, dusty yellows, and faded greens. "
-    "The art style should be detailed pixel art with a gritty, weathered feel. "
+    "Create a single isometric tile in the style of Fallout 2 (1998, Black Isle Studios). "
+    "Top-down 3/4 isometric perspective. "
+    "Desaturated post-nuclear color palette: dusty browns, rust oranges, "
+    "weathered tan, faded olive, muted gray. NO bright or saturated colors. "
+    "Pre-rendered 3D look with visible grit and texture — like original Fallout 2 tiles. "
     "The tile must be a perfect isometric diamond shape on a transparent background. "
 )
 
@@ -71,11 +71,15 @@ TERRAIN_FEATURE_TEMPLATE = (
 # ---------------------------------------------------------------------------
 
 TERRAIN_TEXTURE_PREAMBLE = (
-    "Create a SEAMLESS TILEABLE terrain texture in the style of classic Fallout 2. "
+    "Create a SEAMLESS TILEABLE terrain texture in the style of Fallout 2 "
+    "(1998, Black Isle Studios). "
     "Viewed from a top-down 3/4 isometric perspective (~30 degrees). "
-    "Muted, desaturated post-apocalyptic color palette: earthy browns, "
-    "rust oranges, dusty yellows, faded greens. "
-    "Detailed pixel art with a gritty, weathered feel. "
+    "Color palette: desaturated earth tones — dusty browns, rust oranges, "
+    "weathered tan, faded olive, muted gray. NO bright or saturated colors. "
+    "The ground looks sun-baked, irradiated, and neglected for decades. "
+    "Art style: pre-rendered 3D look with visible grit and texture detail, "
+    "like the original Fallout 2 terrain tiles. NOT flat or cartoon-like. "
+    "Think: nuclear wasteland California desert, 80 years after the bombs fell. "
 )
 
 TERRAIN_TEXTURE_TEMPLATE = (

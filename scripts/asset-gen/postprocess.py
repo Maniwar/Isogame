@@ -1150,6 +1150,99 @@ def process_portraits(config: dict, apply_palette: bool = True) -> int:
     return processed
 
 
+def process_objects(config: dict, apply_palette: bool = True) -> int:
+    """Process environmental object sprites.
+
+    Handles two cases:
+    1. Single object PNGs — resize, remove background, palette reduction
+    2. Object variant sheets (*-sheet.png) — slice into individual variants,
+       then resize and palette-reduce each
+    """
+    obj_size = config.get("objects", {}).get("size", 256)
+    # Target size for objects in the game (rendered at ~32-40px wide)
+    target_size = 64
+    processed = 0
+
+    objects_dir = OUTPUT_DIR / "objects"
+    if not objects_dir.exists():
+        return 0
+
+    for cat_dir in sorted(objects_dir.iterdir()):
+        if not cat_dir.is_dir():
+            continue
+
+        dst_dir = PROCESSED_DIR / "objects" / cat_dir.name
+        dst_dir.mkdir(parents=True, exist_ok=True)
+
+        for img_path in sorted(cat_dir.glob("*.png")):
+            img = Image.open(img_path).convert("RGBA")
+
+            if "-sheet" in img_path.stem:
+                # Variant sheet — slice into individual object images
+                key = img_path.stem.replace("-sheet", "")
+                w, h = img.size
+
+                # Detect grid: 2×2 for 4 variants, 3×3 for up to 9
+                if w > h * 1.3:
+                    cols, rows = 4, 1
+                elif h > w * 1.3:
+                    cols, rows = 1, 4
+                else:
+                    # Square-ish: try 2×2
+                    cols, rows = 2, 2
+
+                cell_w = w // cols
+                cell_h = h // rows
+
+                for row in range(rows):
+                    for col in range(cols):
+                        idx = row * cols + col
+                        x0 = col * cell_w
+                        y0 = row * cell_h
+                        cell = img.crop((x0, y0, x0 + cell_w, y0 + cell_h))
+
+                        # Skip empty cells
+                        bbox = cell.getbbox()
+                        if not bbox:
+                            continue
+
+                        cell = force_transparent_bg(cell)
+                        cell = cleanup_transparency(cell)
+                        cell = resize_to_target(cell, target_size, target_size)
+
+                        if apply_palette:
+                            palette_img = build_palette_image(config)
+                            cell = reduce_palette(cell, palette_img)
+
+                        variant_name = f"{key}_{idx + 1}.png"
+                        cell.save(dst_dir / variant_name, "PNG")
+                        processed += 1
+                        print(f"  Sliced: {img_path.name} -> {variant_name}")
+
+                # Also save first variant as the base key name
+                base_path = dst_dir / f"{key}.png"
+                first_variant = dst_dir / f"{key}_1.png"
+                if first_variant.exists() and not base_path.exists():
+                    import shutil
+                    shutil.copy2(first_variant, base_path)
+
+            else:
+                # Single object — resize + cleanup
+                print(f"  Processing: {img_path.name}")
+                img = force_transparent_bg(img)
+                img = cleanup_transparency(img)
+                img = resize_to_target(img, target_size, target_size)
+
+                if apply_palette:
+                    palette_img = build_palette_image(config)
+                    img = reduce_palette(img, palette_img)
+
+                img.save(dst_dir / img_path.name, "PNG")
+                processed += 1
+
+    return processed
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -1249,11 +1342,12 @@ STEP_MAP = {
     "sprites": process_sprites,
     "weapons": process_weapons,
     "items": process_items,
+    "objects": process_objects,
     "portraits": process_portraits,
 }
 
 # Default categories when --category=all
-DEFAULT_CATEGORIES = ["terrain_textures", "tile_sheets", "sprites", "items", "portraits"]
+DEFAULT_CATEGORIES = ["terrain_textures", "tile_sheets", "sprites", "objects", "items", "portraits"]
 
 
 def main():

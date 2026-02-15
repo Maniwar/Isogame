@@ -262,8 +262,56 @@ export class MapSystem {
       }
     }
 
-    // Scatter some debris objects
-    for (let i = 0; i < 30; i++) {
+    // Scatter environmental objects for Fallout 2 wasteland feel
+    // Weighted object pools per zone: settlement core vs outer wasteland
+    const settlementObjects: { key: string; weight: number; solid: boolean }[] = [
+      { key: "barrel", weight: 3, solid: true },
+      { key: "crate", weight: 3, solid: true },
+      { key: "dumpster", weight: 1, solid: true },
+      { key: "footlocker", weight: 2, solid: false },
+      { key: "scrap_pile", weight: 2, solid: false },
+      { key: "tire_pile", weight: 1, solid: false },
+      { key: "street_lamp", weight: 2, solid: true },
+      { key: "sign_post", weight: 1, solid: false },
+      { key: "fire_hydrant", weight: 1, solid: false },
+    ];
+    const wastelandObjects: { key: string; weight: number; solid: boolean }[] = [
+      { key: "rock", weight: 4, solid: true },
+      { key: "dead_tree", weight: 3, solid: true },
+      { key: "cactus", weight: 2, solid: true },
+      { key: "bones", weight: 3, solid: false },
+      { key: "destroyed_car", weight: 1, solid: true },
+      { key: "scrap_pile", weight: 2, solid: false },
+      { key: "rubble_pile", weight: 2, solid: true },
+      { key: "crater", weight: 1, solid: false },
+      { key: "tire_pile", weight: 1, solid: false },
+      { key: "fence_post", weight: 1, solid: false },
+    ];
+    const hazardObjects: { key: string; weight: number; solid: boolean }[] = [
+      { key: "toxic_barrel", weight: 2, solid: true },
+      { key: "crater", weight: 2, solid: false },
+      { key: "bones", weight: 3, solid: false },
+    ];
+
+    const pickWeighted = (
+      pool: { key: string; weight: number; solid: boolean }[],
+      r: number,
+    ) => {
+      const totalWeight = pool.reduce((sum, o) => sum + o.weight, 0);
+      let cumulative = 0;
+      const target = r * totalWeight;
+      for (const obj of pool) {
+        cumulative += obj.weight;
+        if (target <= cumulative) return obj;
+      }
+      return pool[pool.length - 1];
+    };
+
+    const cx = w / 2;
+    const cy = h / 2;
+
+    // Place ~60 objects (double the old count for denser maps)
+    for (let i = 0; i < 60; i++) {
       const x = Math.floor(rng() * w);
       const y = Math.floor(rng() * h);
       if (
@@ -272,13 +320,55 @@ export class MapSystem {
         y > 2 &&
         y < h - 2 &&
         tiles[y][x].collision === Collision.None &&
-        tiles[y][x].terrain !== Terrain.Water
+        tiles[y][x].terrain !== Terrain.Water &&
+        !tiles[y][x].object
       ) {
-        const obj = rng() < 0.5 ? "barrel" : "rock";
-        tiles[y][x].object = obj;
-        if (rng() < 0.4) {
+        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+        let pool: { key: string; weight: number; solid: boolean }[];
+        if (dist < 8) {
+          pool = settlementObjects;
+        } else if (rng() < 0.15) {
+          pool = hazardObjects;
+        } else {
+          pool = wastelandObjects;
+        }
+        const picked = pickWeighted(pool, rng());
+        tiles[y][x].object = picked.key;
+        if (picked.solid) {
           tiles[y][x].collision = Collision.Solid;
         }
+      }
+    }
+
+    // Place a few campfires at specific spots (raider camps, settlement edge)
+    const campfireSpots = [
+      { x: 11, y: 9 },  // raider camp NW
+      { x: 29, y: 31 }, // raider camp SE
+      { x: 15, y: 15 }, // settlement edge
+    ];
+    for (const spot of campfireSpots) {
+      if (
+        spot.x > 0 && spot.x < w &&
+        spot.y > 0 && spot.y < h &&
+        tiles[spot.y][spot.x].collision === Collision.None
+      ) {
+        tiles[spot.y][spot.x].object = "campfire";
+      }
+    }
+
+    // Place tents near raider camps
+    const tentSpots = [
+      { x: 9, y: 8 },
+      { x: 31, y: 29 },
+    ];
+    for (const spot of tentSpots) {
+      if (
+        spot.x > 0 && spot.x < w &&
+        spot.y > 0 && spot.y < h &&
+        tiles[spot.y][spot.x].collision === Collision.None
+      ) {
+        tiles[spot.y][spot.x].object = "tent";
+        tiles[spot.y][spot.x].collision = Collision.Solid;
       }
     }
   }

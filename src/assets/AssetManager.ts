@@ -53,8 +53,7 @@ export class AssetManager {
 
   /**
    * Maps AI-generated object keys (from manifest) to game object keys.
-   * The game uses "wall", "barrel", "rock" but the pipeline generates
-   * descriptive names like "brick-wall", "concrete-wall", etc.
+   * Covers legacy hyphen-named wall assets and any naming mismatches.
    */
   private static readonly OBJECT_ALIAS: Record<string, string> = {
     "brick-wall": "wall",
@@ -1154,18 +1153,177 @@ export class AssetManager {
   private dirOff(d: Direction): number { return d==="E"||d==="NE"||d==="SE"?2:d==="W"||d==="NW"||d==="SW"?-2:0; }
 
   private generateObjects() {
+    // Wall — isometric 3D box
     const wall=this.createCanvas(TILE_W,32), wc=wall.getContext("2d")!;
     wc.fillStyle="#7a6a5a"; wc.beginPath(); wc.moveTo(TILE_HALF_W,0); wc.lineTo(TILE_W,8); wc.lineTo(TILE_W,24); wc.lineTo(TILE_HALF_W,32); wc.lineTo(0,24); wc.lineTo(0,8); wc.closePath(); wc.fill();
     wc.fillStyle="#8e7e6e"; wc.beginPath(); wc.moveTo(TILE_HALF_W,0); wc.lineTo(TILE_W,8); wc.lineTo(TILE_HALF_W,16); wc.lineTo(0,8); wc.closePath(); wc.fill();
     this.objects.set("wall",wall);
+
+    // Barrel — rusted 55-gallon drum
     const barrel=this.createCanvas(16,20), bc=barrel.getContext("2d")!;
     bc.fillStyle="#7a3b1e"; bc.fillRect(2,4,12,14); bc.fillStyle="#a0522d"; bc.beginPath(); bc.ellipse(8,4,6,3,0,0,Math.PI*2); bc.fill();
     bc.fillStyle="#c4703a"; bc.fillRect(2,8,12,2); bc.fillRect(2,14,12,2);
     this.objects.set("barrel",barrel);
+
+    // Rock — irregular boulder
     const rock=this.createCanvas(18,14), rc=rock.getContext("2d")!;
     rc.fillStyle="#6e6e5e"; rc.beginPath(); rc.moveTo(3,12); rc.lineTo(1,8); rc.lineTo(4,3); rc.lineTo(10,1); rc.lineTo(16,4); rc.lineTo(17,10); rc.lineTo(13,13); rc.closePath(); rc.fill();
     rc.fillStyle="#8e8e7e"; rc.beginPath(); rc.moveTo(4,3); rc.lineTo(10,1); rc.lineTo(16,4); rc.lineTo(10,6); rc.closePath(); rc.fill();
     this.objects.set("rock",rock);
+
+    // Destroyed car — rusted car husk
+    const car=this.createCanvas(40,24), cc=car.getContext("2d")!;
+    cc.fillStyle="#6b5340"; cc.fillRect(4,10,32,10); // body
+    cc.fillStyle="#5c4a3a"; cc.fillRect(8,4,24,8); // roof
+    cc.fillStyle="#3a3a2e"; cc.fillRect(10,6,8,4); cc.fillRect(22,6,8,4); // windows
+    cc.fillStyle="#4a4a3e"; cc.beginPath(); cc.arc(10,20,3,0,Math.PI*2); cc.fill(); // wheels
+    cc.beginPath(); cc.arc(30,20,3,0,Math.PI*2); cc.fill();
+    cc.fillStyle="#7a3b1e"; cc.fillRect(4,12,32,1); // rust stripe
+    this.objects.set("destroyed_car",car);
+
+    // Scrap pile — tangled metal
+    const scrap=this.createCanvas(20,16), sc=scrap.getContext("2d")!;
+    sc.fillStyle="#6e6e5e"; sc.fillRect(3,8,14,6); // base
+    sc.fillStyle="#5a5a4a"; sc.fillRect(5,5,4,8); sc.fillRect(11,4,3,9); // pieces
+    sc.fillStyle="#7a3b1e"; sc.fillRect(7,6,6,2); // rust
+    sc.fillStyle="#9e9e8e"; sc.fillRect(4,10,2,3); // shiny bit
+    this.objects.set("scrap_pile",scrap);
+
+    // Tire pile — stacked tires
+    const tire=this.createCanvas(18,14), tc=tire.getContext("2d")!;
+    tc.fillStyle="#3a3a2e"; tc.beginPath(); tc.ellipse(9,10,7,4,0,0,Math.PI*2); tc.fill();
+    tc.beginPath(); tc.ellipse(9,7,6,3,0,0,Math.PI*2); tc.fill();
+    tc.fillStyle="#4a4a3e"; tc.beginPath(); tc.ellipse(9,7,4,2,0,0,Math.PI*2); tc.fill();
+    this.objects.set("tire_pile",tire);
+
+    // Rubble pile — concrete chunks
+    const rub=this.createCanvas(22,14), rbc=rub.getContext("2d")!;
+    rbc.fillStyle="#7a7a6e"; rbc.fillRect(2,8,8,5); rbc.fillRect(10,6,6,7); rbc.fillRect(14,9,6,4);
+    rbc.fillStyle="#6e6e5e"; rbc.fillRect(4,5,5,4); rbc.fillRect(12,4,4,3);
+    rbc.fillStyle="#5c4a3a"; rbc.fillRect(3,10,2,2); rbc.fillRect(16,10,2,2); // rebar
+    this.objects.set("rubble_pile",rub);
+
+    // Crate — wooden shipping crate
+    const crate=this.createCanvas(18,18), crc=crate.getContext("2d")!;
+    crc.fillStyle="#8b7355"; crc.fillRect(2,4,14,12); // body
+    crc.fillStyle="#6b5340"; crc.fillRect(2,4,14,2); // top
+    crc.fillRect(2,9,14,1); // plank line
+    crc.fillStyle="#5c4a3a"; crc.fillRect(4,4,1,12); crc.fillRect(13,4,1,12); // nails/edges
+    this.objects.set("crate",crate);
+
+    // Dumpster — large metal container
+    const dump=this.createCanvas(26,20), dc=dump.getContext("2d")!;
+    dc.fillStyle="#4a5b3a"; dc.fillRect(2,6,22,12); // body (olive drab)
+    dc.fillStyle="#3a4a2e"; dc.fillRect(2,6,22,2); // lid
+    dc.fillStyle="#5c4a3a"; dc.fillRect(4,9,18,1); dc.fillRect(4,14,18,1); // rust bands
+    this.objects.set("dumpster",dump);
+
+    // Footlocker — military chest
+    const fl=this.createCanvas(18,12), fc=fl.getContext("2d")!;
+    fc.fillStyle="#4a5b3a"; fc.fillRect(2,3,14,8); // olive drab body
+    fc.fillStyle="#3a4a2e"; fc.fillRect(2,3,14,2); // lid
+    fc.fillStyle="#9e9e8e"; fc.fillRect(8,5,2,1); // latch
+    this.objects.set("footlocker",fl);
+
+    // Dead tree — leafless trunk with branches
+    const tree=this.createCanvas(24,36), trc=tree.getContext("2d")!;
+    trc.fillStyle="#5c4a3a"; trc.fillRect(10,12,4,24); // trunk
+    trc.fillStyle="#6b5340";
+    trc.fillRect(6,10,4,2); trc.fillRect(3,6,4,2); // left branch
+    trc.fillRect(14,8,4,2); trc.fillRect(17,4,4,2); // right branch
+    trc.fillRect(8,4,3,2); // top branch
+    this.objects.set("dead_tree",tree);
+
+    // Cactus — saguaro style
+    const cact=this.createCanvas(16,28), cac=cact.getContext("2d")!;
+    cac.fillStyle="#4a5b3a"; cac.fillRect(6,8,4,20); // trunk
+    cac.fillRect(2,10,4,2); cac.fillRect(2,10,2,8); // left arm
+    cac.fillRect(10,14,4,2); cac.fillRect(12,12,2,6); // right arm
+    cac.fillStyle="#7a8b5a"; cac.fillRect(7,8,2,2); // highlight
+    this.objects.set("cactus",cact);
+
+    // Bones — scattered skeleton remains
+    const bone=this.createCanvas(20,12), bnc=bone.getContext("2d")!;
+    bnc.fillStyle="#d4c4a0";
+    bnc.beginPath(); bnc.arc(6,4,3,0,Math.PI*2); bnc.fill(); // skull
+    bnc.fillRect(8,5,8,1); bnc.fillRect(8,7,6,1); // ribs
+    bnc.fillRect(14,4,4,1); bnc.fillRect(3,8,5,1); // long bones
+    bnc.fillStyle="#b8a67c"; bnc.fillRect(5,3,2,1); // eye sockets
+    this.objects.set("bones",bone);
+
+    // Street lamp — bent post with broken globe
+    const lamp=this.createCanvas(12,34), lc=lamp.getContext("2d")!;
+    lc.fillStyle="#6e6e5e"; lc.fillRect(5,8,2,26); // post
+    lc.fillRect(5,8,6,2); // arm
+    lc.fillStyle="#9e9e8e"; lc.beginPath(); lc.arc(10,7,3,0,Math.PI*2); lc.fill(); // globe
+    lc.fillStyle="#6e6e5e"; lc.fillRect(4,32,4,2); // base
+    this.objects.set("street_lamp",lamp);
+
+    // Sign post — bent post with faded sign
+    const sign=this.createCanvas(14,26), sgc=sign.getContext("2d")!;
+    sgc.fillStyle="#6e6e5e"; sgc.fillRect(6,10,2,16); // post
+    sgc.fillStyle="#7a3b1e"; sgc.fillRect(2,2,10,8); // sign face (rusted)
+    sgc.fillStyle="#b8a67c"; sgc.fillRect(4,4,6,1); sgc.fillRect(4,6,4,1); // faded text lines
+    this.objects.set("sign_post",sign);
+
+    // Mailbox — rusted blue mailbox
+    const mb=this.createCanvas(12,16), mbc=mb.getContext("2d")!;
+    mbc.fillStyle="#3a4a6a"; mbc.fillRect(2,4,8,8); // body (faded blue)
+    mbc.fillStyle="#2a3a5a"; mbc.fillRect(2,4,8,2); // top curve
+    mbc.fillStyle="#7a3b1e"; mbc.fillRect(2,8,8,1); // rust band
+    mbc.fillStyle="#6e6e5e"; mbc.fillRect(4,12,4,4); // post
+    this.objects.set("mailbox",mb);
+
+    // Fire hydrant — squat red/yellow
+    const fh=this.createCanvas(10,14), fhc=fh.getContext("2d")!;
+    fhc.fillStyle="#b83030"; fhc.fillRect(3,4,4,8); // body
+    fhc.fillStyle="#c4703a"; fhc.fillRect(2,6,6,2); // nozzle
+    fhc.fillStyle="#b8a67c"; fhc.fillRect(3,4,4,1); // cap
+    fhc.fillStyle="#6e6e5e"; fhc.fillRect(3,12,4,2); // base
+    this.objects.set("fire_hydrant",fh);
+
+    // Fence post — broken wooden fence
+    const fp=this.createCanvas(22,18), fpc=fp.getContext("2d")!;
+    fpc.fillStyle="#6b5340"; fpc.fillRect(3,2,2,16); fpc.fillRect(17,4,2,14); // posts
+    fpc.fillStyle="#8b7355"; fpc.fillRect(5,6,12,2); fpc.fillRect(5,12,8,2); // planks
+    this.objects.set("fence_post",fp);
+
+    // Tent — makeshift shelter
+    const tent=this.createCanvas(28,22), tnc=tent.getContext("2d")!;
+    tnc.fillStyle="#6b5340";
+    tnc.beginPath(); tnc.moveTo(14,2); tnc.lineTo(26,18); tnc.lineTo(2,18); tnc.closePath(); tnc.fill();
+    tnc.fillStyle="#5c4a3a";
+    tnc.beginPath(); tnc.moveTo(14,2); tnc.lineTo(2,18); tnc.lineTo(14,14); tnc.closePath(); tnc.fill();
+    tnc.fillStyle="#8b7355"; tnc.fillRect(10,12,8,6); // opening
+    this.objects.set("tent",tent);
+
+    // Toxic barrel — hazard drum with green glow
+    const tb=this.createCanvas(16,22), tbc=tb.getContext("2d")!;
+    tbc.fillStyle="#5c4a3a"; tbc.fillRect(2,4,12,14); // drum body
+    tbc.fillStyle="#6b5340"; tbc.beginPath(); tbc.ellipse(8,4,6,3,0,0,Math.PI*2); tbc.fill(); // top
+    tbc.fillStyle="#b8a67c"; tbc.fillRect(5,8,6,3); // hazard label
+    tbc.fillStyle="#8ec44a"; tbc.fillRect(6,9,4,1); // trefoil
+    tbc.fillStyle="rgba(142,196,74,0.4)"; tbc.fillRect(4,18,8,4); // green puddle
+    this.objects.set("toxic_barrel",tb);
+
+    // Crater — blast crater in ground
+    const crater=this.createCanvas(22,12), crc2=crater.getContext("2d")!;
+    crc2.fillStyle="#5c4a3a"; crc2.beginPath(); crc2.ellipse(11,7,10,5,0,0,Math.PI*2); crc2.fill();
+    crc2.fillStyle="#3a3a2e"; crc2.beginPath(); crc2.ellipse(11,7,7,3,0,0,Math.PI*2); crc2.fill();
+    crc2.fillStyle="#6b5340"; crc2.beginPath(); crc2.ellipse(11,6,3,1.5,0,0,Math.PI*2); crc2.fill();
+    this.objects.set("crater",crater);
+
+    // Campfire — ring of stones with embers
+    const cf=this.createCanvas(18,14), cfc=cf.getContext("2d")!;
+    cfc.fillStyle="#6e6e5e"; // stones
+    const stoneAngles = [0, 0.8, 1.6, 2.4, 3.2, 4.0, 4.8, 5.6];
+    for (const a of stoneAngles) {
+      cfc.fillRect(9 + Math.cos(a)*6 - 1, 7 + Math.sin(a)*4 - 1, 3, 3);
+    }
+    cfc.fillStyle="#7a3b1e"; cfc.fillRect(7,6,4,3); // charred wood
+    cfc.fillStyle="#c4703a"; cfc.fillRect(8,6,2,2); // embers
+    cfc.fillStyle="rgba(184,48,48,0.3)"; cfc.beginPath(); cfc.arc(9,7,2,0,Math.PI*2); cfc.fill(); // glow
+    this.objects.set("campfire",cf);
   }
 
   private generateItems() {
