@@ -1054,6 +1054,12 @@
     "Grass": "/assets/tiles/grass-texture.png",
     "Road": "/assets/tiles/road-texture.png",
     "Rubble": "/assets/tiles/rubble-texture.png",
-    "Sand": "/assets/tiles/sand-texture.png"
+    "Sand": "/assets/tiles/sand-texture.png",
+    "Water": [
+      "/assets/tiles/water-01.png",
+      "/assets/tiles/water-02.png",
+      "/assets/tiles/water-03.png",
+      "/assets/tiles/water-04.png"
+    ]
   }
 }
