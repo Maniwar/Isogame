@@ -390,6 +390,11 @@ export class AssetManager {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
         if (terrain === undefined) continue;
 
+        // Skip water: AI water textures have edge artifacts that create
+        // visible seams when tiled. Procedural animated water diamonds
+        // look better and the renderer handles them separately.
+        if (terrain === Terrain.Water) continue;
+
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
 
         // Replace procedural textures with AI-generated ones.
@@ -399,9 +404,6 @@ export class AssetManager {
         this.terrainTextures.set(terrain, []);
         // Invalidate cached patterns for this terrain
         this.terrainPatterns.delete(terrain);
-        if (terrain === Terrain.Water) {
-          this.waterPatternCache.clear();
-        }
 
         for (const path of paths) {
           this.totalToLoad++;

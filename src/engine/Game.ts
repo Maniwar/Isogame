@@ -128,6 +128,10 @@ export class Game {
 
     this.camera.centerOn(player.pos);
 
+    // Pre-render terrain layer to offscreen cache for performance.
+    // Must happen after assets.init() and map generation.
+    this.renderer.buildTerrainCache(this.state);
+
     if (Input.isTouchDevice()) {
       this.notify("Welcome to the Wasteland. Tap to move. Use buttons for actions.", "rgb(64, 192, 64)");
     } else {

@@ -49,6 +49,14 @@ export class Renderer {
   private canvas: HTMLCanvasElement;
   private hoveredTile: TilePos | null = null;
 
+  /** Offscreen terrain cache — rendered once, blitted per frame */
+  private terrainCache: HTMLCanvasElement | null = null;
+  private terrainCacheOriginX = 0;
+  private terrainCacheOriginY = 0;
+  /** Water tiles animate, so we track and redraw them separately */
+  private waterTiles: { x: number; y: number; tile: Tile }[] = [];
+  private lastWaterFrame = -1;
+
   /** Device pixel ratio — used to render at physical resolution */
   dpr = 1;
   /** CSS-pixel viewport dimensions (use for all coordinate logic) */
@@ -73,6 +81,66 @@ export class Renderer {
 
   setHoveredTile(tile: TilePos | null) {
     this.hoveredTile = tile;
+  }
+
+  /**
+   * Pre-render the entire terrain layer to an offscreen canvas.
+   * Called once after assets load. Water tiles are tracked separately
+   * for per-frame animation. Non-water terrain is static and never redrawn.
+   */
+  buildTerrainCache(state: GameState) {
+    const mapW = state.map.width;
+    const mapH = state.map.height;
+
+    // Compute bounds of the isometric map in world pixels
+    // Top-left tile (0,0) → screen (0, 0)
+    // Top-right tile (mapW-1, 0) → screen ((mapW-1)*TILE_HALF_W, (mapW-1)*TILE_HALF_H)
+    // Bottom-left tile (0, mapH-1) → screen (-(mapH-1)*TILE_HALF_W, (mapH-1)*TILE_HALF_H)
+    // Bottom-right tile (mapW-1, mapH-1) → screen ((mapW-mapH)*TILE_HALF_W, (mapW+mapH-2)*TILE_HALF_H)
+    const padPx = TILE_W; // extra padding for oversized objects
+    const minWx = -(mapH - 1) * TILE_HALF_W - padPx;
+    const maxWx = (mapW - 1) * TILE_HALF_W + padPx;
+    const minWy = -TILE_HALF_H - padPx;
+    const maxWy = (mapW + mapH - 2) * TILE_HALF_H + TILE_H + padPx;
+
+    const cacheW = Math.ceil(maxWx - minWx);
+    const cacheH = Math.ceil(maxWy - minWy);
+
+    const cache = document.createElement("canvas");
+    cache.width = cacheW;
+    cache.height = cacheH;
+    const cCtx = cache.getContext("2d")!;
+
+    // Offset so tile (0,0) maps to the right position in the cache
+    this.terrainCacheOriginX = minWx;
+    this.terrainCacheOriginY = minWy;
+    cCtx.translate(-minWx, -minWy);
+
+    this.waterTiles = [];
+
+    // Render all tiles to the cache
+    for (let y = 0; y < mapH; y++) {
+      for (let x = 0; x < mapW; x++) {
+        const tile = state.map.tiles[y]?.[x];
+        if (!tile) continue;
+
+        if (tile.terrain === Terrain.Water) {
+          // Track water tiles for per-frame animation
+          this.waterTiles.push({ x, y, tile });
+        }
+
+        // Render terrain + objects to the cache
+        this.drawTileTo(cCtx, x, y, tile, state);
+      }
+    }
+
+    this.terrainCache = cache;
+    console.log(`[Renderer] Terrain cache built: ${cacheW}x${cacheH}px`);
+  }
+
+  /** Invalidate terrain cache (call when map changes) */
+  invalidateTerrainCache() {
+    this.terrainCache = null;
   }
 
   resize() {
@@ -118,18 +186,35 @@ export class Renderer {
     ctx.imageSmoothingEnabled = true;
     (ctx as any).imageSmoothingQuality = "high";
 
-    // --- Terrain pass (save/restore isolates any leaked clip paths) ---
-    // drawTile uses ctx.clip() for terrain patterns. If a save/restore pair
-    // is ever missed, the clip would persist and slice subsequent sprite draws
-    // into diamond-shaped fragments — appearing as "split" characters.
-    // Wrapping the entire terrain pass in save/restore guarantees clean state
-    // for entity rendering even if an individual drawTile leaks state.
+    // --- Terrain pass ---
+    // Uses a pre-rendered offscreen cache for static terrain (non-water).
+    // Water tiles are re-drawn per frame for animation.
     ctx.save();
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        if (!state.map.tiles[y] || !state.map.tiles[y][x]) continue;
-        const tile = state.map.tiles[y][x];
-        this.drawTile(x, y, tile, state);
+    if (this.terrainCache) {
+      // Blit the pre-rendered terrain cache (one drawImage instead of 1600 clip ops)
+      ctx.drawImage(
+        this.terrainCache,
+        this.terrainCacheOriginX,
+        this.terrainCacheOriginY,
+      );
+
+      // Animate water tiles (redraw only water, ~50-100 tiles)
+      const waterFrame = Math.floor(Date.now() / 800) % 4;
+      if (waterFrame !== this.lastWaterFrame) {
+        this.lastWaterFrame = waterFrame;
+      }
+      for (const { x, y, tile } of this.waterTiles) {
+        // Skip water tiles outside the viewport
+        if (x < minX || x > maxX || y < minY || y > maxY) continue;
+        this.drawWaterTile(ctx, x, y, tile);
+      }
+    } else {
+      // No cache yet — fall back to per-tile rendering
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (!state.map.tiles[y] || !state.map.tiles[y][x]) continue;
+          this.drawTile(x, y, state.map.tiles[y][x], state);
+        }
       }
     }
 
@@ -180,21 +265,36 @@ export class Renderer {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
+  /** Legacy per-tile rendering (used when no terrain cache exists) */
   private drawTile(x: number, y: number, tile: Tile, state?: GameState) {
-    const { ctx, assets } = this;
+    this.drawTileTo(this.ctx, x, y, tile, state);
+  }
+
+  /**
+   * Render a single tile (terrain + objects) to any 2D context.
+   * Used both for the offscreen terrain cache and the per-frame fallback.
+   * For water tiles, uses procedural animated diamonds (no pattern clipping).
+   */
+  private drawTileTo(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    tile: Tile,
+    state?: GameState,
+  ) {
+    const { assets } = this;
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
     // --- Terrain surface ---
-    // Prefer seamless terrain texture patterns (rectangular textures clipped
-    // to diamond). Falls back to pre-clipped diamond tile sprites.
     let drewTerrain = false;
 
-    if (assets.hasTerrainTextureMode()) {
+    // Use AI terrain texture patterns for non-water terrain.
+    // Water uses procedural diamond tiles to avoid seam artifacts.
+    if (assets.hasTerrainTextureMode() && tile.terrain !== Terrain.Water) {
       const pattern = assets.getTerrainPattern(tile.terrain, ctx);
       if (pattern) {
         ctx.save();
-        // Clip to isometric diamond
         ctx.beginPath();
         ctx.moveTo(wx, wy - TILE_HALF_H);
         ctx.lineTo(wx + TILE_HALF_W, wy);
@@ -202,7 +302,6 @@ export class Renderer {
         ctx.lineTo(wx - TILE_HALF_W, wy);
         ctx.closePath();
         ctx.clip();
-
         ctx.fillStyle = pattern;
         ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
         ctx.restore();
@@ -211,7 +310,6 @@ export class Renderer {
     }
 
     if (!drewTerrain) {
-      // Fallback: use pre-clipped diamond tile sprites
       let neighborSig = 0;
       if (state) {
         const cardinalDirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
@@ -229,7 +327,6 @@ export class Renderer {
       if (sprite) {
         ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
       } else {
-        // Last resort: solid color diamond
         const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
         if (baseColor) {
           ctx.fillStyle = baseColor;
@@ -251,7 +348,6 @@ export class Renderer {
         const objW = obj instanceof HTMLImageElement ? obj.naturalWidth : obj.width;
         const objH = obj instanceof HTMLImageElement ? obj.naturalHeight : obj.height;
 
-        // Ground shadow — elliptical shadow under objects for grounding
         ctx.save();
         ctx.globalAlpha = 0.3;
         ctx.fillStyle = "#1e1e16";
@@ -262,6 +358,30 @@ export class Renderer {
 
         ctx.drawImage(obj, wx - objW / 2, wy - objH + TILE_HALF_H);
       }
+    }
+  }
+
+  /**
+   * Draw a water tile with animated procedural diamond sprite.
+   * Called per-frame for water tiles overlaid on the terrain cache.
+   */
+  private drawWaterTile(ctx: CanvasRenderingContext2D, x: number, y: number, _tile: Tile) {
+    const { assets } = this;
+    const wx = (x - y) * TILE_HALF_W;
+    const wy = (x + y) * TILE_HALF_H;
+
+    const sprite = assets.getTile(Terrain.Water, x, y, 0);
+    if (sprite) {
+      ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+    } else {
+      ctx.fillStyle = TERRAIN_BASE_COLOR[Terrain.Water] ?? "#2A4A6A";
+      ctx.beginPath();
+      ctx.moveTo(wx, wy - TILE_HALF_H);
+      ctx.lineTo(wx + TILE_HALF_W, wy);
+      ctx.lineTo(wx, wy + TILE_HALF_H);
+      ctx.lineTo(wx - TILE_HALF_W, wy);
+      ctx.closePath();
+      ctx.fill();
     }
   }
 
