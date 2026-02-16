@@ -190,9 +190,7 @@ export class Renderer {
     // to diamond). Falls back to pre-clipped diamond tile sprites.
     let drewTerrain = false;
 
-    // Skip water for pattern mode — AI water textures aren't proper seamless
-    // rectangles. Procedural animated water tiles work better.
-    if (assets.hasTerrainTextureMode() && tile.terrain !== Terrain.Water) {
+    if (assets.hasTerrainTextureMode()) {
       const pattern = assets.getTerrainPattern(tile.terrain, ctx);
       if (pattern) {
         ctx.save();
