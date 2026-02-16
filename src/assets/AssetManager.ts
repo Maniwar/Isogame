@@ -124,12 +124,33 @@ export class AssetManager {
             `[AssetManager] ${this.totalToLoad - this.loadedCount} assets failed to load`,
           );
         }
-        // Log tile variant details to diagnose loading issues
+        // Log terrain details to diagnose loading issues
         console.log(`[AssetManager] Terrain texture mode: ${this.hasTerrainTextures}`);
+        if (this.hasTerrainTextures) {
+          for (const [terrainVal, textures] of this.terrainTextures) {
+            const name = Terrain[terrainVal] ?? terrainVal;
+            const source = textures.length > 0 && textures[0] instanceof HTMLImageElement ? "AI" : "procedural";
+            console.log(`[AssetManager] Terrain texture ${name}: ${textures.length} (${source})`);
+          }
+        }
         for (const [terrainVal, variants] of this.tiles) {
           const name = Terrain[terrainVal] ?? terrainVal;
-          console.log(`[AssetManager] Tile variants for ${name}: ${variants.length} (1 procedural + ${variants.length - 1} AI)`);
+          const aiCount = variants.filter(v => v instanceof HTMLImageElement || (v instanceof HTMLCanvasElement && v.width > 64)).length;
+          console.log(`[AssetManager] Tile variants for ${name}: ${variants.length} total (${aiCount} AI)`);
         }
+        // Log loaded sprites count
+        const spriteEntries = [...this.sprites.entries()];
+        const spriteAiCount = spriteEntries.reduce((sum, [, dirMap]) => {
+          for (const img of dirMap.values()) {
+            if (img instanceof HTMLImageElement) return sum + 1;
+          }
+          return sum;
+        }, 0);
+        console.log(`[AssetManager] Sprites: ${spriteEntries.length} keys, ${spriteAiCount} AI directions`);
+        console.log(`[AssetManager] Objects: ${this.objects.size} keys`);
+        console.log(`[AssetManager] Items: ${this.items.size} keys`);
+        console.log(`[AssetManager] Portraits: ${this.portraits.size} keys`);
+
         if (this.hasAnimations) {
           const animKeys = [...this.animFrames.keys()];
           console.log(`[AssetManager] Animation frames loaded for: ${animKeys.join(", ")}`);
@@ -309,8 +330,25 @@ export class AssetManager {
     return this.objects.get(key);
   }
 
+  /** Maps game item IDs to manifest icon keys */
+  private static readonly ITEM_ICON_MAP: Record<string, string> = {
+    "10mm_pistol": "item_pistol",
+    "pipe_rifle": "item_rifle",
+    "combat_knife": "item_knife",
+    "baseball_bat": "item_bat",
+    "leather_armor": "item_armor",
+    "stimpak": "item_stimpak",
+    "rad_away": "item_radaway",
+    "nuka_cola": "item_nuka",
+    "canned_food": "item_food",
+    "bottle_caps": "item_caps",
+    "bobby_pin": "item_pin",
+    "holotape": "item_holotape",
+  };
+
   getItem(key: string): DrawTarget | undefined {
-    return this.items.get(key);
+    return this.items.get(key)
+        ?? this.items.get(AssetManager.ITEM_ICON_MAP[key] ?? "");
   }
 
   /**
@@ -353,8 +391,16 @@ export class AssetManager {
         if (terrain === undefined) continue;
 
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
-        if (!this.terrainTextures.has(terrain)) {
-          this.terrainTextures.set(terrain, []);
+
+        // Replace procedural textures with AI-generated ones.
+        // The procedural textures were set during generateAllProcedural() but
+        // AI textures should take priority. Clear them so AI textures start at
+        // index 0 (which getTerrainPattern uses for the cached CanvasPattern).
+        this.terrainTextures.set(terrain, []);
+        // Invalidate cached patterns for this terrain
+        this.terrainPatterns.delete(terrain);
+        if (terrain === Terrain.Water) {
+          this.waterPatternCache.clear();
         }
 
         for (const path of paths) {
@@ -373,6 +419,10 @@ export class AssetManager {
 
     // Legacy diamond tiles — fallback for assets that haven't been regenerated.
     // Skip Water: it uses procedural animated frames; AI tiles would break the animation.
+    // AI tiles replace procedural: we collect AI tiles into a separate array,
+    // then after all loads complete we swap them in (keeping procedural only
+    // if zero AI tiles loaded for that terrain).
+    const aiTileCollectors: { terrain: Terrain; tiles: DrawTarget[] }[] = [];
     if (manifest.tiles) {
       for (const [terrainName, pathOrPaths] of Object.entries(manifest.tiles)) {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
@@ -380,17 +430,15 @@ export class AssetManager {
 
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
         const proceduralBase = this.tiles.get(terrain)?.[0];
+        const collector: DrawTarget[] = [];
+        aiTileCollectors.push({ terrain, tiles: collector });
 
         for (const path of paths) {
           this.totalToLoad++;
           promises.push(
             this.loadImage(path).then((img) => {
               if (img) {
-                const composited = this.compositeAiTile(img, proceduralBase);
-                if (!this.tiles.has(terrain)) {
-                  this.tiles.set(terrain, []);
-                }
-                this.tiles.get(terrain)!.push(composited);
+                collector.push(this.compositeAiTile(img, proceduralBase));
                 this.loadedCount++;
               }
             }),
@@ -526,8 +574,28 @@ export class AssetManager {
 
     await Promise.all(promises);
 
-    // Character sprites are already properly sized (64x96) and hole-filled
-    // by the Python postprocess pipeline. No runtime normalization needed.
+    // Replace procedural diamond tiles with AI tiles (if any loaded).
+    // Done after Promise.all so all collector arrays are fully populated.
+    for (const { terrain, tiles } of aiTileCollectors) {
+      if (tiles.length > 0) {
+        this.tiles.set(terrain, tiles);
+      }
+    }
+
+    // If any AI terrain textures failed to load, fall back to procedural
+    // for that terrain so getTerrainPattern doesn't return null.
+    for (const [terrain, textures] of this.terrainTextures) {
+      if (textures.length === 0) {
+        // All AI textures failed — regenerate procedural for this terrain
+        console.warn(`[AssetManager] AI terrain textures failed for ${Terrain[terrain]}, using procedural`);
+        this.terrainTextures.delete(terrain);
+        this.terrainPatterns.delete(terrain);
+      }
+    }
+    // If ALL terrain textures were removed, disable texture mode entirely
+    if (this.hasTerrainTextures && this.terrainTextures.size === 0) {
+      this.hasTerrainTextures = false;
+    }
   }
 
   /**
