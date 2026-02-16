@@ -1382,7 +1382,7 @@ STEP_MAP = {
 }
 
 # Default categories when --category=all
-DEFAULT_CATEGORIES = ["terrain_textures", "tile_sheets", "sprites", "objects", "items", "portraits"]
+DEFAULT_CATEGORIES = ["terrain_textures", "sprites", "objects", "items", "portraits"]
 
 
 def main():
