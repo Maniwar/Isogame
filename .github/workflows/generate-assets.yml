@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   generate:
@@ -55,6 +56,38 @@ jobs:
             exit 1
           fi
           echo "API key is configured (${#GEMINI_API_KEY} chars)"
+
+      # Restore raw output from previous run so --skip-existing can reuse
+      # already-generated sheets (e.g. after a crash mid-pipeline).
+      - name: Restore output from previous run
+        if: inputs.dry_run == false
+        run: |
+          echo "=== Checking for previous run artifacts ==="
+          # Find the most recent artifact named "asset-gen-output"
+          ARTIFACT_ID=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=asset-gen-output&per_page=1" \
+            --jq '.artifacts[0].id // empty' 2>/dev/null || true)
+
+          if [ -n "$ARTIFACT_ID" ]; then
+            echo "Found artifact ID: $ARTIFACT_ID — downloading..."
+            mkdir -p /tmp/prev-output
+            gh api "repos/${{ github.repository }}/actions/artifacts/${ARTIFACT_ID}/zip" \
+              > /tmp/prev-output.zip 2>/dev/null || true
+
+            if [ -f /tmp/prev-output.zip ] && [ -s /tmp/prev-output.zip ]; then
+              cd scripts/asset-gen
+              unzip -o /tmp/prev-output.zip -d output/ 2>/dev/null || true
+              RESTORED=$(find output -name "*.png" -type f 2>/dev/null | wc -l)
+              echo "Restored $RESTORED PNGs from previous run"
+              ls -la output/ 2>/dev/null | head -20
+              cd ../..
+            else
+              echo "Download failed or empty — starting fresh"
+            fi
+          else
+            echo "No previous artifact found — starting fresh"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Configure git for commits
         if: inputs.dry_run == false
@@ -114,10 +147,10 @@ jobs:
 
             PP_CAT=$(postprocess_cat "$CAT")
 
-            # Step 1: Generate
+            # Step 1: Generate (--skip-existing reuses sheets from previous runs)
             echo "--- Generating $CAT ---"
             cd scripts/asset-gen
-            python generate.py --category "$CAT"
+            python generate.py --category "$CAT" --skip-existing
 
             # Step 2: Post-process
             echo "--- Post-processing ($PP_CAT) ---"
