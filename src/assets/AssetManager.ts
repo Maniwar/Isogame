@@ -551,12 +551,17 @@ export class AssetManager {
     }
 
     // Items — keys are icon keys: "item_pistol", etc.
+    // AI-generated item icons may have opaque backgrounds (same as objects).
     if (manifest.items) {
       for (const [key, path] of Object.entries(manifest.items)) {
         this.totalToLoad++;
         promises.push(
           this.loadImage(path).then((img) => {
-            if (img) { this.items.set(key, img); this.loadedCount++; }
+            if (img) {
+              const cleaned = this.cleanObjectAlpha(img);
+              this.items.set(key, cleaned);
+              this.loadedCount++;
+            }
           }),
         );
       }
