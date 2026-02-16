@@ -620,9 +620,15 @@ export class AssetManager {
 
   /**
    * Remove opaque backgrounds from AI-generated object images.
-   * Samples corner pixels to detect the background color, then makes
-   * all pixels within a color-distance threshold fully transparent.
-   * Feathers edges for clean anti-aliased compositing over terrain.
+   *
+   * Uses flood-fill from all border pixels to identify connected background
+   * regions, then makes them transparent. Handles:
+   *  - Solid backgrounds (single color)
+   *  - Checkerboard "transparency" patterns (two alternating colors)
+   *  - Green chroma key backgrounds
+   *
+   * Only removes pixels connected to the image border (flood-fill),
+   * so interior pixels of similar color are preserved.
    */
   private cleanObjectAlpha(img: HTMLImageElement): HTMLCanvasElement {
     const w = img.naturalWidth;
@@ -634,64 +640,162 @@ export class AssetManager {
     const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
 
-    // Sample corner pixels (4 corners, 2x2 each) to detect background color
-    const corners: [number, number, number][] = [];
-    const samplePoints = [
-      [0, 0], [1, 0], [0, 1],                     // top-left
-      [w - 1, 0], [w - 2, 0], [w - 1, 1],         // top-right
-      [0, h - 1], [1, h - 1], [0, h - 2],         // bottom-left
-      [w - 1, h - 1], [w - 2, h - 1], [w - 1, h - 2], // bottom-right
-    ];
+    // Collect all border pixel colors (opaque ones only)
+    const borderColors: [number, number, number][] = [];
+    const addBorder = (x: number, y: number) => {
+      const idx = (y * w + x) * 4;
+      if (data[idx + 3] > 180) {
+        borderColors.push([data[idx], data[idx + 1], data[idx + 2]]);
+      }
+    };
+    for (let x = 0; x < w; x++) { addBorder(x, 0); addBorder(x, h - 1); }
+    for (let y = 1; y < h - 1; y++) { addBorder(0, y); addBorder(w - 1, y); }
 
-    for (const [sx, sy] of samplePoints) {
-      const idx = (sy * w + sx) * 4;
-      // Only use samples that are mostly opaque (part of the background)
-      if (data[idx + 3] > 200) {
-        corners.push([data[idx], data[idx + 1], data[idx + 2]]);
+    // If most border pixels are already transparent, image is fine
+    if (borderColors.length < (w + h)) return canvas;
+
+    // Find up to 2 dominant border colors (handles checkerboard patterns)
+    // Simple k-means with k=2
+    const bgColors = this.findDominantColors(borderColors, 2);
+    if (bgColors.length === 0) return canvas;
+
+    const threshold = 60;
+    const featherRange = 30;
+
+    // Check if pixel matches any background color
+    const isBg = (r: number, g: number, b: number): number => {
+      let minDist = Infinity;
+      for (const [br, bg, bb] of bgColors) {
+        const d = Math.abs(r - br) + Math.abs(g - bg) + Math.abs(b - bb);
+        if (d < minDist) minDist = d;
+      }
+      return minDist;
+    };
+
+    // Flood-fill from border pixels: BFS to find all connected background
+    const visited = new Uint8Array(w * h);
+    const bgMask = new Uint8Array(w * h); // 1 = background, 2 = feather
+    const queue: number[] = [];
+
+    // Seed from all border pixels that match background colors
+    for (let x = 0; x < w; x++) {
+      for (const y of [0, h - 1]) {
+        const idx = (y * w + x) * 4;
+        if (data[idx + 3] < 10) continue; // already transparent
+        const dist = isBg(data[idx], data[idx + 1], data[idx + 2]);
+        if (dist < threshold + featherRange) {
+          const pi = y * w + x;
+          visited[pi] = 1;
+          bgMask[pi] = dist < threshold ? 1 : 2;
+          queue.push(pi);
+        }
+      }
+    }
+    for (let y = 1; y < h - 1; y++) {
+      for (const x of [0, w - 1]) {
+        const idx = (y * w + x) * 4;
+        if (data[idx + 3] < 10) continue;
+        const dist = isBg(data[idx], data[idx + 1], data[idx + 2]);
+        if (dist < threshold + featherRange) {
+          const pi = y * w + x;
+          if (!visited[pi]) {
+            visited[pi] = 1;
+            bgMask[pi] = dist < threshold ? 1 : 2;
+            queue.push(pi);
+          }
+        }
       }
     }
 
-    // If fewer than 4 corner pixels are opaque, image likely already has
-    // proper transparency — return as-is
-    if (corners.length < 4) return canvas;
+    // BFS flood-fill: expand from border into connected background pixels
+    let head = 0;
+    while (head < queue.length) {
+      const pi = queue[head++];
+      const px = pi % w;
+      const py = (pi - px) / w;
 
-    // Average the corner samples to get the background color
-    let bgR = 0, bgG = 0, bgB = 0;
-    for (const [r, g, b] of corners) { bgR += r; bgG += g; bgB += b; }
-    bgR = Math.round(bgR / corners.length);
-    bgG = Math.round(bgG / corners.length);
-    bgB = Math.round(bgB / corners.length);
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+        const nx = px + dx;
+        const ny = py + dy;
+        if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+        const ni = ny * w + nx;
+        if (visited[ni]) continue;
+        visited[ni] = 1;
 
-    // Check corner color consistency — if corners vary too much, it's not
-    // a simple background (might be part of the actual art)
-    let maxDev = 0;
-    for (const [r, g, b] of corners) {
-      const dev = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
-      if (dev > maxDev) maxDev = dev;
+        const idx = ni * 4;
+        if (data[idx + 3] < 10) continue; // already transparent
+
+        const dist = isBg(data[idx], data[idx + 1], data[idx + 2]);
+        if (dist < threshold) {
+          bgMask[ni] = 1;
+          queue.push(ni);
+        } else if (dist < threshold + featherRange) {
+          bgMask[ni] = 2; // feather edge — don't expand further
+        }
+      }
     }
-    if (maxDev > 80) return canvas; // corners too varied, skip cleanup
 
-    // Remove background: threshold-based with feathered edges
-    const threshold = 55;     // max color distance to consider "background"
-    const featherRange = 25;  // feather zone for smooth edges
-
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
-      if (a < 10) continue; // already transparent
-
-      const dist = Math.abs(r - bgR) + Math.abs(g - bgG) + Math.abs(b - bgB);
-      if (dist < threshold) {
-        // Clearly background — make fully transparent
-        data[i + 3] = 0;
-      } else if (dist < threshold + featherRange) {
-        // Feather zone — blend alpha for smooth edge
-        const blend = (dist - threshold) / featherRange;
-        data[i + 3] = Math.round(a * blend);
+    // Apply mask: make background transparent, feather edges
+    for (let i = 0; i < w * h; i++) {
+      if (bgMask[i] === 1) {
+        data[i * 4 + 3] = 0; // fully transparent
+      } else if (bgMask[i] === 2) {
+        const idx = i * 4;
+        const dist = isBg(data[idx], data[idx + 1], data[idx + 2]);
+        const blend = Math.min(1, (dist - threshold) / featherRange);
+        data[idx + 3] = Math.round(data[idx + 3] * blend);
       }
     }
 
     ctx.putImageData(imageData, 0, 0);
     return canvas;
+  }
+
+  /** Find up to k dominant colors from a set of RGB samples using simple clustering. */
+  private findDominantColors(
+    samples: [number, number, number][], k: number
+  ): [number, number, number][] {
+    if (samples.length === 0) return [];
+    if (samples.length <= k) return samples;
+
+    // Initialize centroids: first sample + most distant sample
+    const centroids: [number, number, number][] = [samples[0]];
+    if (k >= 2) {
+      let maxDist = 0;
+      let farthest = samples[0];
+      for (const s of samples) {
+        const d = Math.abs(s[0] - centroids[0][0]) + Math.abs(s[1] - centroids[0][1]) + Math.abs(s[2] - centroids[0][2]);
+        if (d > maxDist) { maxDist = d; farthest = s; }
+      }
+      // Only use 2 centroids if there's meaningful color variation
+      if (maxDist > 40) {
+        centroids.push(farthest);
+      }
+    }
+
+    // 5 iterations of k-means
+    for (let iter = 0; iter < 5; iter++) {
+      const sums = centroids.map(() => [0, 0, 0, 0] as [number, number, number, number]); // r, g, b, count
+      for (const [r, g, b] of samples) {
+        let bestC = 0;
+        let bestD = Infinity;
+        for (let c = 0; c < centroids.length; c++) {
+          const d = Math.abs(r - centroids[c][0]) + Math.abs(g - centroids[c][1]) + Math.abs(b - centroids[c][2]);
+          if (d < bestD) { bestD = d; bestC = c; }
+        }
+        sums[bestC][0] += r; sums[bestC][1] += g; sums[bestC][2] += b; sums[bestC][3]++;
+      }
+      for (let c = 0; c < centroids.length; c++) {
+        if (sums[c][3] > 0) {
+          centroids[c] = [
+            Math.round(sums[c][0] / sums[c][3]),
+            Math.round(sums[c][1] / sums[c][3]),
+            Math.round(sums[c][2] / sums[c][3]),
+          ];
+        }
+      }
+    }
+    return centroids;
   }
 
   private loadImage(path: string): Promise<HTMLImageElement | null> {
