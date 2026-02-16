@@ -243,13 +243,21 @@ export class Game {
     camera.follow(state.player.pos);
     camera.update();
 
-    state.notifications = state.notifications
-      .map((n) => ({ ...n, timeLeft: n.timeLeft - dt }))
-      .filter((n) => n.timeLeft > 0);
+    // Update notifications in-place to avoid per-frame allocations
+    for (let i = state.notifications.length - 1; i >= 0; i--) {
+      state.notifications[i].timeLeft -= dt;
+      if (state.notifications[i].timeLeft <= 0) {
+        state.notifications.splice(i, 1);
+      }
+    }
 
-    state.vfx = state.vfx
-      .map((v) => ({ ...v, timeLeft: v.timeLeft - dt }))
-      .filter((v) => v.timeLeft > 0);
+    // Update VFX in-place
+    for (let i = state.vfx.length - 1; i >= 0; i--) {
+      state.vfx[i].timeLeft -= dt;
+      if (state.vfx[i].timeLeft <= 0) {
+        state.vfx.splice(i, 1);
+      }
+    }
   }
 
   private updateExplore(dt: number) {
