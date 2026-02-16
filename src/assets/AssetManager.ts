@@ -470,12 +470,14 @@ export class AssetManager {
     }
 
     // Animations — spriteKey -> animName -> direction -> path
+    // When AI animations exist for a sprite, replace the entire animation map
+    // (discarding procedural frames) to avoid mixing different content proportions
+    // which would cause normalizeAnimFrames to scale sprites incorrectly.
     if (manifest.animations) {
       this.hasAnimations = true;
       for (const [spriteKey, anims] of Object.entries(manifest.animations)) {
-        if (!this.animFrames.has(spriteKey)) {
-          this.animFrames.set(spriteKey, new Map());
-        }
+        // Always create a fresh map — don't merge with procedural frames
+        this.animFrames.set(spriteKey, new Map());
         const spriteAnims = this.animFrames.get(spriteKey)!;
 
         for (const [animName, directions] of Object.entries(anims)) {

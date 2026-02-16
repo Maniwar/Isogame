@@ -47,10 +47,11 @@ export class MapSystem {
 
     // Define NPC spawns
     const npcs: NpcSpawn[] = [
+      // --- Settlement NPCs ---
       {
         id: "sheriff",
         name: "Sheriff Morgan",
-        pos: { x: 22, y: 18 },
+        pos: { x: 23, y: 18 },  // Inside sheriff_office (interior tile)
         spriteKey: "npc_sheriff",
         isHostile: false,
         dialogueId: "sheriff_intro",
@@ -73,14 +74,51 @@ export class MapSystem {
       {
         id: "doc",
         name: "Doc Hendricks",
-        pos: { x: 21, y: 21 },
+        pos: { x: 21, y: 23 },  // Just south of the clinic
         spriteKey: "npc_doc",
         isHostile: false,
         dialogueId: "doc_intro",
         stats: { hp: 25, maxHp: 25, ap: 6, maxAp: 6, strength: 3, perception: 7, endurance: 3, charisma: 6, intelligence: 9, agility: 4, luck: 5 },
         inventory: [{ itemId: "stimpak", count: 5 }],
       },
-      // Hostile NPCs further out
+      // --- Settlement visitors / wanderers ---
+      {
+        id: "settler1",
+        name: "Dusty Pete",
+        pos: { x: 16, y: 18 },
+        spriteKey: "npc_merchant",
+        isHostile: false,
+        dialogueId: "merchant_intro",
+        stats: { hp: 20, maxHp: 20, ap: 6, maxAp: 6, strength: 4, perception: 5, endurance: 4, charisma: 6, intelligence: 5, agility: 5, luck: 5 },
+        inventory: [
+          { itemId: "canned_food", count: 2 },
+          { itemId: "bottle_caps", count: 15 },
+        ],
+      },
+      {
+        id: "settler2",
+        name: "Martha",
+        pos: { x: 20, y: 16 },
+        spriteKey: "npc_doc",
+        isHostile: false,
+        dialogueId: "doc_intro",
+        stats: { hp: 18, maxHp: 18, ap: 6, maxAp: 6, strength: 3, perception: 5, endurance: 3, charisma: 7, intelligence: 6, agility: 4, luck: 6 },
+        inventory: [
+          { itemId: "nuka_cola", count: 1 },
+          { itemId: "bobby_pin", count: 2 },
+        ],
+      },
+      {
+        id: "guard1",
+        name: "Settlement Guard",
+        pos: { x: 15, y: 20 },
+        spriteKey: "npc_sheriff",
+        isHostile: false,
+        dialogueId: "sheriff_intro",
+        stats: { hp: 35, maxHp: 35, ap: 7, maxAp: 7, strength: 6, perception: 6, endurance: 5, charisma: 3, intelligence: 4, agility: 5, luck: 5 },
+        inventory: [{ itemId: "pipe_rifle", count: 1 }],
+      },
+      // --- NW Raider Camp ---
       {
         id: "raider1",
         name: "Raider",
@@ -107,6 +145,20 @@ export class MapSystem {
       },
       {
         id: "raider3",
+        name: "Raider Scrounger",
+        pos: { x: 8, y: 10 },
+        spriteKey: "npc_raider",
+        isHostile: true,
+        stats: { hp: 18, maxHp: 18, ap: 6, maxAp: 6, strength: 5, perception: 6, endurance: 4, charisma: 2, intelligence: 4, agility: 6, luck: 4 },
+        inventory: [
+          { itemId: "combat_knife", count: 1 },
+          { itemId: "stimpak", count: 1 },
+          { itemId: "bottle_caps", count: 6 },
+        ],
+      },
+      // --- SE Raider Camp ---
+      {
+        id: "raider4",
         name: "Raider Scout",
         pos: { x: 30, y: 30 },
         spriteKey: "npc_raider",
@@ -117,20 +169,91 @@ export class MapSystem {
           { itemId: "bottle_caps", count: 5 },
         ],
       },
+      {
+        id: "raider5",
+        name: "Raider Brute",
+        pos: { x: 32, y: 31 },
+        spriteKey: "npc_raider",
+        isHostile: true,
+        stats: { hp: 30, maxHp: 30, ap: 5, maxAp: 5, strength: 8, perception: 4, endurance: 7, charisma: 1, intelligence: 2, agility: 4, luck: 3 },
+        inventory: [
+          { itemId: "baseball_bat", count: 1 },
+          { itemId: "canned_food", count: 1 },
+          { itemId: "bottle_caps", count: 10 },
+        ],
+      },
+      // --- Lone wandering hostiles ---
+      {
+        id: "raider6",
+        name: "Road Bandit",
+        pos: { x: 6, y: 25 },
+        spriteKey: "npc_raider",
+        isHostile: true,
+        stats: { hp: 22, maxHp: 22, ap: 7, maxAp: 7, strength: 5, perception: 6, endurance: 5, charisma: 2, intelligence: 3, agility: 7, luck: 5 },
+        inventory: [
+          { itemId: "10mm_pistol", count: 1 },
+          { itemId: "bottle_caps", count: 18 },
+        ],
+      },
+      {
+        id: "raider7",
+        name: "Scavenger",
+        pos: { x: 35, y: 12 },
+        spriteKey: "npc_raider",
+        isHostile: true,
+        stats: { hp: 20, maxHp: 20, ap: 6, maxAp: 6, strength: 5, perception: 5, endurance: 4, charisma: 2, intelligence: 4, agility: 6, luck: 5 },
+        inventory: [
+          { itemId: "pipe_rifle", count: 1 },
+          { itemId: "rad_away", count: 1 },
+          { itemId: "bottle_caps", count: 7 },
+        ],
+      },
     ];
 
-    // Item spawns scattered around
+    // Item spawns scattered around the map
     const items: ItemSpawn[] = [
+      // Settlement area
       { itemId: "stimpak", pos: { x: 15, y: 17 }, count: 1 },
       { itemId: "bottle_caps", pos: { x: 23, y: 15 }, count: 25 },
       { itemId: "nuka_cola", pos: { x: 16, y: 25 }, count: 2 },
-      { itemId: "combat_knife", pos: { x: 25, y: 28 }, count: 1 },
-      { itemId: "pipe_rifle", pos: { x: 8, y: 12 }, count: 1 },
-      { itemId: "rad_away", pos: { x: 30, y: 15 }, count: 1 },
       { itemId: "canned_food", pos: { x: 19, y: 14 }, count: 2 },
       { itemId: "bobby_pin", pos: { x: 22, y: 25 }, count: 3 },
+      { itemId: "holotape", pos: { x: 24, y: 19 }, count: 1 },
+      // Near NW raider camp
+      { itemId: "pipe_rifle", pos: { x: 8, y: 12 }, count: 1 },
+      { itemId: "stimpak", pos: { x: 13, y: 7 }, count: 1 },
+      { itemId: "bottle_caps", pos: { x: 9, y: 11 }, count: 15 },
+      { itemId: "canned_food", pos: { x: 11, y: 7 }, count: 1 },
+      // Near SE raider camp
+      { itemId: "combat_knife", pos: { x: 25, y: 28 }, count: 1 },
+      { itemId: "rad_away", pos: { x: 30, y: 15 }, count: 1 },
+      { itemId: "stimpak", pos: { x: 31, y: 32 }, count: 2 },
+      { itemId: "nuka_cola", pos: { x: 28, y: 29 }, count: 1 },
+      // Outer wasteland finds
       { itemId: "leather_armor", pos: { x: 14, y: 30 }, count: 1 },
+      { itemId: "10mm_pistol", pos: { x: 5, y: 15 }, count: 1 },
+      { itemId: "stimpak", pos: { x: 33, y: 8 }, count: 1 },
+      { itemId: "bottle_caps", pos: { x: 7, y: 33 }, count: 30 },
+      { itemId: "rad_away", pos: { x: 36, y: 25 }, count: 1 },
+      { itemId: "canned_food", pos: { x: 27, y: 5 }, count: 2 },
+      { itemId: "nuka_cola", pos: { x: 12, y: 35 }, count: 1 },
+      { itemId: "bobby_pin", pos: { x: 34, y: 18 }, count: 2 },
+      { itemId: "holotape", pos: { x: 6, y: 7 }, count: 1 },
+      { itemId: "baseball_bat", pos: { x: 15, y: 33 }, count: 1 },
     ];
+
+    // Validate NPC spawn positions — nudge any that landed on solid/water tiles
+    for (const npc of npcs) {
+      if (!this.isSpawnable(tiles, npc.pos, width, height)) {
+        const alt = this.findNearbyWalkable(tiles, npc.pos, width, height);
+        if (alt) npc.pos = alt;
+      }
+    }
+
+    // Validate item spawn positions
+    const validItems = items.filter(item =>
+      this.isSpawnable(tiles, item.pos, width, height),
+    );
 
     return {
       name: "Dusty Springs",
@@ -141,7 +264,7 @@ export class MapSystem {
         player: { x: 20, y: 20 },
       },
       npcs,
-      items,
+      items: validItems,
     };
   }
 
@@ -397,6 +520,27 @@ export class MapSystem {
         }
       }
     }
+  }
+
+  /** Check if a position is valid for spawning (walkable, not water) */
+  private isSpawnable(tiles: Tile[][], pos: TilePos, w: number, h: number): boolean {
+    if (pos.x < 0 || pos.y < 0 || pos.x >= w || pos.y >= h) return false;
+    const tile = tiles[pos.y][pos.x];
+    return tile.collision === Collision.None && tile.terrain !== Terrain.Water;
+  }
+
+  /** Find the nearest walkable tile to a position (spiral search) */
+  private findNearbyWalkable(tiles: Tile[][], pos: TilePos, w: number, h: number): TilePos | null {
+    for (let r = 1; r <= 5; r++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+          const np = { x: pos.x + dx, y: pos.y + dy };
+          if (this.isSpawnable(tiles, np, w, h)) return np;
+        }
+      }
+    }
+    return null;
   }
 
   /** Check if a tile is walkable */
