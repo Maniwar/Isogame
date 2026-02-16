@@ -921,15 +921,15 @@ export class AssetManager {
     for (let y = 1; y < h - 1; y++) { addBorder(0, y); addBorder(w - 1, y); }
 
     // If most border pixels are already transparent, image is fine
-    if (borderColors.length < (w + h)) return canvas;
+    if (borderColors.length < Math.floor((w + h) * 0.5)) return canvas;
 
     // Find up to 2 dominant border colors (handles checkerboard patterns)
     // Simple k-means with k=2
     const bgColors = this.findDominantColors(borderColors, 2);
     if (bgColors.length === 0) return canvas;
 
-    const threshold = 60;
-    const featherRange = 30;
+    const threshold = 80;
+    const featherRange = 40;
 
     // Check if pixel matches any background color
     const isBg = (r: number, g: number, b: number): number => {
@@ -983,7 +983,7 @@ export class AssetManager {
       const px = pi % w;
       const py = (pi - px) / w;
 
-      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      for (const [dx, dy] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]]) {
         const nx = px + dx;
         const ny = py + dy;
         if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
@@ -1108,7 +1108,7 @@ export class AssetManager {
       [Terrain.Road]:        { base: "#6e6e5e", detail: "#5a5a4a", noise: "#8e8e7e" },
       [Terrain.Concrete]:    { base: "#8e8e7e", detail: "#a0a090", noise: "#6e6e5e" },
       [Terrain.Grass]:       { base: "#6b7b4a", detail: "#7a8b5a", noise: "#4a5b3a" },
-      [Terrain.Water]:       { base: "#3a5a5a", detail: "#4a7070", noise: "#2a4a4a" },
+      [Terrain.Water]:       { base: "#1E3A5A", detail: "#2A5080", noise: "#162E48" },
     };
 
     const sz = AssetManager.PROC_TEX_SIZE;
@@ -1490,35 +1490,50 @@ export class AssetManager {
   ) {
     const phase = (frame / totalFrames) * Math.PI * 2;
 
-    // Subtle depth gradient
+    // Depth gradient — darker at bottom, lighter at top
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, "rgba(74, 112, 112, 0.15)");
-    grad.addColorStop(1, "rgba(42, 74, 74, 0.1)");
+    grad.addColorStop(0, "rgba(42, 80, 128, 0.2)");
+    grad.addColorStop(1, "rgba(22, 46, 72, 0.15)");
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Wave lines shifted by phase
-    ctx.strokeStyle = "#5a9a9a";
-    ctx.lineWidth = 0.8;
-    ctx.globalAlpha = 0.3;
+    // Primary wave lines — broader, more visible
+    ctx.strokeStyle = "#3A6A9A";
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.35;
     for (let i = 0; i < 6; i++) {
       const baseY = (i + 0.5) * (h / 6);
       ctx.beginPath();
-      for (let x = 0; x <= w; x += 4) {
-        const y = baseY + Math.sin((x / w) * Math.PI * 3 + phase + i * 0.7) * 2.5;
+      for (let x = 0; x <= w; x += 3) {
+        const y = baseY + Math.sin((x / w) * Math.PI * 3 + phase + i * 0.7) * 3
+                        + Math.sin((x / w) * Math.PI * 5 + phase * 1.3 + i) * 1.2;
         if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
 
-    // Specular highlights
-    ctx.fillStyle = "#7ababa";
-    ctx.globalAlpha = 0.12;
-    for (let i = 0; i < 5; i++) {
+    // Secondary ripples — thinner, offset phase
+    ctx.strokeStyle = "#4A80B0";
+    ctx.lineWidth = 0.6;
+    ctx.globalAlpha = 0.2;
+    for (let i = 0; i < 4; i++) {
+      const baseY = (i + 1) * (h / 5);
+      ctx.beginPath();
+      for (let x = 0; x <= w; x += 4) {
+        const y = baseY + Math.sin((x / w) * Math.PI * 4 + phase * 0.7 + i * 1.2) * 2;
+        if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Specular highlights — small bright spots
+    ctx.fillStyle = "#7AC0E0";
+    ctx.globalAlpha = 0.15;
+    for (let i = 0; i < 6; i++) {
       const hx = ((i * 29 + frame * 17) % w);
       const hy = ((i * 37 + frame * 13) % h);
       ctx.beginPath();
-      ctx.ellipse(hx, hy, 3, 1.5, phase + i, 0, Math.PI * 2);
+      ctx.ellipse(hx, hy, 3.5, 1.5, phase + i, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -1539,27 +1554,42 @@ export class AssetManager {
     ctx.closePath();
     ctx.clip();
 
-    // Wave lines
-    ctx.strokeStyle = "#5a9a9a";
-    ctx.lineWidth = 0.7;
-    ctx.globalAlpha = 0.35;
+    // Primary wave lines
+    ctx.strokeStyle = "#3A6A9A";
+    ctx.lineWidth = 1.0;
+    ctx.globalAlpha = 0.4;
     for (let i = 0; i < 3; i++) {
       const baseY = 8 + i * 8;
       ctx.beginPath();
       for (let x = 10; x <= 54; x += 3) {
-        const y = baseY + Math.sin((x / 64) * Math.PI * 4 + phase + i * 0.8) * 1.5;
+        const y = baseY + Math.sin((x / 64) * Math.PI * 4 + phase + i * 0.8) * 2
+                        + Math.sin((x / 64) * Math.PI * 6 + phase * 1.3) * 0.8;
         if (x === 10) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.stroke();
     }
 
-    // Small highlight
-    ctx.fillStyle = "#7ababa";
-    ctx.globalAlpha = 0.1;
+    // Secondary ripples
+    ctx.strokeStyle = "#4A80B0";
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.25;
+    for (let i = 0; i < 2; i++) {
+      const baseY = 12 + i * 10;
+      ctx.beginPath();
+      for (let x = 14; x <= 50; x += 3) {
+        const y = baseY + Math.sin((x / 64) * Math.PI * 5 + phase * 0.8 + i * 1.2) * 1.5;
+        if (x === 14) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    // Specular highlight
+    ctx.fillStyle = "#7AC0E0";
+    ctx.globalAlpha = 0.15;
     const hx = 25 + Math.cos(phase) * 6;
     const hy = 14 + Math.sin(phase) * 2;
     ctx.beginPath();
-    ctx.ellipse(hx, hy, 3, 1, 0, 0, Math.PI * 2);
+    ctx.ellipse(hx, hy, 3.5, 1.2, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.globalAlpha = 1;
@@ -1575,30 +1605,133 @@ export class AssetManager {
       npc_raider:   { body: "#4a3a2a", head: "#c4a080", accent: "#b83030" },
     };
     const dirs: Direction[] = ["N","NE","E","SE","S","SW","W","NW"];
+    const frameKeys = ["idle", "walk_1", "walk_2", "walk_3", "walk_4", "attack_1", "attack_2", "hit"];
+
     for (const [key, colors] of Object.entries(configs)) {
+      // Static sprites (backward compat)
       const m = new Map<Direction, HTMLCanvasElement>();
-      for (const d of dirs) m.set(d, this.genChar(colors, d, key === "player"));
+      for (const d of dirs) m.set(d, this.genCharFrame(colors, d, key === "player", "idle"));
       this.sprites.set(key, m);
+
+      // Animation frames
+      const animData = new Map<string, Map<Direction, HTMLCanvasElement>>();
+      for (const fk of frameKeys) {
+        const dirMap = new Map<Direction, HTMLCanvasElement>();
+        for (const d of dirs) {
+          dirMap.set(d, this.genCharFrame(colors, d, key === "player", fk));
+        }
+        animData.set(fk, dirMap);
+      }
+      this.animFrames.set(key, animData);
     }
+    this.hasAnimations = true;
   }
 
-  private genChar(c: {body:string;head:string;accent:string}, dir: Direction, isPlayer: boolean): HTMLCanvasElement {
-    // Use 64x96 canvas (matching AI sprite dimensions) so procedural fallback
-    // renders at the same visual size when drawn at the fixed display size.
+  /**
+   * Generate a single procedural character frame.
+   * frameKey controls pose: idle, walk_1-4, attack_1-2, hit.
+   */
+  private genCharFrame(
+    c: {body:string;head:string;accent:string},
+    dir: Direction, isPlayer: boolean, frameKey: string,
+  ): HTMLCanvasElement {
     const canvas=this.createCanvas(64,96), ctx=canvas.getContext("2d")!;
-    ctx.scale(64/24, 96/36); // Scale original 24x36 coordinate space to 64x96
+    ctx.scale(64/24, 96/36);
     const w=24, h=36, cx=w/2;
-    ctx.fillStyle="rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(cx,h-3,8,3,0,0,Math.PI*2); ctx.fill();
     const bs=this.dirOff(dir);
-    ctx.fillStyle=c.body; ctx.fillRect(cx-5+bs*1.5,14,10,14);
-    ctx.fillStyle=c.accent; ctx.fillRect(cx-5+bs*1.5,20,10,2);
-    ctx.fillStyle=this.darken(c.body,0.7); const ls=Math.abs(bs)>0?2:0;
-    ctx.fillRect(cx-3+bs-ls,28,3,5); ctx.fillRect(cx+bs+ls,28,3,5);
-    ctx.fillStyle="#3a3a2e"; ctx.fillRect(cx-3+bs-ls,32,3,2); ctx.fillRect(cx+bs+ls,32,3,2);
-    ctx.fillStyle=c.head; ctx.beginPath(); ctx.arc(cx+bs,10,5,0,Math.PI*2); ctx.fill();
-    if(dir!=="N"&&dir!=="NW"&&dir!=="NE"){ctx.fillStyle="#1e1e16";const eo=bs*0.5;ctx.fillRect(cx-2+eo,9,1,1);ctx.fillRect(cx+1+eo,9,1,1);}
-    if(isPlayer){ctx.strokeStyle="rgba(64,192,64,0.5)";ctx.lineWidth=0.5;ctx.beginPath();ctx.arc(cx+bs,10,6,0,Math.PI*2);ctx.stroke();}
-    if(c.accent==="#b83030"){ctx.strokeStyle="#9e9e8e";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx+5+bs,16);ctx.lineTo(cx+10+bs,12);ctx.stroke();}
+
+    // Leg stride offsets per walk frame
+    // [leftLegDx, leftLegDy, rightLegDx, rightLegDy]
+    let legOff = [0, 0, 0, 0];
+    let bodyBob = 0;
+    let armSwing = 0; // for walk arm counter-swing
+
+    switch (frameKey) {
+      case "walk_1": // left foot forward
+        legOff = [-2, -1, 2, 1]; bodyBob = -0.5; armSwing = 1;
+        break;
+      case "walk_2": // passing (legs together, body higher)
+        legOff = [0, 0, 0, 0]; bodyBob = -1;
+        break;
+      case "walk_3": // right foot forward
+        legOff = [2, 1, -2, -1]; bodyBob = -0.5; armSwing = -1;
+        break;
+      case "walk_4": // passing opposite
+        legOff = [0, 0, 0, 0]; bodyBob = -1;
+        break;
+      case "attack_1": // wind-up
+        armSwing = -2;
+        break;
+      case "attack_2": // strike
+        armSwing = 3;
+        break;
+      case "hit": // recoil
+        bodyBob = 1;
+        break;
+    }
+
+    // Shadow
+    ctx.fillStyle="rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(cx,h-3,8,3,0,0,Math.PI*2); ctx.fill();
+
+    // Body (torso)
+    ctx.fillStyle=c.body;
+    ctx.fillRect(cx-5+bs*1.5, 14+bodyBob, 10, 14);
+
+    // Belt accent
+    ctx.fillStyle=c.accent;
+    ctx.fillRect(cx-5+bs*1.5, 20+bodyBob, 10, 2);
+
+    // Arms (subtle swing during walk/attack)
+    if (armSwing !== 0) {
+      ctx.fillStyle=this.darken(c.body, 0.8);
+      const armY = 16 + bodyBob;
+      // Left arm
+      ctx.fillRect(cx-6+bs*1.5 - armSwing*0.5, armY, 2, 8);
+      // Right arm
+      ctx.fillRect(cx+5+bs*1.5 + armSwing*0.5, armY, 2, 8);
+    }
+
+    // Legs with stride offsets
+    const ls=Math.abs(bs)>0?2:0;
+    ctx.fillStyle=this.darken(c.body,0.7);
+    // Left leg
+    ctx.fillRect(cx-3+bs-ls + legOff[0], 28+bodyBob + legOff[1], 3, 5 - legOff[1]);
+    // Right leg
+    ctx.fillRect(cx+bs+ls + legOff[2], 28+bodyBob + legOff[3], 3, 5 - legOff[3]);
+
+    // Boots
+    ctx.fillStyle="#3a3a2e";
+    ctx.fillRect(cx-3+bs-ls + legOff[0], 32 + Math.max(0, legOff[1]), 3, 2);
+    ctx.fillRect(cx+bs+ls + legOff[2], 32 + Math.max(0, legOff[3]), 3, 2);
+
+    // Head
+    ctx.fillStyle=c.head;
+    ctx.beginPath(); ctx.arc(cx+bs, 10+bodyBob, 5, 0, Math.PI*2); ctx.fill();
+
+    // Eyes (front-facing only)
+    if(dir!=="N"&&dir!=="NW"&&dir!=="NE"){
+      ctx.fillStyle="#1e1e16";
+      const eo=bs*0.5;
+      ctx.fillRect(cx-2+eo, 9+bodyBob, 1, 1);
+      ctx.fillRect(cx+1+eo, 9+bodyBob, 1, 1);
+    }
+
+    // Player glow ring
+    if(isPlayer){
+      ctx.strokeStyle="rgba(64,192,64,0.5)"; ctx.lineWidth=0.5;
+      ctx.beginPath(); ctx.arc(cx+bs, 10+bodyBob, 6, 0, Math.PI*2); ctx.stroke();
+    }
+
+    // Raider weapon
+    if(c.accent==="#b83030"){
+      ctx.strokeStyle="#9e9e8e"; ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(cx+5+bs + armSwing*0.5, 16+bodyBob);
+      ctx.lineTo(cx+10+bs + armSwing, 12+bodyBob);
+      ctx.stroke();
+    }
+
     return canvas;
   }
 

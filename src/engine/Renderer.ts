@@ -23,7 +23,7 @@ const TERRAIN_BASE_COLOR: Record<number, string> = {
   [Terrain.Road]:        "#5C5C50",
   [Terrain.Concrete]:    "#7A7A6E",
   [Terrain.Grass]:       "#4A5B3A",
-  [Terrain.Water]:       "#2A4A6A",
+  [Terrain.Water]:       "#1E3A5A",
 };
 
 /**
@@ -149,6 +149,10 @@ export class Renderer {
 
         if (tile.terrain === Terrain.Water) {
           this.waterTiles.push({ x, y, tile });
+          // Skip drawing water to the static terrain cache — water is animated
+          // separately via the water cache. The base-color rectangle from pass 1
+          // already fills the background behind the diamond.
+          continue;
         }
 
         this.drawTileTo(cCtx, x, y, tile, state);
@@ -433,23 +437,25 @@ export class Renderer {
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
-    // Base-color rectangle fill to prevent black bleed at diamond edges
+    // Diamond clip path — slightly oversized (+0.5px) to prevent sub-pixel gaps
+    // between adjacent water tiles. All drawing is clipped to this diamond.
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
+    ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
+    ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
+    ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
+    ctx.closePath();
+    ctx.clip();
+
+    // Base-color fill (clipped to diamond) to prevent gaps
     ctx.fillStyle = TERRAIN_BASE_COLOR[Terrain.Water] ?? "#2A4A6A";
-    ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+    ctx.fillRect(wx - TILE_HALF_W - 1, wy - TILE_HALF_H - 1, TILE_W + 2, TILE_H + 2);
 
     // Try AI terrain texture pattern first (animated, mirror-tiled for no seams)
     if (assets.hasTerrainTextureMode()) {
       const pattern = assets.getTerrainPattern(Terrain.Water, ctx);
       if (pattern) {
-        // Slightly oversized diamond clip (+0.5px) for seamless edges
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
-        ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
-        ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
-        ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
-        ctx.closePath();
-        ctx.clip();
         ctx.fillStyle = pattern;
         ctx.fillRect(wx - TILE_HALF_W - 1, wy - TILE_HALF_H - 1, TILE_W + 2, TILE_H + 2);
         ctx.restore();
@@ -461,15 +467,8 @@ export class Renderer {
     const sprite = assets.getTile(Terrain.Water, x, y, 0);
     if (sprite) {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(wx, wy - TILE_HALF_H);
-      ctx.lineTo(wx + TILE_HALF_W, wy);
-      ctx.lineTo(wx, wy + TILE_HALF_H);
-      ctx.lineTo(wx - TILE_HALF_W, wy);
-      ctx.closePath();
-      ctx.fill();
     }
+    ctx.restore();
   }
 
 
