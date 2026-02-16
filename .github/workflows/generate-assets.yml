@@ -183,6 +183,33 @@ jobs:
           echo "=== All categories complete! Total: ${TOTAL_COMMITTED} PNGs ==="
           echo "========================================"
 
+      # Emergency commit: save any deployed assets that weren't committed before failure
+      - name: Emergency commit (save partial output on failure)
+        if: failure() && inputs.dry_run == false
+        run: |
+          echo "=== Emergency: saving partial output ==="
+          DEPLOYED_COUNT=$(find public/assets -name "*.png" -type f 2>/dev/null | wc -l)
+          RAW_COUNT=$(find scripts/asset-gen/output -name "*.png" -type f 2>/dev/null | wc -l)
+          echo "Deployed PNGs: $DEPLOYED_COUNT"
+          echo "Raw PNGs on disk: $RAW_COUNT (saved via artifact upload)"
+          git add public/assets/ || true
+          if ! git diff --staged --quiet; then
+            git commit -m "assets: Emergency save — partial output from interrupted run"
+            git push || echo "::warning::Emergency push failed"
+          else
+            echo "No uncommitted deployed assets to save"
+          fi
+
+      # Upload raw output as artifact — survives even if git push fails
+      - name: Upload raw output (crash recovery)
+        if: always() && inputs.dry_run == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-gen-output
+          path: scripts/asset-gen/output/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Show deployed assets
         if: inputs.dry_run == false
         run: |
