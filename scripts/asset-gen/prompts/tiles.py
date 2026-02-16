@@ -22,7 +22,10 @@ TILE_STYLE_PREAMBLE = (
     "Art style: detailed pre-rendered 3D look with visible grit and texture — "
     "like original Fallout 2 tiles. NOT flat cartoon or pixel art. "
     "NO dark outlines or borders around the tile edges. "
-    "The tile must be a perfect isometric diamond shape on a transparent background. "
+    "The tile must be a perfect isometric diamond shape on a pure bright GREEN "
+    "(#00FF00) chroma key background. Fill ALL space outside the diamond with "
+    "solid RGB(0,255,0) green. DO NOT use transparent, checkered, gray, or white backgrounds. "
+    "Tile edges should have a soft 1-2 pixel anti-aliased blend into the green. "
 )
 
 GROUND_TILE_TEMPLATE = (
@@ -48,7 +51,7 @@ WALL_TILE_TEMPLATE = (
     "Show the wall from the standard isometric 3/4 view with visible front and top faces. "
     "The wall should look weathered and post-apocalyptic — damaged, patched, or deteriorating. "
     "Variation #{variant_num} — visually distinct but same material. "
-    "Transparent background. No text, no labels, no watermarks."
+    "Pure bright GREEN (#00FF00) chroma key background. No text, no labels, no watermarks."
 )
 
 TERRAIN_FEATURE_TEMPLATE = (
@@ -56,7 +59,8 @@ TERRAIN_FEATURE_TEMPLATE = (
     "This is a TERRAIN FEATURE tile ({width}x{height} pixels, isometric). "
     "Subject: {description}. "
     "This is an object or feature placed on top of ground tiles. "
-    "It should have a transparent background so it can be composited over ground tiles. "
+    "Pure bright GREEN (#00FF00) chroma key background — software will replace it "
+    "with transparency for compositing over ground tiles. "
     "Maintain consistent isometric perspective and post-apocalyptic styling. "
     "Variation #{variant_num}. "
     "No text, no labels, no watermarks."
@@ -385,7 +389,8 @@ TILE_SET_PREAMBLE = (
     "rust oranges, dusty yellows, and faded greens. "
     "Art style: detailed pre-rendered 3D look with gritty, weathered texture — "
     "NOT flat cartoon or pixel art. NO dark outlines on tile edges. "
-    "Each tile is a perfect isometric diamond on a transparent background. "
+    "Each tile is a perfect isometric diamond on a pure bright GREEN (#00FF00) "
+    "chroma key background. Fill ALL space outside diamonds with solid green. "
 )
 
 TILE_SET_TEMPLATE = (
@@ -399,7 +404,7 @@ TILE_SET_TEMPLATE = (
     "Tiles from left to right:\n{variant_list}\n\n"
     "RULES:\n"
     "- Every tile must be an isometric diamond shape\n"
-    "- Transparent background around each diamond\n"
+    "- Pure bright GREEN (#00FF00) chroma key background around each diamond\n"
     "- Consistent perspective (top-down 3/4 view)\n"
     "- Tiles MUST seamlessly connect: edges should fade to neutral earth tones\n"
     "- Concentrate detail in the CENTER; the outer 20% of edges should be soft/blended\n"
@@ -417,7 +422,8 @@ ITEM_SET_TEMPLATE = (
     "Items from left to right:\n{item_list}\n\n"
     "RULES:\n"
     "- Each item centered in its {size}x{size} cell with ~10%% padding on all sides\n"
-    "- Transparent background — NO ground, NO shadows\n"
+    "- Pure bright GREEN (#00FF00) chroma key background — NOT transparent, NOT checkered\n"
+    "- Fill ALL empty space with solid RGB(0,255,0) green\n"
     "- NO dark outlines or borders around items\n"
     "- Items look worn, used, and weathered\n"
     "- Slightly angled top-down perspective, like items on a table\n"

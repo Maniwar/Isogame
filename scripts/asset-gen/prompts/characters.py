@@ -114,7 +114,8 @@ SPRITESHEET_TEMPLATE = (
     "- Fill ALL empty space with this exact green — inside cells, between cells, everywhere.\n"
     "- The character must be painted DIRECTLY on the green background with NO border, "
     "NO outline, and NO dark edge around the character's silhouette.\n"
-    "- Character edges should transition DIRECTLY from skin/clothing/armor color to green.\n"
+    "- Character edges should transition DIRECTLY from skin/clothing/armor color to green\n"
+    "  with a soft 1-2 pixel anti-aliased blend — NO hard pixel-perfect cutouts.\n"
     "- DO NOT draw any black or dark outline around the character shape.\n"
     "- DO NOT draw ground shadows, cast shadows, or drop shadows.\n\n"
 
