@@ -29,6 +29,7 @@ Environment:
 import argparse
 import io
 import os
+import signal
 import sys
 import time
 from pathlib import Path
@@ -132,13 +133,18 @@ def generate_image(
 
     retry_attempts = config.get("api", {}).get("retry_attempts", 3)
     retry_delay = config.get("api", {}).get("retry_delay_seconds", 5)
+    call_timeout = config.get("api", {}).get("call_timeout_seconds", 120)
 
     # Build image config with resolution tier if specified
     image_config = None
     if image_size:
         image_config = types.ImageConfig(
             image_size=image_size,
+            aspect_ratio="1:1",
         )
+
+    def _timeout_handler(signum, frame):
+        raise TimeoutError("API call timed out")
 
     for attempt in range(1, retry_attempts + 1):
         try:
@@ -148,11 +154,23 @@ def generate_image(
             if image_config:
                 gen_config.image_config = image_config
 
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=gen_config,
-            )
+            # Set per-call timeout (Unix only; ignored on Windows)
+            old_handler = None
+            if hasattr(signal, "SIGALRM"):
+                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(call_timeout)
+
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=gen_config,
+                )
+            finally:
+                if hasattr(signal, "SIGALRM"):
+                    signal.alarm(0)  # Cancel timeout
+                    if old_handler is not None:
+                        signal.signal(signal.SIGALRM, old_handler)
 
             # Extract image from response parts
             if response.candidates:
@@ -172,6 +190,14 @@ def generate_image(
                 time.sleep(retry_delay)
                 continue
             return None
+
+        except TimeoutError:
+            print(f"  TIMEOUT: API call exceeded {call_timeout}s (attempt {attempt}/{retry_attempts})")
+            if attempt < retry_attempts:
+                print(f"  Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                return None
 
         except Exception as e:
             print(f"  ERROR (attempt {attempt}/{retry_attempts}): {e}")

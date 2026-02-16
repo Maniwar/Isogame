@@ -112,9 +112,10 @@ portraits:
 # Gemini API settings
 api:
   model: "gemini-3-pro-image-preview"  # Supports 2K/4K output with image_size param
-  requests_per_minute: 10        # Rate limiting
+  requests_per_minute: 15         # Rate limit — actual bottleneck is API latency (~15-30s/call)
   retry_attempts: 3
   retry_delay_seconds: 5
+  call_timeout_seconds: 120       # Per-call timeout — skip hung calls instead of blocking
   output_format: "png"
 
 # Batch definitions for proof-of-concept
