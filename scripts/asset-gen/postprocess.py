@@ -690,15 +690,7 @@ def force_transparent_bg(image: Image.Image) -> Image.Image:
         if len(opaque_border) > 0:
             # Check for checkerboard pattern: analyze color variance
             # Checkerboards have two distinct clusters; solid backgrounds have one
-            from sklearn.cluster import KMeans as _KMeans  # type: ignore
-            use_kmeans = False
-            try:
-                # Only import if available; otherwise use simple approach
-                use_kmeans = True
-            except ImportError:
-                pass
-
-            # Simple 2-cluster detection without sklearn:
+            # Simple 2-cluster detection using numpy (no sklearn needed):
             # Split border pixels into two groups by distance from median
             median_color = np.median(opaque_border, axis=0)
             dists = np.sqrt(np.sum((opaque_border - median_color) ** 2, axis=1))
