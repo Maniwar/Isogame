@@ -837,7 +837,7 @@ export class Game {
       this.dialogueUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this, this.assets);
     }
     if (this.state.phase === "inventory" || this.state.showInventory) {
-      this.inventoryUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this);
+      this.inventoryUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this, this.assets);
     }
     if (this.state.phase === "combat") {
       this.drawCombatUI(ctx);

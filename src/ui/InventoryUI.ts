@@ -1,6 +1,7 @@
 import { GameState } from "../types";
 import { ITEM_DB } from "../systems/InventorySystem";
 import type { Game } from "../engine/Game";
+import type { AssetManager } from "../assets/AssetManager";
 
 export class InventoryUI {
   private boundClick: ((e: MouseEvent) => void) | null = null;
@@ -18,6 +19,7 @@ export class InventoryUI {
     screenW: number,
     screenH: number,
     game: Game,
+    assets?: AssetManager,
   ) {
     this.lastState = state;
 
@@ -88,22 +90,32 @@ export class InventoryUI {
           ctx.fillRect(px + 5, itemY, pw - 10, this.itemH);
         }
 
+        // Item icon (AI-generated PNG or fallback)
+        const iconSize = 24;
+        const iconX = px + 12;
+        const iconY = itemY + (this.itemH - iconSize) / 2;
+        const icon = assets?.getItem(item.itemId);
+        if (icon) {
+          ctx.drawImage(icon, iconX, iconY, iconSize, iconSize);
+        }
+        const textLeft = icon ? px + 12 + iconSize + 8 : px + 40;
+
         // Equipped indicator
         if (item.equipped) {
           ctx.fillStyle = "#40c040";
           ctx.font = "10px monospace";
-          ctx.fillText("[E]", px + 15, itemY + 20);
+          ctx.fillText("[E]", textLeft - 22, itemY + 20);
         }
 
         // Item name
         ctx.fillStyle = item.equipped ? "#40c040" : "#d4c4a0";
         ctx.font = "12px monospace";
-        ctx.fillText(def.name, px + 40, itemY + 15);
+        ctx.fillText(def.name, textLeft, itemY + 15);
 
         // Count
         if (item.count > 1) {
           ctx.fillStyle = "#8ec44a";
-          ctx.fillText(`x${item.count}`, px + 40, itemY + 30);
+          ctx.fillText(`x${item.count}`, textLeft, itemY + 30);
         }
 
         // Item stats on right side
