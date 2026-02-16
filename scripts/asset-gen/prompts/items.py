@@ -2,16 +2,22 @@
 
 ITEM_STYLE_PREAMBLE = (
     "Create an inventory icon in the style of Fallout 2 (1998, Black Isle Studios). "
-    "The icon should be a clear, recognizable depiction of the item "
-    "on a transparent background. "
+    "The icon should be a clear, recognizable depiction of the item. "
     "Desaturated post-nuclear color palette: rusty browns, olive drab, "
     "weathered metal grays, faded labels. Nothing looks new or clean. "
     "Art style: pre-rendered 3D look with visible wear and texture detail — "
     "matching the Fallout 2 inventory screen aesthetic. "
     "NOT flat cartoon or pixel art. "
     "NO dark outlines or black borders around the item. "
-    "The item edges transition directly from the object surface to transparent. "
+    "Item edges transition directly from the object surface to the green background "
+    "with a soft 1-2 pixel anti-aliased blend — NO hard pixel-perfect cutouts. "
     "Slightly angled top-down perspective, like items laid on a table. "
+    "CRITICAL: Pure bright GREEN (#00FF00) chroma key background everywhere. "
+    "The ENTIRE background must be solid bright green RGB(0, 255, 0). "
+    "This green is a chroma key — software will replace it with transparency. "
+    "Fill ALL empty space with this exact green. "
+    "DO NOT use a checkered pattern, gray, white, or any other background color. "
+    "DO NOT attempt to make the background transparent — use SOLID GREEN instead. "
 )
 
 ITEM_TEMPLATE = (
@@ -23,9 +29,11 @@ ITEM_TEMPLATE = (
     "transparent padding on every side. The item MUST NOT touch the image edges.\n\n"
     "The item should look worn, used, and weathered — fitting for a post-apocalyptic setting.\n"
     "RULES:\n"
-    "- Transparent background — NO ground, NO shadows, NO surface\n"
-    "- NO dark outlines or borders around the item\n"
-    "- Item edges blend directly from surface material to transparent\n"
+    "- Pure bright GREEN (#00FF00) background — NOT transparent, NOT checkered, NOT gray\n"
+    "- Fill ALL empty space with solid RGB(0,255,0) green — this is a chroma key\n"
+    "- NO ground plane, NO drop shadows, NO cast shadows\n"
+    "- NO dark outlines or borders around the item edges\n"
+    "- Item edges transition from surface material to green with soft anti-aliased blend\n"
     "- Pre-rendered 3D look, NOT flat cartoon\n"
     "- NO text, NO labels, NO watermarks\n"
 )

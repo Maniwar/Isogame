@@ -95,18 +95,14 @@ SPRITESHEET_TEMPLATE = (
     "TECHNICAL SPECIFICATION — READ CAREFULLY\n"
     "═══════════════════════════════════════════\n\n"
 
-    "OUTPUT IMAGE: Exactly 2048 × 2048 pixels.\n\n"
+    "OUTPUT IMAGE: A square image.\n\n"
 
     "GRID LAYOUT:\n"
-    "- 8 columns × 8 rows = 64 cells total.\n"
-    "- Each cell is exactly 256 × 256 pixels (2048 ÷ 8 = 256).\n"
-    "- Cell boundaries are a STRICT pixel grid:\n"
-    "    Column 1: x=0–255    Column 2: x=256–511   Column 3: x=512–767   Column 4: x=768–1023\n"
-    "    Column 5: x=1024–1279  Column 6: x=1280–1535  Column 7: x=1536–1791  Column 8: x=1792–2047\n"
-    "    Row 1: y=0–255  Row 2: y=256–511  Row 3: y=512–767  Row 4: y=768–1023\n"
-    "    Row 5: y=1024–1279  Row 6: y=1280–1535  Row 7: y=1536–1791  Row 8: y=1792–2047\n"
-    "- The software will slice this image into 64 individual 256×256 cells using these "
-    "exact pixel coordinates. Every cell MUST contain exactly one character pose.\n\n"
+    "- {n_cols} columns × {n_rows} rows = {total_cells} cells total.\n"
+    "- The image is divided into a strict {n_cols}×{n_rows} grid of equal cells.\n"
+    "{grid_coordinates}"
+    "- Software will slice this image into {total_cells} individual cells using these "
+    "exact proportions. Every cell MUST contain exactly one character pose.\n\n"
 
     "BACKGROUND & TRANSPARENCY:\n"
     "- The ENTIRE image background must be pure bright GREEN: RGB(0, 255, 0) / #00FF00.\n"
@@ -114,20 +110,18 @@ SPRITESHEET_TEMPLATE = (
     "- Fill ALL empty space with this exact green — inside cells, between cells, everywhere.\n"
     "- The character must be painted DIRECTLY on the green background with NO border, "
     "NO outline, and NO dark edge around the character's silhouette.\n"
-    "- Character edges should transition DIRECTLY from skin/clothing/armor color to green.\n"
+    "- Character edges should transition DIRECTLY from skin/clothing/armor color to green\n"
+    "  with a soft 1-2 pixel anti-aliased blend — NO hard pixel-perfect cutouts.\n"
     "- DO NOT draw any black or dark outline around the character shape.\n"
     "- DO NOT draw ground shadows, cast shadows, or drop shadows.\n\n"
 
     "CHARACTER SIZING (CRITICAL — prevents cut-off sprites):\n"
-    "- Each character pose must fit within a 200 × 200 pixel area CENTERED within the "
-    "256 × 256 cell. This gives 28 pixels of green padding on every side.\n"
-    "- The character is vertically anchored to the BOTTOM of the 200px area "
+    "- Each character pose must fit within roughly 78%% of the cell area, CENTERED.\n"
+    "- The character is vertically anchored to the BOTTOM of the safe zone "
     "(feet at the bottom, head at the top). Horizontally centered.\n"
-    "- NO part of the character may extend beyond this 200 × 200 safe zone.\n"
+    "- NO part of the character may extend beyond the safe zone.\n"
     "- Arms, weapons, feet, hats, shoulder pads — EVERYTHING stays inside the safe zone.\n"
-    "- The character should be approximately 170–200 pixels tall (head to toe) in the "
-    "idle pose. Attack and hit poses may be shorter due to crouching/leaning.\n"
-    "- ALL 64 cells must have the character at the SAME SIZE. Do not make some cells "
+    "- ALL {total_cells} cells must have the character at the SAME SIZE. Do not make some cells "
     "bigger or smaller than others.\n\n"
 
     "═══════════════════════════════════════════\n"
@@ -256,16 +250,6 @@ SINGLE_DIRECTION_TEMPLATE = (
     "No ground, no shadow, no text, no labels, no watermarks. "
     "Just the character on a flat bright green background."
 )
-
-REFERENCE_FOLLOW_UP = (
-    "{preamble}"
-    "Generate the SAME character shown in the reference image, but now {direction_desc}. "
-    "Keep the exact same outfit, proportions, colors, and equipment. "
-    "Only change the viewing angle. "
-    "Sprite size: {width}x{height} pixels. "
-    "No text, no labels, no watermarks."
-)
-
 
 # ---------------------------------------------------------------------------
 # Character base appearances (without weapon — combined with WEAPON_VARIANTS)
@@ -479,6 +463,33 @@ def _build_archetypes():
 CHARACTER_ARCHETYPES = _build_archetypes()
 
 
+def _build_grid_coordinates(sheet_size: int, n_cols: int, n_rows: int) -> str:
+    """Build grid coordinate text from config values."""
+    cell_size = sheet_size // n_cols
+    lines = ["- Cell boundaries are a STRICT pixel grid:\n"]
+    # Column coordinates
+    for c in range(n_cols):
+        x0 = c * cell_size
+        x1 = x0 + cell_size - 1
+        lines.append(f"    Column {c+1}: x={x0}–{x1}")
+        if (c + 1) % 4 == 0 and c < n_cols - 1:
+            lines.append("\n")
+        else:
+            lines.append("   ")
+    lines.append("\n")
+    # Row coordinates
+    for r in range(n_rows):
+        y0 = r * cell_size
+        y1 = y0 + cell_size - 1
+        lines.append(f"    Row {r+1}: y={y0}–{y1}")
+        if (r + 1) % 4 == 0 and r < n_rows - 1:
+            lines.append("\n")
+        else:
+            lines.append("  ")
+    lines.append("\n")
+    return "".join(lines)
+
+
 def build_spritesheet_prompt(
     name: str,
     description: str,
@@ -486,20 +497,29 @@ def build_spritesheet_prompt(
     weapon_idle_desc: str = "weapon held at side, relaxed",
     weapon_attack_desc: str = "weapon swung or fired forward",
 ) -> str:
-    """Build a prompt for generating a full 8×8 character sprite sheet.
+    """Build a prompt for generating a full character sprite sheet.
 
-    The sheet has 8 rows (idle, walk_1-4, attack_1-2, hit)
-    × 8 columns (S, SW, W, NW, N, NE, E, SE) = 64 frames.
-
-    Uses gemini-3-pro-image-preview with image_size="2K" for native
-    2048×2048 output (256×256 per cell).
+    Grid dimensions (rows, cols, sheet_size) are read from config.sprites.
+    The prompt describes the grid layout proportionally so it matches
+    the actual image_size sent to the Gemini API.
     """
+    sheet_size = config["sprites"].get("sheet_size", 2048)
+    n_cols = config["sprites"].get("sheet_cols", 8)
+    n_rows = config["sprites"].get("sheet_rows", 8)
+    total_cells = n_cols * n_rows
+
+    grid_coordinates = _build_grid_coordinates(sheet_size, n_cols, n_rows)
+
     return SPRITESHEET_TEMPLATE.format(
         preamble=CHAR_STYLE_PREAMBLE,
         name=name,
         description=description,
         idle_desc=weapon_idle_desc,
         attack_desc=weapon_attack_desc,
+        n_cols=n_cols,
+        n_rows=n_rows,
+        total_cells=total_cells,
+        grid_coordinates=grid_coordinates,
     )
 
 
@@ -522,11 +542,3 @@ def build_character_prompt(
     )
 
 
-def build_reference_prompt(direction: str, config: dict) -> str:
-    """Build a follow-up prompt that references a previously generated sprite."""
-    return REFERENCE_FOLLOW_UP.format(
-        preamble=CHAR_STYLE_PREAMBLE,
-        direction_desc=DIRECTION_LABELS[direction],
-        width=config["sprites"]["base_width"],
-        height=config["sprites"]["base_height"],
-    )

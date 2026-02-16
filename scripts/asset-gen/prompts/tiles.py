@@ -22,7 +22,10 @@ TILE_STYLE_PREAMBLE = (
     "Art style: detailed pre-rendered 3D look with visible grit and texture — "
     "like original Fallout 2 tiles. NOT flat cartoon or pixel art. "
     "NO dark outlines or borders around the tile edges. "
-    "The tile must be a perfect isometric diamond shape on a transparent background. "
+    "The tile must be a perfect isometric diamond shape on a pure bright GREEN "
+    "(#00FF00) chroma key background. Fill ALL space outside the diamond with "
+    "solid RGB(0,255,0) green. DO NOT use transparent, checkered, gray, or white backgrounds. "
+    "Tile edges should have a soft 1-2 pixel anti-aliased blend into the green. "
 )
 
 GROUND_TILE_TEMPLATE = (
@@ -48,7 +51,7 @@ WALL_TILE_TEMPLATE = (
     "Show the wall from the standard isometric 3/4 view with visible front and top faces. "
     "The wall should look weathered and post-apocalyptic — damaged, patched, or deteriorating. "
     "Variation #{variant_num} — visually distinct but same material. "
-    "Transparent background. No text, no labels, no watermarks."
+    "Pure bright GREEN (#00FF00) chroma key background. No text, no labels, no watermarks."
 )
 
 TERRAIN_FEATURE_TEMPLATE = (
@@ -56,7 +59,8 @@ TERRAIN_FEATURE_TEMPLATE = (
     "This is a TERRAIN FEATURE tile ({width}x{height} pixels, isometric). "
     "Subject: {description}. "
     "This is an object or feature placed on top of ground tiles. "
-    "It should have a transparent background so it can be composited over ground tiles. "
+    "Pure bright GREEN (#00FF00) chroma key background — software will replace it "
+    "with transparency for compositing over ground tiles. "
     "Maintain consistent isometric perspective and post-apocalyptic styling. "
     "Variation #{variant_num}. "
     "No text, no labels, no watermarks."
@@ -88,15 +92,14 @@ TERRAIN_TEXTURE_TEMPLATE = (
     "{preamble}"
     "Generate a SEAMLESS TILEABLE terrain texture.\n\n"
     "TERRAIN TYPE: {terrain_name} — {description}\n\n"
-    "IMAGE SIZE: 1024 × 1024 pixels.\n\n"
-    "The ENTIRE image must be filled with terrain surface — NO diamonds, "
-    "NO transparent areas, NO green backgrounds. This is a flat rectangular "
-    "texture that will be used as a repeating tile pattern.\n\n"
+    "The output is a square image. The ENTIRE image must be filled with terrain "
+    "surface — NO diamonds, NO transparent areas, NO green backgrounds. "
+    "This is a flat rectangular texture that will be used as a repeating tile pattern.\n\n"
     "CRITICAL RULES:\n"
     "- SEAMLESS TILING: the left edge must match the right edge perfectly,\n"
     "  and the top edge must match the bottom edge perfectly, so the texture\n"
     "  can repeat infinitely without visible seams.\n"
-    "- Fill the ENTIRE 1024×1024 area with terrain surface detail.\n"
+    "- Fill the ENTIRE image area with terrain surface detail.\n"
     "- NO diamond shapes, NO transparent background, NO green background.\n"
     "- Consistent isometric 3/4 perspective across the entire texture.\n"
     "- Natural-looking variation: {detail_notes}\n"
@@ -109,8 +112,7 @@ WATER_TEXTURE_TEMPLATE = (
     "{preamble}"
     "Generate 4 SEAMLESS TILEABLE water animation frames.\n\n"
     "WATER STYLE: {description}\n\n"
-    "IMAGE SIZE: 1024 × 1024 pixels.\n"
-    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "The output is a square image divided into a 2×2 grid of 4 equal cells.\n\n"
     "Each cell is a rectangular water surface texture (NOT a diamond).\n"
     "The 4 frames show a LOOPING water animation sequence:\n"
     "  Frame 1 (top-left): Calm water, subtle small ripples beginning\n"
@@ -118,7 +120,7 @@ WATER_TEXTURE_TEMPLATE = (
     "  Frame 3 (bottom-left): Waves at peak, surface most disturbed\n"
     "  Frame 4 (bottom-right): Waves receding, settling back to calm\n\n"
     "CRITICAL RULES:\n"
-    "- Each frame FILLS its entire 512×512 cell — NO diamonds, NO transparency\n"
+    "- Each frame FILLS its entire cell — NO diamonds, NO transparency\n"
     "- Each frame must be SEAMLESSLY TILEABLE (edges match when repeated)\n"
     "- SAME water color and style in all 4 frames — only ripple pattern changes\n"
     "- Changes between frames should be SUBTLE but VISIBLE for smooth animation\n"
@@ -171,11 +173,10 @@ TERRAIN_VARIANT_SHEET_TEMPLATE = (
     "{preamble}"
     "Generate a TERRAIN VARIANT SHEET with 4 isometric tile variants.\n\n"
     "TERRAIN TYPE: {terrain_name} — {description}\n\n"
-    "IMAGE SIZE: 1024 × 1024 pixels.\n"
-    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "The output is a square image divided into a 2×2 grid of 4 equal cells.\n\n"
     "Each cell contains ONE isometric diamond tile:\n"
-    "- The diamond shape is approximately 512 wide × 256 tall (2:1 ratio)\n"
-    "- Centered within its 512×512 cell\n"
+    "- The diamond shape uses 2:1 width-to-height ratio\n"
+    "- Centered within its cell\n"
     "- Pure GREEN (#00FF00) background behind and around each diamond\n\n"
     "All 4 tiles are the SAME terrain type but with DIFFERENT visual details:\n"
     "  Cell 1 (top-left): {v1}\n"
@@ -198,11 +199,10 @@ WATER_ANIMATION_SHEET_TEMPLATE = (
     "{preamble}"
     "Generate an ANIMATED WATER TILE SHEET with 4 animation frames.\n\n"
     "WATER STYLE: {description}\n\n"
-    "IMAGE SIZE: 1024 × 1024 pixels.\n"
-    "GRID: 2 columns × 2 rows = 4 cells, each 512 × 512 pixels.\n\n"
+    "The output is a square image divided into a 2×2 grid of 4 equal cells.\n\n"
     "Each cell contains ONE isometric diamond water tile:\n"
-    "- Diamond shape: approximately 512 wide × 256 tall (2:1 ratio)\n"
-    "- Centered within its 512×512 cell\n"
+    "- Diamond shape uses 2:1 width-to-height ratio\n"
+    "- Centered within its cell\n"
     "- Pure GREEN (#00FF00) background behind and around each diamond\n\n"
     "The 4 frames show a LOOPING water animation sequence:\n"
     "  Frame 1 (top-left): Calm water, subtle small ripples beginning to form\n"
@@ -373,38 +373,8 @@ def build_water_animation_sheet_prompt(config: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Legacy prompts (kept for backwards compatibility)
+# Item icon sheet — generates all item/weapon icons in a single row image
 # ---------------------------------------------------------------------------
-
-# --- Tile Set Sheet (all variants in one image) ---
-
-TILE_SET_PREAMBLE = (
-    "Create an isometric TILE SET in the style of Fallout 2 "
-    "(1998, Black Isle Studios). "
-    "Use a muted, desaturated post-apocalyptic color palette with earthy browns, "
-    "rust oranges, dusty yellows, and faded greens. "
-    "Art style: detailed pre-rendered 3D look with gritty, weathered texture — "
-    "NOT flat cartoon or pixel art. NO dark outlines on tile edges. "
-    "Each tile is a perfect isometric diamond on a transparent background. "
-)
-
-TILE_SET_TEMPLATE = (
-    "{preamble}"
-    "Generate a TILE SET SHEET with {count} tile variants in a single row.\n\n"
-    "LAYOUT: {count} tiles arranged horizontally, each {width}x{height} pixels.\n"
-    "Total image size: {sheet_w}x{height} pixels.\n\n"
-    "Subject: {description}.\n"
-    "Each variant should be visually distinct but clearly the same terrain type.\n"
-    "Variations can include different crack patterns, debris placement, color shifts, etc.\n\n"
-    "Tiles from left to right:\n{variant_list}\n\n"
-    "RULES:\n"
-    "- Every tile must be an isometric diamond shape\n"
-    "- Transparent background around each diamond\n"
-    "- Consistent perspective (top-down 3/4 view)\n"
-    "- Tiles MUST seamlessly connect: edges should fade to neutral earth tones\n"
-    "- Concentrate detail in the CENTER; the outer 20% of edges should be soft/blended\n"
-    "- No text, no labels, no watermarks, no grid lines\n"
-)
 
 ITEM_SET_TEMPLATE = (
     "Create an INVENTORY ICON SHEET in the style of Fallout 2 "
@@ -417,7 +387,8 @@ ITEM_SET_TEMPLATE = (
     "Items from left to right:\n{item_list}\n\n"
     "RULES:\n"
     "- Each item centered in its {size}x{size} cell with ~10%% padding on all sides\n"
-    "- Transparent background — NO ground, NO shadows\n"
+    "- Pure bright GREEN (#00FF00) chroma key background — NOT transparent, NOT checkered\n"
+    "- Fill ALL empty space with solid RGB(0,255,0) green\n"
     "- NO dark outlines or borders around items\n"
     "- Items look worn, used, and weathered\n"
     "- Slightly angled top-down perspective, like items on a table\n"
@@ -455,45 +426,6 @@ def build_terrain_prompt(description: str, variant_num: int, config: dict) -> st
         height=config["tiles"]["base_height"],
         description=description,
         variant_num=variant_num,
-    )
-
-
-def build_tileset_prompt(
-    description: str,
-    count: int,
-    config: dict,
-    variant_descriptions: list[str] | None = None,
-) -> str:
-    """Build a prompt for generating a tile set sheet (all variants in one image).
-
-    Args:
-        description: Base terrain description.
-        count: Number of tile variants.
-        config: Config dict.
-        variant_descriptions: Optional per-variant descriptions. If None,
-            generates generic "Variant N" descriptions.
-    """
-    width = config["tiles"]["base_width"]
-    height = config["tiles"]["base_height"]
-
-    if variant_descriptions:
-        variant_list = "\n".join(
-            f"  {i + 1}. {desc}" for i, desc in enumerate(variant_descriptions)
-        )
-    else:
-        variant_list = "\n".join(
-            f"  {i + 1}. Variation {i + 1} of {description}"
-            for i in range(count)
-        )
-
-    return TILE_SET_TEMPLATE.format(
-        preamble=TILE_SET_PREAMBLE,
-        count=count,
-        width=width,
-        height=height,
-        sheet_w=width * count,
-        description=description,
-        variant_list=variant_list,
     )
 
 

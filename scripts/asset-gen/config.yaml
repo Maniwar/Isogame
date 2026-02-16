@@ -53,11 +53,12 @@ palette:
 
 # Resolution and tile geometry
 tiles:
-  base_width: 128        # Tile width in pixels
+  base_width: 128        # Tile width in pixels (legacy individual tiles)
   base_height: 64        # Tile height in pixels (2:1 ratio for isometric)
   wall_height: 128       # Additional height for wall tiles
+  image_size: "1K"       # API parameter: "1K" (1024), "2K" (2048), "4K" (4096)
   format: "png"
-  transparent_bg: true   # Use transparent backgrounds for compositing
+  background: "chroma_key"  # Green #00FF00 chroma key (Gemini has no alpha support)
 
 sprites:
   base_width: 64         # Final frame width after post-processing
@@ -87,29 +88,34 @@ sprites:
     - "E"
     - "SE"
   format: "png"
-  transparent_bg: true
+  background: "chroma_key"
 
 items:
   icon_size: 64          # Square icons for inventory
+  image_size: "1K"       # API parameter for generation resolution
   format: "png"
-  transparent_bg: true
+  background: "chroma_key"
 
 objects:
   size: 256              # Square object sprites (downscaled at render time)
+  image_size: "1K"       # API parameter: "1K" for single objects, sheets
   format: "png"
-  transparent_bg: true
+  background: "chroma_key"
 
 portraits:
   width: 200
   height: 200
+  image_size: "1K"       # API parameter for generation resolution
   format: "png"
+  background: "solid"    # Dark brown RGB(60,45,30) — not transparent
 
 # Gemini API settings
 api:
   model: "gemini-3-pro-image-preview"  # Supports 2K/4K output with image_size param
-  requests_per_minute: 10        # Rate limiting
+  requests_per_minute: 15         # Rate limit — actual bottleneck is API latency (~15-30s/call)
   retry_attempts: 3
   retry_delay_seconds: 5
+  call_timeout_seconds: 120       # Per-call timeout — skip hung calls instead of blocking
   output_format: "png"
 
 # Batch definitions for proof-of-concept

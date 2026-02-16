@@ -29,6 +29,7 @@ Environment:
 import argparse
 import io
 import os
+import signal
 import sys
 import time
 from pathlib import Path
@@ -54,7 +55,6 @@ from prompts.tiles import (
     build_ground_prompt,
     build_wall_prompt,
     build_terrain_prompt,
-    build_tileset_prompt,
     build_itemset_prompt,
     build_terrain_variant_sheet_prompt,
     build_water_animation_sheet_prompt,
@@ -69,10 +69,6 @@ from prompts.characters import (
     CHARACTER_ARCHETYPES,
     DIRECTIONS,
 )
-from prompts.weapons import (
-    build_weapon_spritesheet_prompt,
-    WEAPON_ARCHETYPES,
-)
 from prompts.items import build_item_prompt, ITEM_CATALOG
 from prompts.portraits import build_portrait_prompt, NPC_PORTRAITS
 from prompts.objects import build_object_prompt, build_object_sheet_prompt, OBJECT_CATALOG
@@ -80,6 +76,13 @@ from prompts.objects import build_object_prompt, build_object_sheet_prompt, OBJE
 SCRIPT_DIR = Path(__file__).parent
 CONFIG_PATH = SCRIPT_DIR / "config.yaml"
 OUTPUT_DIR = SCRIPT_DIR / "output"
+
+# Prepended to prompts when reference images are provided
+REFERENCE_PREAMBLE = (
+    "Use these reference images as a style guide. "
+    "Match their art style, color palette, and level of detail:"
+)
+REFERENCE_TRANSITION = "Now generate the following new asset in the same style:"
 
 
 def load_config() -> dict:
@@ -97,6 +100,7 @@ def generate_image(
     client: genai.Client,
     prompt: str,
     model: str,
+    config: dict,
     reference_images: list | None = None,
     image_size: str | None = None,
 ) -> Image.Image | None:
@@ -107,9 +111,10 @@ def generate_image(
         client: Gemini API client.
         prompt: The text prompt describing the image.
         model: Model name to use.
+        config: Pipeline config dict (for retry settings).
         reference_images: Optional list of PIL Images to use as style references.
         image_size: Output resolution tier — "1K", "2K", or "4K".
-                    Supported by gemini-3-pro-image-preview and imagen-4.
+                    Supported by gemini-3-pro-image-preview.
                     If None, the model uses its default (typically 1K).
 
     Returns:
@@ -119,24 +124,27 @@ def generate_image(
 
     # Add reference images if provided (for style consistency)
     if reference_images:
-        contents.append("Use these reference images as a style guide. "
-                        "Match their art style, color palette, and level of detail:")
+        contents.append(REFERENCE_PREAMBLE)
         for ref_img in reference_images:
             contents.append(ref_img)
-        contents.append("Now generate the following new asset in the same style:")
+        contents.append(REFERENCE_TRANSITION)
 
     contents.append(prompt)
 
-    config = load_config()
     retry_attempts = config.get("api", {}).get("retry_attempts", 3)
     retry_delay = config.get("api", {}).get("retry_delay_seconds", 5)
+    call_timeout = config.get("api", {}).get("call_timeout_seconds", 120)
 
     # Build image config with resolution tier if specified
     image_config = None
     if image_size:
         image_config = types.ImageConfig(
             image_size=image_size,
+            aspect_ratio="1:1",
         )
+
+    def _timeout_handler(signum, frame):
+        raise TimeoutError("API call timed out")
 
     for attempt in range(1, retry_attempts + 1):
         try:
@@ -146,11 +154,23 @@ def generate_image(
             if image_config:
                 gen_config.image_config = image_config
 
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=gen_config,
-            )
+            # Set per-call timeout (Unix only; ignored on Windows)
+            old_handler = None
+            if hasattr(signal, "SIGALRM"):
+                old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+                signal.alarm(call_timeout)
+
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=contents,
+                    config=gen_config,
+                )
+            finally:
+                if hasattr(signal, "SIGALRM"):
+                    signal.alarm(0)  # Cancel timeout
+                    if old_handler is not None:
+                        signal.signal(signal.SIGALRM, old_handler)
 
             # Extract image from response parts
             if response.candidates:
@@ -170,6 +190,14 @@ def generate_image(
                 time.sleep(retry_delay)
                 continue
             return None
+
+        except TimeoutError:
+            print(f"  TIMEOUT: API call exceeded {call_timeout}s (attempt {attempt}/{retry_attempts})")
+            if attempt < retry_attempts:
+                print(f"  Retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                return None
 
         except Exception as e:
             print(f"  ERROR (attempt {attempt}/{retry_attempts}): {e}")
@@ -223,10 +251,11 @@ def rate_limit(rpm: int) -> None:
 # ---------------------------------------------------------------------------
 
 def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
-                   reference_images: list) -> int:
+                   reference_images: list, skip_existing: bool = False) -> int:
     """Generate all tile batches defined in config."""
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["tiles"].get("image_size", "1K")
     generated = 0
 
     for batch_name in ("ground_tiles", "wall_tiles", "terrain_tiles"):
@@ -241,6 +270,11 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
             for i in range(1, variant["count"] + 1):
                 filename = f"{variant['name']}-{i:02d}.png"
                 output_path = OUTPUT_DIR / category / filename
+
+                if skip_existing and output_path.exists():
+                    print(f"  SKIP (exists): {filename}")
+                    generated += 1
+                    continue
 
                 # Choose the right prompt builder
                 if "ground" in batch_name:
@@ -257,7 +291,7 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
                     continue
 
                 print(f"  Generating: {filename}")
-                image = generate_image(client, prompt, model, reference_images)
+                image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
                 if image:
                     save_image(image, output_path)
                     generated += 1
@@ -267,20 +301,21 @@ def generate_tiles(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
-                         reference_images: list) -> int:
+                         reference_images: list, skip_existing: bool = False) -> int:
     """Generate terrain variant sheets — 4 variants per terrain in a 2×2 grid.
 
-    Each terrain type produces a single 1024×1024 image containing 4 isometric
-    diamond tile variants.  Water gets a special animation sheet with 4 frames.
-    Uses image_size="1K" for 1024×1024 output.
+    Each terrain type produces a single image containing 4 isometric diamond
+    tile variants. Water gets a special animation sheet with 4 frames.
+    Resolution controlled by config tiles.image_size.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["tiles"].get("image_size", "1K")
     generated = 0
 
     sheets_dir = OUTPUT_DIR / "tiles" / "sheets"
 
-    print(f"\n--- Generating terrain variant sheets ({len(TERRAIN_ARCHETYPES)} terrain + water) ---")
+    print(f"\n--- Generating terrain variant sheets ({len(TERRAIN_ARCHETYPES)} terrain + water, image_size={image_size}) ---")
 
     # Generate each terrain type's 4-variant sheet
     for archetype in TERRAIN_ARCHETYPES:
@@ -288,16 +323,21 @@ def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
         filename = f"{key}-sheet.png"
         output_path = sheets_dir / filename
 
+        if skip_existing and output_path.exists():
+            print(f"  SKIP (exists): {filename}")
+            generated += 1
+            continue
+
         prompt = build_terrain_variant_sheet_prompt(archetype, config)
 
         if dry_run:
-            print(f"  [DRY RUN] {filename} (4 variants, 1024×1024, image_size=1K)")
+            print(f"  [DRY RUN] {filename} (4 variants, image_size={image_size})")
             print(f"    Prompt: {prompt[:200]}...")
             generated += 1
             continue
 
         print(f"  Generating: {filename} (4 variants of {archetype['terrain_name']})")
-        image = generate_image(client, prompt, model, reference_images, image_size="1K")
+        image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
@@ -306,15 +346,19 @@ def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
     # Generate animated water sheet (4 animation frames)
     water_filename = "water-sheet.png"
     water_path = sheets_dir / water_filename
-    water_prompt = build_water_animation_sheet_prompt(config)
 
-    if dry_run:
-        print(f"  [DRY RUN] {water_filename} (4 anim frames, 1024×1024, image_size=1K)")
+    if skip_existing and water_path.exists():
+        print(f"  SKIP (exists): {water_filename}")
+        generated += 1
+    elif dry_run:
+        water_prompt = build_water_animation_sheet_prompt(config)
+        print(f"  [DRY RUN] {water_filename} (4 anim frames, image_size={image_size})")
         print(f"    Prompt: {water_prompt[:200]}...")
         generated += 1
     else:
+        water_prompt = build_water_animation_sheet_prompt(config)
         print(f"  Generating: {water_filename} (4 animation frames)")
-        image = generate_image(client, water_prompt, model, reference_images, image_size="1K")
+        image = generate_image(client, water_prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, water_path)
             generated += 1
@@ -324,40 +368,46 @@ def generate_tile_sheets(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_terrain_textures(client: genai.Client, config: dict, dry_run: bool,
-                              reference_images: list) -> int:
+                              reference_images: list, skip_existing: bool = False) -> int:
     """Generate seamless rectangular terrain textures (preferred format).
 
-    Each terrain type produces a single 1024×1024 seamless tileable texture.
-    These are full rectangular images — no diamond shapes, no transparency.
-    The game engine uses them as repeating CanvasPattern fills clipped to
-    isometric diamonds at render time, creating a cohesive landscape.
+    Each terrain type produces a seamless tileable texture. Resolution
+    controlled by config tiles.image_size. These are full rectangular
+    images — no diamond shapes, no transparency. The game engine uses
+    them as repeating CanvasPattern fills clipped to isometric diamonds
+    at render time, creating a cohesive landscape.
 
-    Water produces a 2×2 grid of 4 animation frames (same sheet layout
-    as tile_sheets, but rectangular fills instead of diamonds).
+    Water produces a 2×2 grid of 4 animation frames.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["tiles"].get("image_size", "1K")
     generated = 0
 
     textures_dir = OUTPUT_DIR / "tiles" / "textures"
 
-    print(f"\n--- Generating terrain textures ({len(TERRAIN_ARCHETYPES)} terrain + water) ---")
+    print(f"\n--- Generating terrain textures ({len(TERRAIN_ARCHETYPES)} terrain + water, image_size={image_size}) ---")
 
     for archetype in TERRAIN_ARCHETYPES:
         key = archetype["key"]
         filename = f"{key}-texture.png"
         output_path = textures_dir / filename
 
+        if skip_existing and output_path.exists():
+            print(f"  SKIP (exists): {filename}")
+            generated += 1
+            continue
+
         prompt = build_terrain_texture_prompt(archetype, config)
 
         if dry_run:
-            print(f"  [DRY RUN] {filename} (1024×1024, seamless texture)")
+            print(f"  [DRY RUN] {filename} (seamless texture, image_size={image_size})")
             print(f"    Prompt: {prompt[:200]}...")
             generated += 1
             continue
 
         print(f"  Generating: {filename} ({archetype['terrain_name']})")
-        image = generate_image(client, prompt, model, reference_images, image_size="1K")
+        image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
@@ -366,15 +416,19 @@ def generate_terrain_textures(client: genai.Client, config: dict, dry_run: bool,
     # Generate animated water texture (4 frames in 2×2 grid)
     water_filename = "water-texture.png"
     water_path = textures_dir / water_filename
-    water_prompt = build_water_texture_prompt(config)
 
-    if dry_run:
-        print(f"  [DRY RUN] {water_filename} (1024×1024, 4 frames)")
+    if skip_existing and water_path.exists():
+        print(f"  SKIP (exists): {water_filename}")
+        generated += 1
+    elif dry_run:
+        water_prompt = build_water_texture_prompt(config)
+        print(f"  [DRY RUN] {water_filename} (4 frames, image_size={image_size})")
         print(f"    Prompt: {water_prompt[:200]}...")
         generated += 1
     else:
+        water_prompt = build_water_texture_prompt(config)
         print(f"  Generating: {water_filename} (4 animation frames)")
-        image = generate_image(client, water_prompt, model, reference_images, image_size="1K")
+        image = generate_image(client, water_prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, water_path)
             generated += 1
@@ -384,7 +438,8 @@ def generate_terrain_textures(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_characters(client: genai.Client, config: dict, dry_run: bool,
-                        reference_images: list, use_sheets: bool = True) -> int:
+                        reference_images: list, use_sheets: bool = True,
+                        skip_existing: bool = False) -> int:
     """Generate character sprites — either as full sprite sheets or individual images.
 
     When use_sheets=True (default), generates one 8×8 sprite sheet per character:
@@ -416,6 +471,17 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
             filename = f"{sprite_key}-sheet.png"
             output_path = char_dir / filename
 
+            if skip_existing and output_path.exists():
+                print(f"    SKIP (exists): {filename}")
+                # Load the existing sheet for cross-referencing
+                if base_key not in base_reference_sheets:
+                    try:
+                        base_reference_sheets[base_key] = Image.open(output_path)
+                    except Exception:
+                        pass
+                generated += 1
+                continue
+
             prompt = build_spritesheet_prompt(
                 name=char["name"],
                 description=char["description"],
@@ -443,7 +509,7 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                 char_refs.append(base_reference_sheets[base_key])
 
             print(f"    Generating sprite sheet: {filename} ({sheet_size}×{sheet_size}px)")
-            image = generate_image(client, prompt, model, char_refs if char_refs else None, image_size=image_size)
+            image = generate_image(client, prompt, model, config, char_refs if char_refs else None, image_size=image_size)
             if image:
                 save_image(image, output_path)
                 generated += 1
@@ -456,6 +522,11 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
             for direction in DIRECTIONS:
                 filename = f"{sprite_key}-{direction.lower()}.png"
                 output_path = char_dir / filename
+
+                if skip_existing and output_path.exists():
+                    print(f"    SKIP (exists): {filename}")
+                    generated += 1
+                    continue
 
                 prompt = build_character_prompt(
                     name=char["name"],
@@ -471,7 +542,7 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
                     continue
 
                 print(f"    Generating: {filename} ({direction})")
-                image = generate_image(client, prompt, model, reference_images)
+                image = generate_image(client, prompt, model, config, reference_images)
                 if image:
                     save_image(image, output_path)
                     generated += 1
@@ -480,73 +551,26 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
-def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
-                     reference_images: list) -> int:
-    """Generate weapon overlay sprite sheets.
-
-    Each weapon gets an 8×8 sprite sheet (2048×2048, 256×256 per cell)
-    showing only the weapon + hands, designed to overlay on character sprites.
-
-    NOTE: Weapon overlays are currently unused — the game uses weapon-variant
-    character sprites instead. Kept for potential future use.
-    """
-    model = config["api"]["model"]
-    rpm = config["api"]["requests_per_minute"]
-    image_size = config["sprites"].get("image_size")
-    generated = 0
-
-    sheet_size = config["sprites"].get("sheet_size", 2048)
-    n_cols = config["sprites"].get("sheet_cols", 8)
-    n_rows = config["sprites"].get("sheet_rows", 8)
-
-    print(f"\n--- Generating weapon overlay sprites ({len(WEAPON_ARCHETYPES)} weapons) ---")
-
-    for weapon in WEAPON_ARCHETYPES:
-        sprite_key = weapon["sprite_key"]
-        weapon_dir = OUTPUT_DIR / "weapons" / sprite_key
-        print(f"\n  Weapon: {weapon['name']} (sprite_key: {sprite_key})")
-
-        filename = f"{sprite_key}-sheet.png"
-        output_path = weapon_dir / filename
-
-        prompt = build_weapon_spritesheet_prompt(
-            name=weapon["name"],
-            description=weapon["description"],
-            attack_desc=weapon["attack_desc"],
-            config=config,
-            idle_desc=weapon.get("idle_desc", "weapon held at rest, relaxed grip"),
-        )
-
-        if dry_run:
-            print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
-            print(f"    Prompt: {prompt[:200]}...")
-            generated += 1
-            continue
-
-        print(f"    Generating weapon sheet: {filename} ({sheet_size}×{sheet_size}px)")
-        image = generate_image(client, prompt, model, reference_images, image_size=image_size)
-        if image:
-            save_image(image, output_path)
-            generated += 1
-        rate_limit(rpm)
-
-    return generated
-
-
 def generate_items(client: genai.Client, config: dict, dry_run: bool,
-                   reference_images: list) -> int:
+                   reference_images: list, skip_existing: bool = False) -> int:
     """Generate inventory item icons."""
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["items"].get("image_size", "1K")
     generated = 0
 
-    print(f"\n--- Generating item icons ({len(ITEM_CATALOG)} items) ---")
+    print(f"\n--- Generating item icons ({len(ITEM_CATALOG)} items, image_size={image_size}) ---")
 
     for item in ITEM_CATALOG:
         cat_dir = OUTPUT_DIR / "items" / item["category"]
         icon_key = item.get("icon_key", item["name"].lower().replace(" ", "-"))
         filename = f"{icon_key}.png"
         output_path = cat_dir / filename
+
+        if skip_existing and output_path.exists():
+            print(f"  SKIP (exists): {filename}")
+            generated += 1
+            continue
 
         prompt = build_item_prompt(item["name"], item["description"], config)
 
@@ -556,7 +580,7 @@ def generate_items(client: genai.Client, config: dict, dry_run: bool,
             continue
 
         print(f"  Generating: {filename}")
-        image = generate_image(client, prompt, model, reference_images)
+        image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
@@ -566,17 +590,23 @@ def generate_items(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
-                       reference_images: list) -> int:
+                       reference_images: list, skip_existing: bool = False) -> int:
     """Generate NPC dialogue portraits."""
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["portraits"].get("image_size", "1K")
     generated = 0
 
-    print(f"\n--- Generating NPC portraits ({len(NPC_PORTRAITS)} portraits) ---")
+    print(f"\n--- Generating NPC portraits ({len(NPC_PORTRAITS)} portraits, image_size={image_size}) ---")
 
     for npc in NPC_PORTRAITS:
         filename = f"{npc['name'].lower().replace(' ', '-')}.png"
         output_path = OUTPUT_DIR / "portraits" / filename
+
+        if skip_existing and output_path.exists():
+            print(f"  SKIP (exists): {filename}")
+            generated += 1
+            continue
 
         prompt = build_portrait_prompt(
             name=npc["name"],
@@ -591,7 +621,7 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
             continue
 
         print(f"  Generating: {filename}")
-        image = generate_image(client, prompt, model, reference_images)
+        image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
         if image:
             save_image(image, output_path)
             generated += 1
@@ -601,17 +631,19 @@ def generate_portraits(client: genai.Client, config: dict, dry_run: bool,
 
 
 def generate_objects(client: genai.Client, config: dict, dry_run: bool,
-                     reference_images: list) -> int:
+                     reference_images: list, skip_existing: bool = False) -> int:
     """Generate environmental object sprites for map decoration.
 
-    Each object produces a transparent-background PNG at 256×256 (or config size).
-    Objects with variant lists generate a multi-variant sheet (1024×1024).
+    Each object produces a chroma-key PNG at config size.
+    Objects with variant lists generate a multi-variant sheet.
+    Resolution controlled by config objects.image_size.
     """
     model = config["api"]["model"]
     rpm = config["api"]["requests_per_minute"]
+    image_size = config["objects"].get("image_size", "1K")
     generated = 0
 
-    print(f"\n--- Generating environmental objects ({len(OBJECT_CATALOG)} objects) ---")
+    print(f"\n--- Generating environmental objects ({len(OBJECT_CATALOG)} objects, image_size={image_size}) ---")
 
     for obj in OBJECT_CATALOG:
         key = obj["key"]
@@ -620,9 +652,14 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
 
         variants = obj.get("variants")
         if variants:
-            # Generate variant sheet (2×2 grid at 1024×1024)
+            # Generate variant sheet (2×2 grid)
             filename = f"{key}-sheet.png"
             output_path = obj_dir / filename
+
+            if skip_existing and output_path.exists():
+                print(f"  SKIP (exists): {filename}")
+                generated += 1
+                continue
 
             prompt = build_object_sheet_prompt(
                 name=obj["name"],
@@ -638,7 +675,7 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
                 continue
 
             print(f"  Generating: {filename} ({len(variants)} variants of {obj['name']})")
-            image = generate_image(client, prompt, model, reference_images, image_size="1K")
+            image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
             if image:
                 save_image(image, output_path)
                 generated += 1
@@ -647,6 +684,11 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
             # Generate single object
             filename = f"{key}.png"
             output_path = obj_dir / filename
+
+            if skip_existing and output_path.exists():
+                print(f"  SKIP (exists): {filename}")
+                generated += 1
+                continue
 
             prompt = build_object_prompt(
                 name=obj["name"],
@@ -661,7 +703,7 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
                 continue
 
             print(f"  Generating: {filename}")
-            image = generate_image(client, prompt, model, reference_images)
+            image = generate_image(client, prompt, model, config, reference_images, image_size=image_size)
             if image:
                 save_image(image, output_path)
                 generated += 1
@@ -675,14 +717,11 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
 # ---------------------------------------------------------------------------
 
 # Categories available for generation.
-# NOTE: "weapons" is kept for backwards compatibility but is deprecated.
-# Weapons are now generated as part of character sprite sheets (weapon variants).
 CATEGORY_MAP = {
     "tiles": generate_tiles,
     "tile_sheets": generate_tile_sheets,
     "terrain_textures": generate_terrain_textures,
     "characters": generate_characters,
-    "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
     "objects": generate_objects,
@@ -725,6 +764,11 @@ def main():
         "--no-sheets",
         action="store_true",
         help="Generate individual sprites instead of sprite sheets (legacy mode)",
+    )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip assets that already exist on disk (resume interrupted runs)",
     )
     args = parser.parse_args()
 
@@ -780,10 +824,13 @@ def main():
             print(f"Valid categories: {', '.join(CATEGORY_MAP.keys())}")
             sys.exit(1)
 
+    skip_existing = args.skip_existing
+
     print(f"=== Isogame Asset Generator ===")
     print(f"Model: {config['api']['model']}")
     print(f"Categories: {', '.join(categories)}")
     print(f"Dry run: {args.dry_run}")
+    print(f"Skip existing: {skip_existing}")
     print(f"Output: {OUTPUT_DIR}")
 
     for cat in categories:
@@ -791,9 +838,11 @@ def main():
             count = generate_characters(
                 client, config, args.dry_run, reference_images,
                 use_sheets=not args.no_sheets,
+                skip_existing=skip_existing,
             )
         else:
-            count = CATEGORY_MAP[cat](client, config, args.dry_run, reference_images)
+            count = CATEGORY_MAP[cat](client, config, args.dry_run, reference_images,
+                                      skip_existing=skip_existing)
         total += count
 
     # Check output directory for actual files
