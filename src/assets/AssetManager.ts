@@ -390,27 +390,25 @@ export class AssetManager {
         const terrain = Terrain[terrainName as keyof typeof Terrain];
         if (terrain === undefined) continue;
 
-        // Skip water: AI water textures have edge artifacts that create
-        // visible seams when tiled. Procedural animated water diamonds
-        // look better and the renderer handles them separately.
-        if (terrain === Terrain.Water) continue;
-
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
 
         // Replace procedural textures with AI-generated ones.
-        // The procedural textures were set during generateAllProcedural() but
-        // AI textures should take priority. Clear them so AI textures start at
-        // index 0 (which getTerrainPattern uses for the cached CanvasPattern).
         this.terrainTextures.set(terrain, []);
-        // Invalidate cached patterns for this terrain
         this.terrainPatterns.delete(terrain);
+        if (terrain === Terrain.Water) {
+          this.waterPatternCache.clear();
+        }
 
         for (const path of paths) {
           this.totalToLoad++;
           promises.push(
             this.loadImage(path).then((img) => {
               if (img) {
-                this.terrainTextures.get(terrain)!.push(img);
+                // Mirror-tile the texture to eliminate edge seams.
+                // Creates a 2x2 grid where adjacent copies are flipped,
+                // so edges always match their mirrored neighbor perfectly.
+                const seamless = this.makeMirrorTile(img);
+                this.terrainTextures.get(terrain)!.push(seamless);
                 this.loadedCount++;
               }
             }),
@@ -664,7 +662,42 @@ export class AssetManager {
   }
 
   /**
-   * Composite an AI tile onto the procedural base tile.
+   * Create a seamless mirror-tiled version of a texture.
+   * Draws the image in a 2x2 grid with alternating H/V flips so that
+   * edges always meet their mirror image — guaranteeing zero seams.
+   * The result is 2x the original size and tiles perfectly.
+   */
+  private makeMirrorTile(img: HTMLImageElement): HTMLCanvasElement {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const canvas = this.createCanvas(w * 2, h * 2);
+    const ctx = canvas.getContext("2d")!;
+
+    // Top-left: normal
+    ctx.drawImage(img, 0, 0);
+    // Top-right: flip horizontal
+    ctx.save();
+    ctx.translate(w * 2, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    // Bottom-left: flip vertical
+    ctx.save();
+    ctx.translate(0, h * 2);
+    ctx.scale(1, -1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    // Bottom-right: flip both
+    ctx.save();
+    ctx.translate(w * 2, h * 2);
+    ctx.scale(-1, -1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+
+    return canvas;
+  }
+
+  /**
    * Composite an AI tile onto the procedural base, clipped to the
    * isometric diamond so no rectangular overflow is visible.
    */

@@ -289,9 +289,8 @@ export class Renderer {
     // --- Terrain surface ---
     let drewTerrain = false;
 
-    // Use AI terrain texture patterns for non-water terrain.
-    // Water uses procedural diamond tiles to avoid seam artifacts.
-    if (assets.hasTerrainTextureMode() && tile.terrain !== Terrain.Water) {
+    // Use AI terrain texture patterns (mirror-tiled for seamless edges).
+    if (assets.hasTerrainTextureMode()) {
       const pattern = assets.getTerrainPattern(tile.terrain, ctx);
       if (pattern) {
         ctx.save();
@@ -370,6 +369,26 @@ export class Renderer {
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
+    // Try AI terrain texture pattern first (animated, mirror-tiled for no seams)
+    if (assets.hasTerrainTextureMode()) {
+      const pattern = assets.getTerrainPattern(Terrain.Water, ctx);
+      if (pattern) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(wx, wy - TILE_HALF_H);
+        ctx.lineTo(wx + TILE_HALF_W, wy);
+        ctx.lineTo(wx, wy + TILE_HALF_H);
+        ctx.lineTo(wx - TILE_HALF_W, wy);
+        ctx.closePath();
+        ctx.clip();
+        ctx.fillStyle = pattern;
+        ctx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+        ctx.restore();
+        return;
+      }
+    }
+
+    // Fallback: procedural diamond tile
     const sprite = assets.getTile(Terrain.Water, x, y, 0);
     if (sprite) {
       ctx.drawImage(sprite, wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
