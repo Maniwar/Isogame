@@ -156,6 +156,8 @@ export class AssetManager {
           console.log(`[AssetManager] Animation frames loaded for: ${animKeys.join(", ")}`);
           // Validate sprite dimensions at load time
           this.validateSpriteDimensions();
+          // Normalize frame sizes so all animations for a character are consistent
+          this.normalizeAnimFrames();
         }
         if (manifest.weapons) {
           const weaponKeys = Object.keys(manifest.weapons);
@@ -393,11 +395,7 @@ export class AssetManager {
         const paths = Array.isArray(pathOrPaths) ? pathOrPaths : [pathOrPaths];
 
         // Replace procedural textures with AI-generated ones.
-        // The procedural textures were set during generateAllProcedural() but
-        // AI textures should take priority. Clear them so AI textures start at
-        // index 0 (which getTerrainPattern uses for the cached CanvasPattern).
         this.terrainTextures.set(terrain, []);
-        // Invalidate cached patterns for this terrain
         this.terrainPatterns.delete(terrain);
         if (terrain === Terrain.Water) {
           this.waterPatternCache.clear();
@@ -408,7 +406,11 @@ export class AssetManager {
           promises.push(
             this.loadImage(path).then((img) => {
               if (img) {
-                this.terrainTextures.get(terrain)!.push(img);
+                // Mirror-tile the texture to eliminate edge seams.
+                // Creates a 2x2 grid where adjacent copies are flipped,
+                // so edges always match their mirrored neighbor perfectly.
+                const seamless = this.makeMirrorTile(img);
+                this.terrainTextures.get(terrain)!.push(seamless);
                 this.loadedCount++;
               }
             }),
@@ -634,6 +636,165 @@ export class AssetManager {
   }
 
   /**
+   * Normalize animation frames so all frames for a character have consistent
+   * content size and positioning. Fixes two issues:
+   *
+   * 1. Intra-character inconsistency: Some frames have wildly different content
+   *    sizes (e.g. raider idle=32x58 but walk_2=64x64) due to sprite sheet
+   *    slicing artifacts. This causes visible size jumping during animation.
+   *
+   * 2. Inter-character inconsistency: Player fills ~100% of 64x96 frame while
+   *    NPCs only fill ~60%. This makes NPCs look tiny next to the player.
+   *
+   * Strategy: For each character, compute the median content height across all
+   * frames. Replace outlier frames (content height deviates >25% from median)
+   * with the nearest "normal" frame. Then scale all frames so content fills
+   * a target proportion of the frame height.
+   */
+  private normalizeAnimFrames() {
+    const FRAME_W = 64;
+    const FRAME_H = 96;
+    const TARGET_CONTENT_H = 88; // Target: content fills ~92% of frame
+    const MIN_CONTENT_H = 40;    // Don't normalize very small/broken content
+
+    let charsNormalized = 0;
+    let framesFixed = 0;
+
+    for (const [spriteKey, anims] of this.animFrames) {
+      // Skip weapon variants (they share references with base)
+      if (AssetManager.WEAPON_SUFFIXES.some(s => spriteKey.endsWith(`_${s}`))) continue;
+
+      // Measure content bounds for every frame
+      type FrameInfo = {
+        animName: string; dir: string;
+        contentH: number; contentW: number; top: number; bottom: number;
+      };
+      const frameInfos: FrameInfo[] = [];
+
+      for (const [animName, dirMap] of anims) {
+        for (const [dir, img] of dirMap) {
+          const bounds = this.measureContent(img);
+          if (bounds) {
+            frameInfos.push({
+              animName, dir,
+              contentH: bounds.bottom - bounds.top,
+              contentW: bounds.right - bounds.left,
+              top: bounds.top, bottom: bounds.bottom,
+            });
+          }
+        }
+      }
+
+      if (frameInfos.length === 0) continue;
+
+      // Find median content height
+      const heights = frameInfos.map(f => f.contentH).sort((a, b) => a - b);
+      const medianH = heights[Math.floor(heights.length / 2)];
+
+      if (medianH < MIN_CONTENT_H) continue;
+
+      // Replace outlier frames (content height deviates >25% from median)
+      // with the idle frame for that direction (most stable pose)
+      const outlierThreshold = medianH * 0.25;
+      for (const [, dirMap] of anims) {
+        for (const [dir, img] of dirMap) {
+          const bounds = this.measureContent(img);
+          if (!bounds) continue;
+          const contentH = bounds.bottom - bounds.top;
+          if (Math.abs(contentH - medianH) > outlierThreshold) {
+            // Find idle frame for this direction as replacement
+            const idleDir = anims.get("idle");
+            const replacement = idleDir?.get(dir as Direction);
+            if (replacement && replacement !== img) {
+              dirMap.set(dir as Direction, replacement);
+              framesFixed++;
+            }
+          }
+        }
+      }
+
+      // Scale character content to fill target proportion of frame
+      if (medianH < TARGET_CONTENT_H * 0.85) {
+        const scale = TARGET_CONTENT_H / medianH;
+        for (const [, dirMap] of anims) {
+          for (const [dir, img] of dirMap) {
+            const normalized = this.scaleFrameContent(img, scale, FRAME_W, FRAME_H);
+            if (normalized) {
+              dirMap.set(dir as Direction, normalized);
+            }
+          }
+        }
+        charsNormalized++;
+      }
+    }
+
+    if (charsNormalized > 0 || framesFixed > 0) {
+      console.log(
+        `[AssetManager] Frame normalization: ${charsNormalized} characters scaled, ` +
+        `${framesFixed} outlier frames replaced`,
+      );
+    }
+  }
+
+  /** Measure the non-transparent content bounds of a sprite. */
+  private measureContent(img: DrawTarget): { top: number; bottom: number; left: number; right: number } | null {
+    const w = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
+    const h = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
+    if (w === 0 || h === 0) return null;
+
+    const canvas = this.createCanvas(w, h);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const data = ctx.getImageData(0, 0, w, h).data;
+
+    let top = h, bottom = 0, left = w, right = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (data[(y * w + x) * 4 + 3] > 10) {
+          if (y < top) top = y;
+          if (y + 1 > bottom) bottom = y + 1;
+          if (x < left) left = x;
+          if (x + 1 > right) right = x + 1;
+        }
+      }
+    }
+    if (bottom <= top) return null;
+    return { top, bottom, left, right };
+  }
+
+  /** Scale content within a frame to a new size, maintaining bottom-center alignment. */
+  private scaleFrameContent(
+    img: DrawTarget, scale: number, frameW: number, frameH: number,
+  ): HTMLCanvasElement | null {
+    const bounds = this.measureContent(img);
+    if (!bounds) return null;
+
+    const contentW = bounds.right - bounds.left;
+    const contentH = bounds.bottom - bounds.top;
+
+    // Extract content region
+    const extract = this.createCanvas(contentW, contentH);
+    const ectx = extract.getContext("2d")!;
+    ectx.drawImage(img, -bounds.left, -bounds.top);
+
+    // Scale content
+    const newW = Math.min(frameW, Math.round(contentW * scale));
+    const newH = Math.min(frameH, Math.round(contentH * scale));
+
+    // Place on new frame canvas: center horizontally, bottom-align
+    const canvas = this.createCanvas(frameW, frameH);
+    const ctx = canvas.getContext("2d")!;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+
+    const dx = Math.round((frameW - newW) / 2);
+    const dy = frameH - newH;
+    ctx.drawImage(extract, 0, 0, contentW, contentH, dx, dy, newW, newH);
+
+    return canvas;
+  }
+
+  /**
    * Register weapon variant aliases so that lookups like "player_pistol" resolve
    * to "player" animation/sprite data when per-weapon assets haven't been generated.
    * Once weapon-variant assets exist in the manifest, they take priority (already loaded).
@@ -662,7 +823,42 @@ export class AssetManager {
   }
 
   /**
-   * Composite an AI tile onto the procedural base tile.
+   * Create a seamless mirror-tiled version of a texture.
+   * Draws the image in a 2x2 grid with alternating H/V flips so that
+   * edges always meet their mirror image — guaranteeing zero seams.
+   * The result is 2x the original size and tiles perfectly.
+   */
+  private makeMirrorTile(img: HTMLImageElement): HTMLCanvasElement {
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    const canvas = this.createCanvas(w * 2, h * 2);
+    const ctx = canvas.getContext("2d")!;
+
+    // Top-left: normal
+    ctx.drawImage(img, 0, 0);
+    // Top-right: flip horizontal
+    ctx.save();
+    ctx.translate(w * 2, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    // Bottom-left: flip vertical
+    ctx.save();
+    ctx.translate(0, h * 2);
+    ctx.scale(1, -1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+    // Bottom-right: flip both
+    ctx.save();
+    ctx.translate(w * 2, h * 2);
+    ctx.scale(-1, -1);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+
+    return canvas;
+  }
+
+  /**
    * Composite an AI tile onto the procedural base, clipped to the
    * isometric diamond so no rectangular overflow is visible.
    */

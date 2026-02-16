@@ -128,6 +128,10 @@ export class Game {
 
     this.camera.centerOn(player.pos);
 
+    // Pre-render terrain layer to offscreen cache for performance.
+    // Must happen after assets.init() and map generation.
+    this.renderer.buildTerrainCache(this.state);
+
     if (Input.isTouchDevice()) {
       this.notify("Welcome to the Wasteland. Tap to move. Use buttons for actions.", "rgb(64, 192, 64)");
     } else {
@@ -239,13 +243,21 @@ export class Game {
     camera.follow(state.player.pos);
     camera.update();
 
-    state.notifications = state.notifications
-      .map((n) => ({ ...n, timeLeft: n.timeLeft - dt }))
-      .filter((n) => n.timeLeft > 0);
+    // Update notifications in-place to avoid per-frame allocations
+    for (let i = state.notifications.length - 1; i >= 0; i--) {
+      state.notifications[i].timeLeft -= dt;
+      if (state.notifications[i].timeLeft <= 0) {
+        state.notifications.splice(i, 1);
+      }
+    }
 
-    state.vfx = state.vfx
-      .map((v) => ({ ...v, timeLeft: v.timeLeft - dt }))
-      .filter((v) => v.timeLeft > 0);
+    // Update VFX in-place
+    for (let i = state.vfx.length - 1; i >= 0; i--) {
+      state.vfx[i].timeLeft -= dt;
+      if (state.vfx[i].timeLeft <= 0) {
+        state.vfx.splice(i, 1);
+      }
+    }
   }
 
   private updateExplore(dt: number) {
@@ -825,7 +837,7 @@ export class Game {
       this.dialogueUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this, this.assets);
     }
     if (this.state.phase === "inventory" || this.state.showInventory) {
-      this.inventoryUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this);
+      this.inventoryUI.draw(ctx, this.state, this.renderer.cssWidth, this.renderer.cssHeight, this, this.assets);
     }
     if (this.state.phase === "combat") {
       this.drawCombatUI(ctx);
