@@ -54,7 +54,6 @@ from prompts.tiles import (
     build_ground_prompt,
     build_wall_prompt,
     build_terrain_prompt,
-    build_tileset_prompt,
     build_itemset_prompt,
     build_terrain_variant_sheet_prompt,
     build_water_animation_sheet_prompt,
@@ -68,10 +67,6 @@ from prompts.characters import (
     build_spritesheet_prompt,
     CHARACTER_ARCHETYPES,
     DIRECTIONS,
-)
-from prompts.weapons import (
-    build_weapon_spritesheet_prompt,
-    WEAPON_ARCHETYPES,
 )
 from prompts.items import build_item_prompt, ITEM_CATALOG
 from prompts.portraits import build_portrait_prompt, NPC_PORTRAITS
@@ -480,59 +475,6 @@ def generate_characters(client: genai.Client, config: dict, dry_run: bool,
     return generated
 
 
-def generate_weapons(client: genai.Client, config: dict, dry_run: bool,
-                     reference_images: list) -> int:
-    """Generate weapon overlay sprite sheets.
-
-    Each weapon gets an 8×8 sprite sheet (2048×2048, 256×256 per cell)
-    showing only the weapon + hands, designed to overlay on character sprites.
-
-    NOTE: Weapon overlays are currently unused — the game uses weapon-variant
-    character sprites instead. Kept for potential future use.
-    """
-    model = config["api"]["model"]
-    rpm = config["api"]["requests_per_minute"]
-    image_size = config["sprites"].get("image_size")
-    generated = 0
-
-    sheet_size = config["sprites"].get("sheet_size", 2048)
-    n_cols = config["sprites"].get("sheet_cols", 8)
-    n_rows = config["sprites"].get("sheet_rows", 8)
-
-    print(f"\n--- Generating weapon overlay sprites ({len(WEAPON_ARCHETYPES)} weapons) ---")
-
-    for weapon in WEAPON_ARCHETYPES:
-        sprite_key = weapon["sprite_key"]
-        weapon_dir = OUTPUT_DIR / "weapons" / sprite_key
-        print(f"\n  Weapon: {weapon['name']} (sprite_key: {sprite_key})")
-
-        filename = f"{sprite_key}-sheet.png"
-        output_path = weapon_dir / filename
-
-        prompt = build_weapon_spritesheet_prompt(
-            name=weapon["name"],
-            description=weapon["description"],
-            attack_desc=weapon["attack_desc"],
-            config=config,
-            idle_desc=weapon.get("idle_desc", "weapon held at rest, relaxed grip"),
-        )
-
-        if dry_run:
-            print(f"    [DRY RUN] {filename} ({n_rows} anims x {n_cols} dirs = {n_rows*n_cols} frames, {sheet_size}×{sheet_size}px, image_size={image_size})")
-            print(f"    Prompt: {prompt[:200]}...")
-            generated += 1
-            continue
-
-        print(f"    Generating weapon sheet: {filename} ({sheet_size}×{sheet_size}px)")
-        image = generate_image(client, prompt, model, reference_images, image_size=image_size)
-        if image:
-            save_image(image, output_path)
-            generated += 1
-        rate_limit(rpm)
-
-    return generated
-
-
 def generate_items(client: genai.Client, config: dict, dry_run: bool,
                    reference_images: list) -> int:
     """Generate inventory item icons."""
@@ -675,14 +617,11 @@ def generate_objects(client: genai.Client, config: dict, dry_run: bool,
 # ---------------------------------------------------------------------------
 
 # Categories available for generation.
-# NOTE: "weapons" is kept for backwards compatibility but is deprecated.
-# Weapons are now generated as part of character sprite sheets (weapon variants).
 CATEGORY_MAP = {
     "tiles": generate_tiles,
     "tile_sheets": generate_tile_sheets,
     "terrain_textures": generate_terrain_textures,
     "characters": generate_characters,
-    "weapons": generate_weapons,
     "items": generate_items,
     "portraits": generate_portraits,
     "objects": generate_objects,

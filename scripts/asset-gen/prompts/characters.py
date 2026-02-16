@@ -258,16 +258,6 @@ SINGLE_DIRECTION_TEMPLATE = (
     "Just the character on a flat bright green background."
 )
 
-REFERENCE_FOLLOW_UP = (
-    "{preamble}"
-    "Generate the SAME character shown in the reference image, but now {direction_desc}. "
-    "Keep the exact same outfit, proportions, colors, and equipment. "
-    "Only change the viewing angle. "
-    "Sprite size: {width}x{height} pixels. "
-    "No text, no labels, no watermarks."
-)
-
-
 # ---------------------------------------------------------------------------
 # Character base appearances (without weapon — combined with WEAPON_VARIANTS)
 # ---------------------------------------------------------------------------
@@ -523,11 +513,3 @@ def build_character_prompt(
     )
 
 
-def build_reference_prompt(direction: str, config: dict) -> str:
-    """Build a follow-up prompt that references a previously generated sprite."""
-    return REFERENCE_FOLLOW_UP.format(
-        preamble=CHAR_STYLE_PREAMBLE,
-        direction_desc=DIRECTION_LABELS[direction],
-        width=config["sprites"]["base_width"],
-        height=config["sprites"]["base_height"],
-    )

@@ -377,39 +377,8 @@ def build_water_animation_sheet_prompt(config: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Legacy prompts (kept for backwards compatibility)
+# Item icon sheet — generates all item/weapon icons in a single row image
 # ---------------------------------------------------------------------------
-
-# --- Tile Set Sheet (all variants in one image) ---
-
-TILE_SET_PREAMBLE = (
-    "Create an isometric TILE SET in the style of Fallout 2 "
-    "(1998, Black Isle Studios). "
-    "Use a muted, desaturated post-apocalyptic color palette with earthy browns, "
-    "rust oranges, dusty yellows, and faded greens. "
-    "Art style: detailed pre-rendered 3D look with gritty, weathered texture — "
-    "NOT flat cartoon or pixel art. NO dark outlines on tile edges. "
-    "Each tile is a perfect isometric diamond on a pure bright GREEN (#00FF00) "
-    "chroma key background. Fill ALL space outside diamonds with solid green. "
-)
-
-TILE_SET_TEMPLATE = (
-    "{preamble}"
-    "Generate a TILE SET SHEET with {count} tile variants in a single row.\n\n"
-    "LAYOUT: {count} tiles arranged horizontally, each {width}x{height} pixels.\n"
-    "Total image size: {sheet_w}x{height} pixels.\n\n"
-    "Subject: {description}.\n"
-    "Each variant should be visually distinct but clearly the same terrain type.\n"
-    "Variations can include different crack patterns, debris placement, color shifts, etc.\n\n"
-    "Tiles from left to right:\n{variant_list}\n\n"
-    "RULES:\n"
-    "- Every tile must be an isometric diamond shape\n"
-    "- Pure bright GREEN (#00FF00) chroma key background around each diamond\n"
-    "- Consistent perspective (top-down 3/4 view)\n"
-    "- Tiles MUST seamlessly connect: edges should fade to neutral earth tones\n"
-    "- Concentrate detail in the CENTER; the outer 20% of edges should be soft/blended\n"
-    "- No text, no labels, no watermarks, no grid lines\n"
-)
 
 ITEM_SET_TEMPLATE = (
     "Create an INVENTORY ICON SHEET in the style of Fallout 2 "
@@ -461,45 +430,6 @@ def build_terrain_prompt(description: str, variant_num: int, config: dict) -> st
         height=config["tiles"]["base_height"],
         description=description,
         variant_num=variant_num,
-    )
-
-
-def build_tileset_prompt(
-    description: str,
-    count: int,
-    config: dict,
-    variant_descriptions: list[str] | None = None,
-) -> str:
-    """Build a prompt for generating a tile set sheet (all variants in one image).
-
-    Args:
-        description: Base terrain description.
-        count: Number of tile variants.
-        config: Config dict.
-        variant_descriptions: Optional per-variant descriptions. If None,
-            generates generic "Variant N" descriptions.
-    """
-    width = config["tiles"]["base_width"]
-    height = config["tiles"]["base_height"]
-
-    if variant_descriptions:
-        variant_list = "\n".join(
-            f"  {i + 1}. {desc}" for i, desc in enumerate(variant_descriptions)
-        )
-    else:
-        variant_list = "\n".join(
-            f"  {i + 1}. Variation {i + 1} of {description}"
-            for i in range(count)
-        )
-
-    return TILE_SET_TEMPLATE.format(
-        preamble=TILE_SET_PREAMBLE,
-        count=count,
-        width=width,
-        height=height,
-        sheet_w=width * count,
-        description=description,
-        variant_list=variant_list,
     )
 
 
