@@ -804,15 +804,25 @@ export class AssetManager {
   /**
    * Register weapon variant aliases so that lookups like "player_pistol" resolve
    * to "player" animation/sprite data when per-weapon assets haven't been generated.
-   * Always overwrites variant keys to ensure they point to the latest base data
-   * (important after AI assets replace procedural data for a base key).
    * Only processes true base keys — skips keys that are themselves weapon variants
    * to prevent creating nonsense like "player_pistol_pistol".
+   * Preserves manifest-loaded variant data: if the manifest provided specific
+   * assets for a variant (e.g., player_pistol with weapon-specific art), those
+   * are kept. Only empty or missing variants get the base key's data.
    */
   private registerWeaponAliases() {
     // Helper: check if a key is itself a weapon variant (ends with a suffix)
     const isVariantKey = (key: string) =>
       AssetManager.WEAPON_SUFFIXES.some((s) => key.endsWith(`_${s}`));
+
+    // Helper: check if an anim map has actual loaded content (non-empty direction maps)
+    const hasContent = (map: Map<string, Map<string, unknown>> | undefined): boolean => {
+      if (!map || map.size === 0) return false;
+      for (const dirMap of map.values()) {
+        if (dirMap.size > 0) return true;
+      }
+      return false;
+    };
 
     // Alias animation frames: player → player_pistol, player_rifle, etc.
     const animBaseKeys = [...this.animFrames.keys()].filter((k) => !isVariantKey(k));
@@ -820,8 +830,11 @@ export class AssetManager {
       const baseData = this.animFrames.get(baseKey)!;
       for (const suffix of AssetManager.WEAPON_SUFFIXES) {
         const variantKey = `${baseKey}_${suffix}`;
-        // Always overwrite — ensures variants point to latest data (AI or procedural)
-        this.animFrames.set(variantKey, baseData);
+        const existing = this.animFrames.get(variantKey);
+        // Only alias if the variant doesn't already have manifest-loaded content
+        if (!hasContent(existing)) {
+          this.animFrames.set(variantKey, baseData);
+        }
       }
     }
     // Alias static sprites the same way
@@ -830,7 +843,11 @@ export class AssetManager {
       const baseData = this.sprites.get(baseKey)!;
       for (const suffix of AssetManager.WEAPON_SUFFIXES) {
         const variantKey = `${baseKey}_${suffix}`;
-        this.sprites.set(variantKey, baseData);
+        const existing = this.sprites.get(variantKey);
+        // Only alias if the variant doesn't have its own data
+        if (!existing || existing.size === 0) {
+          this.sprites.set(variantKey, baseData);
+        }
       }
     }
   }
@@ -1611,6 +1628,9 @@ export class AssetManager {
       npc_merchant: { body: "#7a6b5a", head: "#d4c4a0", accent: "#8ec44a" },
       npc_doc:      { body: "#8e8e7e", head: "#d4c4a0", accent: "#4a8ab0" },
       npc_raider:   { body: "#4a3a2a", head: "#c4a080", accent: "#b83030" },
+      npc_settler:  { body: "#8b7355", head: "#c4a880", accent: "#b89060" },
+      npc_martha:   { body: "#6a5a6a", head: "#d4b8a0", accent: "#9070a0" },
+      npc_guard:    { body: "#4a5a4a", head: "#c4b490", accent: "#6a8a5a" },
     };
     const dirs: Direction[] = ["N","NE","E","SE","S","SW","W","NW"];
     const frameKeys = ["idle", "walk_1", "walk_2", "walk_3", "walk_4", "attack_1", "attack_2", "hit"];

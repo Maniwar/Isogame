@@ -205,6 +205,159 @@ const DIALOGUES: Record<string, DialogueTree> = {
       },
     },
   },
+  settler_dusty_pete: {
+    id: "settler_dusty_pete",
+    startNodeId: "start",
+    nodes: {
+      start: {
+        id: "start",
+        speaker: "Dusty Pete",
+        text: "*tips a battered hat* Name's Pete. Most folks call me Dusty on account of... well, everything being dusty. Been wandering the wastes for years before settling here.",
+        responses: [
+          { text: "What do you do around here?", nextNodeId: "role" },
+          { text: "Heard any rumors?", nextNodeId: "rumors" },
+          { text: "Take care, Pete. [Leave]", nextNodeId: null },
+        ],
+      },
+      role: {
+        id: "role",
+        speaker: "Dusty Pete",
+        text: "A little of everything, a lot of nothing. I fix things mostly — pipes, generators, anything mechanical. Keeps the settlement running. Joe pays me in canned food and caps.",
+        responses: [
+          { text: "Know any good scavenging spots?", nextNodeId: "scavenge" },
+          { text: "Thanks. [Leave]", nextNodeId: null },
+        ],
+      },
+      rumors: {
+        id: "rumors",
+        speaker: "Dusty Pete",
+        text: "There's talk of an old vault somewhere east of here. Pre-war tech, untouched. Could be a goldmine... or a deathtrap. Also heard the raiders have been getting bolder — attacked a caravan just last week.",
+        responses: [
+          { text: "Tell me more about the vault.", nextNodeId: "vault" },
+          { text: "Interesting. [Leave]", nextNodeId: null },
+        ],
+      },
+      vault: {
+        id: "vault",
+        speaker: "Dusty Pete",
+        text: "Don't know much more than rumors. Some scavver claimed he saw a big metal door half-buried in a hillside. Could be anything — a vault, a bunker, an old missile silo. Worth checking out if you've got a death wish.",
+        responses: [
+          { text: "I'll keep my eyes open. [Leave]", nextNodeId: null },
+        ],
+      },
+      scavenge: {
+        id: "scavenge",
+        speaker: "Dusty Pete",
+        text: "South side of town, past the dead trees — there's an old gas station buried in sand. I pulled a working radio out of there last month. Might still be good pickings if the critters haven't moved in.",
+        responses: [
+          { text: "Thanks for the tip. [Leave]", nextNodeId: null },
+        ],
+      },
+    },
+  },
+
+  settler_martha: {
+    id: "settler_martha",
+    startNodeId: "start",
+    nodes: {
+      start: {
+        id: "start",
+        speaker: "Martha",
+        text: "Oh! A stranger. We don't get many visitors these days. I'm Martha — I look after the settlement garden. Such as it is.",
+        responses: [
+          { text: "A garden? Out here?", nextNodeId: "garden" },
+          { text: "How long have you lived here?", nextNodeId: "history" },
+          { text: "Stay safe, Martha. [Leave]", nextNodeId: null },
+        ],
+      },
+      garden: {
+        id: "garden",
+        speaker: "Martha",
+        text: "It's just a few mutfruit plants and some tatos, but it keeps us fed. Water's the hard part — we have to boil everything twice to get the rads out. Doc Hendricks showed me how.",
+        responses: [
+          { text: "That's resourceful.", nextNodeId: "resourceful" },
+          { text: "Do you need any help?", nextNodeId: "help" },
+          { text: "Good luck with it. [Leave]", nextNodeId: null },
+        ],
+      },
+      history: {
+        id: "history",
+        speaker: "Martha",
+        text: "Born and raised. My parents helped found Dusty Springs twenty years ago. They didn't make it through the last raider attack... but I'm still here. Someone has to keep this place alive.",
+        responses: [
+          { text: "I'm sorry for your loss.", nextNodeId: "loss" },
+          { text: "You're very brave. [Leave]", nextNodeId: null },
+        ],
+      },
+      loss: {
+        id: "loss",
+        speaker: "Martha",
+        text: "*looks away* Everybody's lost someone. That's the wasteland. But we remember them by keeping going. My mother always said — as long as something's growing, there's hope.",
+        responses: [
+          { text: "She sounds wise. [Leave]", nextNodeId: null },
+        ],
+      },
+      resourceful: {
+        id: "resourceful",
+        speaker: "Martha",
+        text: "You learn fast out here, or you don't learn at all. If you happen to find any seeds in your travels — real, pre-war seeds — I'd trade well for them.",
+        responses: [
+          { text: "I'll keep an eye out. [Leave]", nextNodeId: null },
+        ],
+      },
+      help: {
+        id: "help",
+        speaker: "Martha",
+        text: "That's kind of you. If you're heading out into the wastes, keep an eye out for clean water or any fertilizer. And if those raiders would just disappear... *sighs* That'd help more than anything.",
+        responses: [
+          { text: "I'll see what I can do. [Leave]", nextNodeId: null },
+        ],
+      },
+    },
+  },
+
+  guard_intro: {
+    id: "guard_intro",
+    startNodeId: "start",
+    nodes: {
+      start: {
+        id: "start",
+        speaker: "Settlement Guard",
+        text: "*grips rifle* Hold it. You new here? Keep your weapons holstered inside the settlement. Sheriff's orders.",
+        responses: [
+          { text: "Understood. Just passing through.", nextNodeId: "passing" },
+          { text: "What's the security situation?", nextNodeId: "security" },
+          { text: "Alright. [Leave]", nextNodeId: null },
+        ],
+      },
+      passing: {
+        id: "passing",
+        speaker: "Settlement Guard",
+        text: "Long as you don't cause trouble, you're welcome here. The trading post is south — Joe's usually there. And the Sheriff's office is east if you need something official.",
+        responses: [
+          { text: "Any threats I should know about?", nextNodeId: "security" },
+          { text: "Thanks. [Leave]", nextNodeId: null },
+        ],
+      },
+      security: {
+        id: "security",
+        speaker: "Settlement Guard",
+        text: "Raiders to the northwest have been getting bolder. We lost two people last month — caught outside the perimeter after dark. I do what I can but... there's only so many of us. If you can handle yourself in a fight, talk to the Sheriff.",
+        responses: [
+          { text: "I can handle myself.", nextNodeId: "fighter" },
+          { text: "I'll be careful. [Leave]", nextNodeId: null },
+        ],
+      },
+      fighter: {
+        id: "fighter",
+        speaker: "Settlement Guard",
+        text: "Good. We need more people who can shoot straight. Watch the northwest approach especially — that's where they come from. And if you see anyone sneaking around at night... shoot first.",
+        responses: [
+          { text: "Got it. [Leave]", nextNodeId: null },
+        ],
+      },
+    },
+  },
 };
 
 export class DialogueSystem {
