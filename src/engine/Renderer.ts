@@ -122,16 +122,16 @@ export class Renderer {
 
     cCtx.translate(-minWx, -minWy);
 
-    // PASS 1: Fill rectangular base-color blocks for ALL tiles (including water).
+    // PASS 1: Fill rectangular base-color blocks for non-water tiles.
     // This eliminates black gaps between diamond-clipped tiles by ensuring
     // the area behind each diamond is the correct terrain color.
-    // Water tiles get their base-color fill here too — if there's a sub-pixel
-    // gap in the water cache diamond overlay, the correct blue shows through
-    // instead of black.
+    // Water tiles are EXCLUDED — their rectangular fill would bleed into the
+    // transparent corners of adjacent land diamonds, creating blue triangles.
     for (let y = 0; y < mapH; y++) {
       for (let x = 0; x < mapW; x++) {
         const tile = state.map.tiles[y]?.[x];
         if (!tile) continue;
+        if (tile.terrain === Terrain.Water) continue;
         const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
         if (baseColor) {
           const wx = (x - y) * TILE_HALF_W;
@@ -152,9 +152,23 @@ export class Renderer {
 
         if (tile.terrain === Terrain.Water) {
           this.waterTiles.push({ x, y, tile });
-          // Skip drawing water to the static terrain cache — water is animated
-          // separately via the water cache. The base-color rectangle from pass 1
-          // already fills the background behind the diamond.
+          // Draw a DIAMOND-clipped base-color fill to the static terrain cache.
+          // This ensures any sub-pixel gaps in the water animation overlay show
+          // the correct blue, NOT black or neighboring terrain colors.
+          // Using a diamond (not rectangle) prevents bleed into adjacent land tiles.
+          const wx = (x - y) * TILE_HALF_W;
+          const wy = (x + y) * TILE_HALF_H;
+          cCtx.save();
+          cCtx.beginPath();
+          cCtx.moveTo(wx, wy - TILE_HALF_H);
+          cCtx.lineTo(wx + TILE_HALF_W, wy);
+          cCtx.lineTo(wx, wy + TILE_HALF_H);
+          cCtx.lineTo(wx - TILE_HALF_W, wy);
+          cCtx.closePath();
+          cCtx.clip();
+          cCtx.fillStyle = TERRAIN_BASE_COLOR[Terrain.Water] ?? "#1E3A5A";
+          cCtx.fillRect(wx - TILE_HALF_W, wy - TILE_HALF_H, TILE_W, TILE_H);
+          cCtx.restore();
           continue;
         }
 
