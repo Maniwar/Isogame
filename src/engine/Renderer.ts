@@ -122,15 +122,16 @@ export class Renderer {
 
     cCtx.translate(-minWx, -minWy);
 
-    // PASS 1: Fill rectangular base-color blocks for every non-water tile.
+    // PASS 1: Fill rectangular base-color blocks for ALL tiles (including water).
     // This eliminates black gaps between diamond-clipped tiles by ensuring
     // the area behind each diamond is the correct terrain color.
-    // Water tiles are skipped here — they are rendered entirely by the water cache.
+    // Water tiles get their base-color fill here too — if there's a sub-pixel
+    // gap in the water cache diamond overlay, the correct blue shows through
+    // instead of black.
     for (let y = 0; y < mapH; y++) {
       for (let x = 0; x < mapW; x++) {
         const tile = state.map.tiles[y]?.[x];
         if (!tile) continue;
-        if (tile.terrain === Terrain.Water) continue;
         const baseColor = TERRAIN_BASE_COLOR[tile.terrain];
         if (baseColor) {
           const wx = (x - y) * TILE_HALF_W;

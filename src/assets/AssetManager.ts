@@ -804,27 +804,33 @@ export class AssetManager {
   /**
    * Register weapon variant aliases so that lookups like "player_pistol" resolve
    * to "player" animation/sprite data when per-weapon assets haven't been generated.
-   * Once weapon-variant assets exist in the manifest, they take priority (already loaded).
+   * Always overwrites variant keys to ensure they point to the latest base data
+   * (important after AI assets replace procedural data for a base key).
+   * Only processes true base keys — skips keys that are themselves weapon variants
+   * to prevent creating nonsense like "player_pistol_pistol".
    */
   private registerWeaponAliases() {
+    // Helper: check if a key is itself a weapon variant (ends with a suffix)
+    const isVariantKey = (key: string) =>
+      AssetManager.WEAPON_SUFFIXES.some((s) => key.endsWith(`_${s}`));
+
     // Alias animation frames: player → player_pistol, player_rifle, etc.
-    const animBaseKeys = [...this.animFrames.keys()];
+    const animBaseKeys = [...this.animFrames.keys()].filter((k) => !isVariantKey(k));
     for (const baseKey of animBaseKeys) {
+      const baseData = this.animFrames.get(baseKey)!;
       for (const suffix of AssetManager.WEAPON_SUFFIXES) {
         const variantKey = `${baseKey}_${suffix}`;
-        if (!this.animFrames.has(variantKey)) {
-          this.animFrames.set(variantKey, this.animFrames.get(baseKey)!);
-        }
+        // Always overwrite — ensures variants point to latest data (AI or procedural)
+        this.animFrames.set(variantKey, baseData);
       }
     }
     // Alias static sprites the same way
-    const spriteBaseKeys = [...this.sprites.keys()];
+    const spriteBaseKeys = [...this.sprites.keys()].filter((k) => !isVariantKey(k));
     for (const baseKey of spriteBaseKeys) {
+      const baseData = this.sprites.get(baseKey)!;
       for (const suffix of AssetManager.WEAPON_SUFFIXES) {
         const variantKey = `${baseKey}_${suffix}`;
-        if (!this.sprites.has(variantKey)) {
-          this.sprites.set(variantKey, this.sprites.get(baseKey)!);
-        }
+        this.sprites.set(variantKey, baseData);
       }
     }
   }
