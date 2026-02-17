@@ -251,21 +251,34 @@ export class Renderer {
 
       // Animate water tiles: render to offscreen water cache, then blit once.
       // This avoids expensive per-tile clip operations on the main canvas.
+      // We expand the clear + render region by a full tile so that adjacent
+      // diamond overlaps (the +0.5px oversizing in drawWaterTile) are never
+      // cut by a rectangular clearRect edge, eliminating seam lines.
       if (this.waterCacheCtx && this.waterCache) {
         const wCtx = this.waterCacheCtx;
-        // Clear the visible portion of the water cache
+
+        // Expand clear region by a tile to cover diamond overlap edges
+        const pad = TILE_W;
+        const wcx = Math.max(0, sx - pad);
+        const wcy = Math.max(0, sy - pad);
+        const wcx2 = Math.min(this.terrainCacheWidth, sx2 + pad);
+        const wcy2 = Math.min(this.terrainCacheHeight, sy2 + pad);
+
         wCtx.save();
         wCtx.setTransform(1, 0, 0, 1, 0, 0);
-        wCtx.clearRect(sx, sy, sw, sh);
+        wCtx.clearRect(wcx, wcy, wcx2 - wcx, wcy2 - wcy);
         wCtx.restore();
 
-        // Draw only visible water tiles to the water cache
+        // Draw water tiles with an expanded margin (2 tiles beyond viewport)
+        // so diamonds at the viewport edge overlap properly
+        const waterMargin = 2;
         for (const { x, y, tile } of this.waterTiles) {
-          if (x < minX || x > maxX || y < minY || y > maxY) continue;
+          if (x < minX - waterMargin || x > maxX + waterMargin ||
+              y < minY - waterMargin || y > maxY + waterMargin) continue;
           this.drawWaterTile(wCtx, x, y, tile);
         }
 
-        // Blit water cache (viewport-culled) onto main canvas
+        // Blit water cache onto main canvas (original viewport region)
         if (sw > 0 && sh > 0) {
           const dx = this.terrainCacheOriginX + sx;
           const dy = this.terrainCacheOriginY + sy;
@@ -440,14 +453,15 @@ export class Renderer {
     const wx = (x - y) * TILE_HALF_W;
     const wy = (x + y) * TILE_HALF_H;
 
-    // Diamond clip path — slightly oversized (+0.5px) to prevent sub-pixel gaps
-    // between adjacent water tiles. All drawing is clipped to this diamond.
+    // Diamond clip path — oversized (+1px) to guarantee overlap between
+    // adjacent water tiles. This eliminates seam lines caused by anti-aliased
+    // clip edges and rectangular clearRect operations on the water cache.
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(wx, wy - TILE_HALF_H - 0.5);
-    ctx.lineTo(wx + TILE_HALF_W + 0.5, wy);
-    ctx.lineTo(wx, wy + TILE_HALF_H + 0.5);
-    ctx.lineTo(wx - TILE_HALF_W - 0.5, wy);
+    ctx.moveTo(wx, wy - TILE_HALF_H - 1);
+    ctx.lineTo(wx + TILE_HALF_W + 1, wy);
+    ctx.lineTo(wx, wy + TILE_HALF_H + 1);
+    ctx.lineTo(wx - TILE_HALF_W - 1, wy);
     ctx.closePath();
     ctx.clip();
 
