@@ -283,13 +283,31 @@ export class AssetManager {
     "hit": ["idle"],                 // hit → idle if no hit frame
   };
 
+  /** Adjacent directions to try when exact direction is missing. */
+  private static readonly DIRECTION_NEIGHBORS: Record<Direction, Direction[]> = {
+    "N":  ["NE", "NW"],
+    "NE": ["N", "E"],
+    "E":  ["NE", "SE"],
+    "SE": ["E", "S"],
+    "S":  ["SE", "SW"],
+    "SW": ["S", "W"],
+    "W":  ["SW", "NW"],
+    "NW": ["W", "N"],
+  };
+
   getAnimFrame(spriteKey: string, frameKey: string, dir: Direction): DrawTarget | undefined {
     const animData = this.animFrames.get(spriteKey);
     if (animData) {
+      // Try exact frame + direction
       const frameDir = animData.get(frameKey);
       if (frameDir) {
         const img = frameDir.get(dir);
         if (img) return img;
+        // Try adjacent directions if exact direction missing
+        for (const adj of AssetManager.DIRECTION_NEIGHBORS[dir] ?? []) {
+          const adjImg = frameDir.get(adj);
+          if (adjImg) return adjImg;
+        }
       }
       // Try fallback frame keys for backward/forward compatibility
       const fallbacks = AssetManager.FRAME_FALLBACKS[frameKey];
@@ -307,6 +325,11 @@ export class AssetManager {
       if (idleDir) {
         const img = idleDir.get(dir);
         if (img) return img;
+        // Try adjacent directions for idle too
+        for (const adj of AssetManager.DIRECTION_NEIGHBORS[dir] ?? []) {
+          const adjImg = idleDir.get(adj);
+          if (adjImg) return adjImg;
+        }
       }
     }
     // Final fallback: static sprite
@@ -770,7 +793,7 @@ export class AssetManager {
     const WALK_KEYS = ["walk_1", "walk_2", "walk_3", "walk_4"];
     const ALL_DIRS: Direction[] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 
-    for (const [_spriteKey, anims] of this.animFrames) {
+    for (const [sk, anims] of this.animFrames) {
       const walk1Dir = anims.get("walk_1");
       const idleDir = anims.get("idle");
       if (!walk1Dir || !idleDir) continue;
@@ -788,6 +811,7 @@ export class AssetManager {
         if (similarity > 0.80) {
           // Walk frame is too similar to S — replace ALL walk frames for this
           // direction with the idle frame (which IS correctly directional)
+          console.log(`[AssetManager] ${sk} walk-${dir}: ${(similarity * 100).toFixed(0)}% similar to S → using idle`);
           const idleFrame = idleDir.get(dir);
           if (!idleFrame) continue;
           for (const walkKey of WALK_KEYS) {
