@@ -158,6 +158,18 @@ export class AssetManager {
           this.validateSpriteDimensions();
           // Normalize frame sizes so all animations for a character are consistent
           this.normalizeAnimFrames();
+
+          // Diagnostic: verify player_pistol animation data is populated
+          for (const diagKey of ["player_pistol", "player"]) {
+            const diagAnims = this.animFrames.get(diagKey);
+            if (diagAnims) {
+              const animNames = [...diagAnims.keys()];
+              const dirCounts = animNames.map(a => `${a}:${diagAnims.get(a)?.size ?? 0}`);
+              console.log(`[AssetManager] ${diagKey} anim dirs: ${dirCounts.join(", ")}`);
+            } else {
+              console.warn(`[AssetManager] ${diagKey} has NO animation data!`);
+            }
+          }
         }
         if (manifest.weapons) {
           const weaponKeys = Object.keys(manifest.weapons);
@@ -668,8 +680,15 @@ export class AssetManager {
     let framesFixed = 0;
 
     for (const [spriteKey, anims] of this.animFrames) {
-      // Skip weapon variants (they share references with base)
-      if (AssetManager.WEAPON_SUFFIXES.some(s => spriteKey.endsWith(`_${s}`))) continue;
+      // Skip weapon variants that are aliases (same Map reference as their base key).
+      // Weapon variants with their OWN loaded data (from manifest) need normalization.
+      const isVariant = AssetManager.WEAPON_SUFFIXES.some(s => spriteKey.endsWith(`_${s}`));
+      if (isVariant) {
+        // Find the base key and check if this variant shares its Map reference
+        const basePart = spriteKey.replace(/_[^_]+$/, "");
+        const baseAnims = this.animFrames.get(basePart);
+        if (baseAnims === anims) continue; // alias — skip (base handles normalization)
+      }
 
       // Measure content bounds for every frame
       type FrameInfo = {
@@ -741,6 +760,99 @@ export class AssetManager {
         `${framesFixed} outlier frames replaced`,
       );
     }
+
+    // Walk-direction quality check: AI-generated walk sprites sometimes show
+    // the character facing the same direction (usually S/front) regardless of
+    // the nominal direction. Detect this by comparing walk frames across
+    // directions and replace directionally-uniform walk frames with the
+    // correctly-facing idle frame.
+    let walkDirFixes = 0;
+    const WALK_KEYS = ["walk_1", "walk_2", "walk_3", "walk_4"];
+    const ALL_DIRS: Direction[] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+
+    for (const [_spriteKey, anims] of this.animFrames) {
+      const walk1Dir = anims.get("walk_1");
+      const idleDir = anims.get("idle");
+      if (!walk1Dir || !idleDir) continue;
+
+      const refFrame = walk1Dir.get("S" as Direction);
+      if (!refFrame) continue;
+
+      // Compare each non-S direction's walk_1 frame with the S frame
+      for (const dir of ALL_DIRS) {
+        if (dir === "S") continue;
+        const testFrame = walk1Dir.get(dir);
+        if (!testFrame) continue;
+
+        const similarity = this.computeImageSimilarity(refFrame, testFrame);
+        if (similarity > 0.80) {
+          // Walk frame is too similar to S — replace ALL walk frames for this
+          // direction with the idle frame (which IS correctly directional)
+          const idleFrame = idleDir.get(dir);
+          if (!idleFrame) continue;
+          for (const walkKey of WALK_KEYS) {
+            const walkDirMap = anims.get(walkKey);
+            if (walkDirMap) {
+              walkDirMap.set(dir, idleFrame);
+              walkDirFixes++;
+            }
+          }
+        }
+      }
+    }
+    if (walkDirFixes > 0) {
+      console.log(`[AssetManager] Walk-direction fix: ${walkDirFixes} frames replaced with idle`);
+    }
+  }
+
+  /**
+   * Compare two images and return a similarity score (0.0 = totally different, 1.0 = identical).
+   * Uses a fast downsampled pixel comparison to avoid expensive full-resolution checks.
+   */
+  private computeImageSimilarity(a: DrawTarget, b: DrawTarget): number {
+    // Downsample to 16x24 for fast comparison
+    const sw = 16;
+    const sh = 24;
+    const canvasA = this.createCanvas(sw, sh);
+    const ctxA = canvasA.getContext("2d")!;
+    ctxA.drawImage(a, 0, 0, sw, sh);
+    const dataA = ctxA.getImageData(0, 0, sw, sh).data;
+
+    const canvasB = this.createCanvas(sw, sh);
+    const ctxB = canvasB.getContext("2d")!;
+    ctxB.drawImage(b, 0, 0, sw, sh);
+    const dataB = ctxB.getImageData(0, 0, sw, sh).data;
+
+    let matchCount = 0;
+    let totalPixels = 0;
+    const colorThreshold = 30; // Allow some variance in color matching
+
+    for (let i = 0; i < dataA.length; i += 4) {
+      const aAlpha = dataA[i + 3];
+      const bAlpha = dataB[i + 3];
+
+      // Both transparent = match
+      if (aAlpha < 20 && bAlpha < 20) {
+        matchCount++;
+        totalPixels++;
+        continue;
+      }
+      // One transparent one not = no match
+      if (aAlpha < 20 || bAlpha < 20) {
+        totalPixels++;
+        continue;
+      }
+
+      totalPixels++;
+      const dr = Math.abs(dataA[i] - dataB[i]);
+      const dg = Math.abs(dataA[i + 1] - dataB[i + 1]);
+      const db = Math.abs(dataA[i + 2] - dataB[i + 2]);
+      if (dr <= colorThreshold && dg <= colorThreshold && db <= colorThreshold) {
+        matchCount++;
+      }
+    }
+
+    return totalPixels > 0 ? matchCount / totalPixels : 0;
   }
 
   /** Measure the non-transparent content bounds of a sprite. */
@@ -1623,14 +1735,17 @@ export class AssetManager {
 
   private generateSprites() {
     const configs: Record<string, { body: string; head: string; accent: string }> = {
-      player:       { body: "#6b5340", head: "#d4c4a0", accent: "#40c040" },
-      npc_sheriff:  { body: "#5a4a3a", head: "#d4c4a0", accent: "#c4703a" },
-      npc_merchant: { body: "#7a6b5a", head: "#d4c4a0", accent: "#8ec44a" },
-      npc_doc:      { body: "#8e8e7e", head: "#d4c4a0", accent: "#4a8ab0" },
-      npc_raider:   { body: "#4a3a2a", head: "#c4a080", accent: "#b83030" },
-      npc_settler:  { body: "#8b7355", head: "#c4a880", accent: "#b89060" },
-      npc_martha:   { body: "#6a5a6a", head: "#d4b8a0", accent: "#9070a0" },
-      npc_guard:    { body: "#4a5a4a", head: "#c4b490", accent: "#6a8a5a" },
+      player:          { body: "#6b5340", head: "#d4c4a0", accent: "#40c040" },
+      npc_sheriff:     { body: "#5a4a3a", head: "#d4c4a0", accent: "#c4703a" },
+      npc_merchant:    { body: "#7a6b5a", head: "#d4c4a0", accent: "#8ec44a" },
+      npc_doc:         { body: "#8e8e7e", head: "#d4c4a0", accent: "#4a8ab0" },
+      npc_raider:      { body: "#4a3a2a", head: "#c4a080", accent: "#b83030" },
+      npc_guard:       { body: "#4a5a4a", head: "#c4b490", accent: "#6a8a5a" },
+      npc_caravan:     { body: "#8b7355", head: "#c4a880", accent: "#b89060" },
+      npc_wastelander: { body: "#6a5a6a", head: "#d4b8a0", accent: "#9070a0" },
+      npc_tribal:      { body: "#7a6040", head: "#b8a070", accent: "#a08040" },
+      npc_ghoul:       { body: "#5a5a4a", head: "#8a8a6a", accent: "#6a7a5a" },
+      npc_mutant:      { body: "#4a6a3a", head: "#6a8a5a", accent: "#3a5a2a" },
     };
     const dirs: Direction[] = ["N","NE","E","SE","S","SW","W","NW"];
     const frameKeys = ["idle", "walk_1", "walk_2", "walk_3", "walk_4", "attack_1", "attack_2", "hit"];
